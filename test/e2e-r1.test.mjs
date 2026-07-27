@@ -348,6 +348,135 @@ try {
   await page.uncheck('#ov-height');
 
   // ============================================================================
+  // 3. 地点比較（F1-2）
+  // ============================================================================
+  console.log('\n=== 3. 地点比較 ===');
+
+  /** 座標を直接指定して素早く診断する（日照はスキップ） */
+  async function quickDiagnose(lon, lat, title) {
+    await page.evaluate(
+      ({ lon, lat, title }) =>
+        window.__nakano.diagnosis.runDiagnosisAt(lon, lat, { title, fly: false, skipSunlight: true }),
+      { lon, lat, title }
+    );
+    await waitSection(page, 'secZoning');
+  }
+
+  const YAYOI = [139.673935, 35.691502, '東京都中野区弥生町二丁目'];
+  const SAGINOMIYA = [139.635, 35.725, '東京都中野区鷺宮三丁目'];
+  const STATION = [139.6659, 35.7056, '中野駅前'];
+  const NAKANO5 = [139.66893, 35.707859, '東京都中野区中野五丁目'];
+
+  await page.evaluate(() => window.__nakano.compare.clearAll());
+
+  await quickDiagnose(...YAYOI);
+  await page.click('#compareAddBtn');
+  await page.waitForTimeout(300);
+  check('1件目を追加すると比較バーが出る', await page.isVisible('#compareBar'));
+  check('比較バーに件数が出る', (await page.textContent('#compareBarText')).includes('1地点'),
+    await page.textContent('#compareBarText'));
+  check('1件だけでは「表を表示」が押せない',
+    await page.isDisabled('#compareShowBtn'));
+
+  // 同一地点（10m未満）の重複追加は無視される
+  await page.click('#compareAddBtn');
+  await page.waitForTimeout(300);
+  const dupCount = await page.evaluate(() => window.__nakano.compare.getItems().length);
+  equal('同じ地点の重複追加は無視される', dupCount, 1);
+
+  await quickDiagnose(...SAGINOMIYA);
+  await page.click('#compareAddBtn');
+  await page.waitForTimeout(300);
+  check('2件目で「表を表示」が押せる', !(await page.isDisabled('#compareShowBtn')));
+
+  await page.click('#compareShowBtn');
+  await page.waitForSelector('#compareModal:not(.hidden)', { timeout: 10000 });
+  check('比較モーダルが role="dialog" で開く',
+    await page.getAttribute('#compareModal', 'role') === 'dialog');
+
+  const table2 = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#compareModalBody tbody tr')];
+    const out = {};
+    for (const tr of rows) {
+      const key = tr.querySelector('th').textContent.trim();
+      out[key] = [...tr.querySelectorAll('td')].map((td) => td.textContent.trim());
+    }
+    return { rows: out, cols: document.querySelectorAll('#compareModalBody thead th').length - 1 };
+  });
+  console.log('  比較表: ' + JSON.stringify(table2.rows, null, 1).slice(0, 600));
+  equal('列が2つ', table2.cols, 2);
+  equal('洪水の行が「0.5m未満 vs 区域外」', table2.rows['洪水浸水想定'].join(' vs '), '0.5m未満 vs 区域外');
+  equal('用途地域の行が「近隣商業地域 vs 第1種低層住居専用地域」',
+    table2.rows['用途地域'].join(' vs '), '近隣商業地域 vs 第1種低層住居専用地域');
+  equal('建蔽率の行', table2.rows['建蔽率'].join(' vs '), '80% vs 50%');
+  equal('容積率の行', table2.rows['容積率'].join(' vs '), '400% vs 150%');
+  equal('日照は未計算と出る', table2.rows['日照（冬至）'].join(' vs '), '未計算 vs 未計算');
+
+  const headText = (await page.textContent('#compareModalBody thead')).replace(/\s+/g, ' ');
+  check('列ヘッダに住所が出る', headText.includes('弥生町二丁目') && headText.includes('鷺宮'), headText);
+  check('列ヘッダに削除ボタンがある', (await page.locator('#compareModalBody .cmp-del').count()) === 2);
+  check('列ヘッダに地図で表示ボタンがある', (await page.locator('#compareModalBody .cmp-goto').count()) === 2);
+  check('日照未計算の案内文が出る', (await page.textContent('#compareModalBody')).includes('地図で表示'));
+
+  await page.screenshot({ path: shotPath('r1-05-compare-table.png') });
+  await page.locator('.cmp-panel').screenshot({ path: shotPath('r1-06-compare-panel.png') });
+
+  // Escapeで閉じる
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  check('Escapeで比較モーダルが閉じる', await page.isHidden('#compareModal'));
+
+  // 3件目・4件目（最古の押し出し）
+  await quickDiagnose(...STATION);
+  await page.click('#compareAddBtn');
+  await page.waitForTimeout(300);
+  equal('3件目まで追加できる',
+    await page.evaluate(() => window.__nakano.compare.getItems().length), 3);
+
+  await quickDiagnose(...NAKANO5);
+  await page.click('#compareAddBtn');
+  await page.waitForTimeout(300);
+  const after4 = await page.evaluate(() => ({
+    n: window.__nakano.compare.getItems().length,
+    titles: window.__nakano.compare.getItems().map((s) => s.title),
+    toast: document.getElementById('toast').textContent,
+  }));
+  console.log('  4件目追加後: ' + JSON.stringify(after4));
+  equal('4件目を足しても3件のまま', after4.n, 3);
+  check('最も古い弥生町が押し出される',
+    !after4.titles.some((x) => String(x).includes('弥生町')), JSON.stringify(after4.titles));
+  check('押し出しをトーストで知らせる', after4.toast.includes('最大'), after4.toast);
+
+  // 列の削除
+  await page.click('#compareShowBtn');
+  await page.waitForSelector('#compareModal:not(.hidden)');
+  await page.locator('#compareModalBody .cmp-del').first().click();
+  await page.waitForTimeout(400);
+  const cols2 = await page.locator('#compareModalBody thead th').count();
+  equal('列を削除すると2列になる', cols2 - 1, 2);
+
+  // 比較URLの共有と復元
+  await page.click('#compareShareBtn');
+  await page.waitForTimeout(500);
+  const cmpHash = await page.evaluate(() => location.hash);
+  console.log('  compare hash: ' + cmpHash);
+  check('比較のハッシュに compare= が入る', /[&#]compare=[\d.]+,[\d.]+;[\d.]+,[\d.]+/.test(cmpHash), cmpHash);
+
+  const p6 = await t.newPage(BASE_URL + cmpHash);
+  await waitForViewerReady(p6);
+  await p6.waitForSelector('#compareModal:not(.hidden)', { timeout: 150000 });
+  const restoredCols = await p6.locator('#compareModalBody thead th').count();
+  equal('比較URLを開くと2列のモーダルが自動表示される', restoredCols - 1, 2);
+  const restoredText = (await p6.textContent('#compareModalBody')).replace(/\s+/g, ' ');
+  check('復元した比較表に用途地域が入っている',
+    /商業地域|住居専用地域/.test(restoredText), restoredText.slice(0, 200));
+  check('復元時の日照は未計算', restoredText.includes('未計算'), restoredText.slice(0, 300));
+  await p6.close();
+
+  await page.evaluate(() => window.__nakano.compare.clearAll());
+  check('消去で比較バーが隠れる', await page.isHidden('#compareBar'));
+
+  // ============================================================================
   // JSエラー
   // ============================================================================
   const fatal = t.errors.filter(

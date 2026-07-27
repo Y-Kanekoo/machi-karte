@@ -7,6 +7,7 @@ import { escapeHtml } from './util.js';
 import { initDiagnosis } from './diagnose.js';
 import { initShare } from './share.js';
 import { initZoningOverlay } from './zoning-overlay.js';
+import { initCompare } from './compare.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -259,11 +260,21 @@ const diagnosis = initDiagnosis({
 });
 diagnosis.onClose(clearHighlight);
 
-// ---- R1: 都市計画オーバーレイ / 共有URL --------------------------------------------
+// ---- R1: 都市計画オーバーレイ / 地点比較 / 共有URL -----------------------------------
 
 const overlays = initZoningOverlay({ viewer });
-const compare = null; // P3で initCompare に差し替える
+
+// compare は「比較のリンクをコピー」でのみ share を使うので、実体は後から差し込む
+// （share は起動時復元で compare.restoreFromPoints を呼ぶため、相互に必要になる）
+const shareRef = {};
+const compare = initCompare({
+  diagnosis,
+  viewer,
+  toast,
+  share: { shareCompare: (pts) => shareRef.api.shareCompare(pts) },
+});
 const share = initShare({ viewer, diagnosis, overlays, compare, toast });
+shareRef.api = share;
 
 /** クリック位置の経緯度を求める（建物表面 → 地表の順にフォールバック） */
 function pickLonLat(windowPosition) {
