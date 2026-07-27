@@ -1,0 +1,244 @@
+# 実装計画: 中野「街カルテ」— 地点診断ツール（防災 × 日照 × 都市計画）
+
+作成: 2026-07-27 / 計画: Claude (Fable) / 実装: Claude (Opus)
+
+## 0. 前提
+
+既存の中野区3Dビューア（CesiumJS + PLATEAU 2025 ストリーミング、ビルドレス静的サイト）の上に、**住所や地図クリックで指定した地点の「浸水リスク・土砂災害リスク・用途地域・日照・建物属性」をワンカードで診断表示する機能**を追加する。
+
+設計原則（既存と同じ）:
+- ビルド不要・静的サイトのまま（GitHub Pagesでそのまま動く）
+- データは実行時にすべて公式配信サーバから取得（リポジトリにデータを持たない）
+- APIキー不要のデータソースのみ使用
+- UIは日本語
+
+**主要データソースは全てCORS対応・キー不要であることを事前検証済み**（2026-07-27、本計画の付録A参照）。
+
+## 1. ユーザーストーリー
+
+1. 引越し先を探している人が「中野区弥生町2丁目」と入力すると、3D地図がその地点に飛び、ピンが立ち、診断カードに「浸水想定 0.5〜3.0m / 土砂警戒区域外 / 第一種住居地域(建蔽率60%・容積率300%) / 冬至の日照 4.5時間」のように表示される。
+2. 3D地図上の任意の建物をクリックすると、その建物の高さ・階数などの属性に加えて、同じ診断カードが表示される。
+3. 洪水レイヤーを3D表示に重ねて、診断結果を視覚的に確認できる（既存機能との連携）。
+
+## 2. 機能要件と受け入れ基準
+
+### F1. 住所検索（ジオコーディング）
+- 画面上部に検索ボックス。Enterまたはボタンで国土地理院の住所検索APIを叩き、先頭候補へflyTo＋ピン表示＋自動診断。
+- 候補が複数ある場合は上位5件をドロップダウン表示して選択可能に。
+- 該当なしのときは「見つかりませんでした」を表示。
+- **受け入れ基準**: 「中野区中野五丁目」で中野駅北側へ移動しピンが立つこと。
+
+### F2. 地点診断モード（クリック診断）
+- 「地点を診断」トグルボタンをONにすると、次の地図クリックの地点を診断。建物クリック時は建物属性もカードに統合。
+- 診断中はスピナー表示。各項目は取得でき次第、順次埋める（全体をブロックしない）。
+- **受け入れ基準**: 地図クリックでカードが開き、全項目が「取得中→値 or 判定不能」に遷移すること。
+
+### F3. 洪水浸水想定の判定
+- ハザードマップポータル（重ねるハザードマップ）の想定最大規模洪水タイルPNGから、地点ピクセル色→浸水深ランクを判定。
+- ランク: 「区域外 / 0.5m未満 / 0.5〜3m / 3〜5m / 5〜10m / 10〜20m / 20m以上」。
+- 色が凡例と一致しない場合（アンチエイリアス境界等）は最近傍色（閾値付き）で判定し、閾値超は「判定不能」。
+- **受け入れ基準**: 神田川沿い（例: 中野新橋駅周辺、弥生町・本町付近）で浸水深ランクが出ること。中野駅北口の台地側で「区域外」となること。※実装前にNode+curlでタイルを直接デコードして期待値を確定させ、その値をテストに使う。
+
+### F4. 土砂災害警戒区域の判定
+- 土石流・急傾斜地・地すべりの3レイヤーそれぞれについて、非透明ピクセル＝区域内。色で「特別警戒（レッド）/警戒（イエロー）」を区別。
+- **受け入れ基準**: 3レイヤーの判定が「区域外/警戒/特別警戒」のいずれかで表示されること（中野区はほぼ区域外のはず。判定ロジックのテストはタイル直読みで行う）。
+
+### F5. 用途地域・防火地域・高度地区の判定
+- PLATEAU配信のMVT（UseDistrict / FirePreventionDistrict / HeightControlDistrict）をz=16で取得・デコードし、点内包判定（point-in-polygon）で該当ポリゴンの属性を取得。
+- 表示: 用途地域名（`urf_function`）、建蔽率（`urf_buildingCoverageRate`）、容積率（`urf_floorAreaRate`）、防火/準防火、高度地区名。
+- **受け入れ基準**: 中野駅前（中野五丁目）で「商業地域」系、閑静な住宅地（例: 上高田・江古田の一部）で「第一種低層住居専用地域」系が出ること。※これも実装前にNodeでタイルをデコードして期待値を確定。
+
+### F6. 日照シミュレーション（簡易日照時間）
+- 対象日: 冬至・春分/秋分・夏至の3パターン。7:00〜17:00 JSTを20分刻みでサンプリング。
+- 各時刻の太陽方位・高度はNOAAの太陽位置計算式をJSで実装（`solar.js`、Cesium非依存・単体テスト可能に）。
+- 地点（地表+1.2m）から太陽方向へレイを飛ばし、`scene.pickFromRay`で建物3D Tilesとの交差を判定。交差なし＝日照。太陽高度5度未満は日照外として扱う。
+- レイ原点の高さ: 建物クリック時はその建物の`_zmin`属性、それ以外は`scene.sampleHeightMostDetailed`、失敗時は35m（中野駅周辺の実測`_zmin`≒33mに基づくデフォルト）。
+- 結果表示: 日付ごとの日照時間（例「冬至 4.3h」）と、時刻帯の日照/日陰を示す横棒タイムライン。
+- 精度の注記をUIに明記: 「読み込み済みの建物のみを考慮した簡易計算です」。計算前に該当地点周辺へカメラを向け、`tileset.allTilesLoaded`イベント（または一定時間）を待ってから実行する。
+- **受け入れ基準**: `solar.js`単体で「東京の冬至の南中高度 ≒ 30.9°、夏至 ≒ 77.8°」が±1°で出ること（Nodeで単体テスト）。ブラウザ統合では、高層ビル北側直近の地点が開けた公園より日照時間が短くなること。
+
+### F7. 診断カードUI
+- 右側パネル（既存の建物情報パネルを拡張・置換）に、セクション: 「📍地点」「🌊洪水」「⛰️土砂災害」「🏘️都市計画」「☀️日照」「🏢建物」（建物クリック時のみ）。
+- 各項目に取得中スピナー／判定不能表示。出典（ハザードマップポータル・PLATEAU）を小さく明記。
+- カードを閉じるとピンも消える。
+- **受け入れ基準**: スクリーンショットでカード全体が視認でき、モバイル幅でも崩れないこと。
+
+## 3. データソース（検証済み）
+
+| 用途 | URL | 形式 | CORS | 備考 |
+|---|---|---|---|---|
+| 住所検索 | `https://msearch.gsi.go.jp/address-search/AddressSearch?q={URLエンコード住所}` | GeoJSON Feature配列 | `*` 確認済 | `geometry.coordinates`=[lon,lat], `properties.title` |
+| 洪水浸水想定(想定最大) | `https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin_data/{z}/{x}/{y}.png` | PNG (256px) | `*` 確認済 | z=2〜17。透明=区域外 |
+| 土石流警戒区域 | `https://disaportaldata.gsi.go.jp/raster/05_dosekiryukeikaikuiki/{z}/{x}/{y}.png` | PNG | 同上 | |
+| 急傾斜地崩壊警戒区域 | `https://disaportaldata.gsi.go.jp/raster/05_kyukeishakeikaikuiki/{z}/{x}/{y}.png` | PNG | 同上 | |
+| 地すべり警戒区域 | `https://disaportaldata.gsi.go.jp/raster/05_jisuberikeikaikuiki/{z}/{x}/{y}.png` | PNG | 同上 | |
+| 用途地域 | `docs/nakano-datasets.md`のUseDistrict MVT | MVT | 確認済 | z=14〜16で配信確認済。レイヤー名`UseDistrict`, extent=65536 |
+| 防火・準防火地域 | 同 FirePreventionDistrict MVT | MVT | 同上 | レイヤー名は要確認（おそらく`FirePreventionDistrict`） |
+| 高度地区 | 同 HeightControlDistrict MVT | MVT | 同上 | 同上 |
+
+MVT属性（UseDistrictで確認済み）: `urf_function`（用途地域名）, `urf_buildingCoverageRate`, `urf_floorAreaRate`, `urf_buildingHeightLimits`, `urf_location`, `city_code` など。**注意: タイルには隣接区（杉並・三鷹等）のフィーチャも含まれるが、点内包判定なので問題ない。`city_code`によるフィルタはしないこと**（区境の判定が正しく出なくなる）。
+
+### 洪水タイルの凡例色（想定最大規模・標準凡例）
+
+| 浸水深 | RGB |
+|---|---|
+| 0.5m未満 | (247, 245, 169) |
+| 0.5〜3.0m | (255, 216, 192) |
+| 3.0〜5.0m | (255, 183, 183) |
+| 5.0〜10.0m | (255, 145, 145) |
+| 10.0〜20.0m | (242, 133, 201) |
+| 20.0m以上 | (220, 122, 220) |
+
+実装時に必ず実タイルのピクセル値で照合し、ズレがあればこの表を修正してから実装すること（付録B参照）。判定は各凡例色とのユークリッド距離最小、距離>60は「判定不能」。
+
+## 4. アーキテクチャ / ファイル構成
+
+既存 `app.js` をESモジュールに分割する（挙動を変えないリファクタを先行）。
+
+```
+index.html            … <script type="module" src="js/main.js">に変更、検索ボックス・診断カードのDOM追加
+style.css             … 追記
+js/
+  config.js           … タイルURL・凡例色・スポット座標などの定数（既存TILESETS等を移動）
+  main.js             … viewer初期化、レイヤー管理、既存UI配線（旧app.jsの大部分）
+  geocode.js          … GSI住所検索。search(q) => [{title, lon, lat}]
+  tilemath.js         … lon/lat→タイル座標(z,x,y)とタイル内ピクセル/ローカル座標変換（hazard/zoning共用）
+  hazard.js           … PNGタイル取得→canvas→ピクセル色→ランク判定。queryFlood(lon,lat), queryLandslide(lon,lat)
+  zoning.js           … MVT取得→デコード→point-in-polygon。queryZoning(lon,lat) => {useDistrict, fire, height}
+  solar.js            … NOAA太陽位置計算（純粋関数のみ、Cesium非依存）。sunPosition(date, lon, lat) => {azimuthDeg, elevationDeg}
+  sunlight.js         … レイキャスト日照判定。estimateSunlight(viewer, tileset, lon, lat, baseHeight)
+  diagnose.js         … 診断オーケストレータ＋カードDOM生成。runDiagnosis({lon, lat, pickedFeature})
+test/
+  harness.mjs         … Playwright起動＋curl中継の共通部（付録C）
+  solar.test.mjs      … solar.js単体テスト（Node実行、南中高度の検証）
+  data-expectations.mjs … タイル直読みで期待値を確定するスクリプト（実装前に1回実行し、結果をコメントで固定）
+  e2e.test.mjs        … ブラウザ統合テスト（検索→診断→カード内容のassert、スクリーンショット保存）
+package.json          … devDependenciesにplaywright, pbf, @mapbox/vector-tile, pngjs（テスト用のみ。アプリ本体は無依存のまま）
+.gitignore            … node_modules, test/output
+```
+
+### ブラウザ側のMVTデコード
+
+CDNのESMを`js/zoning.js`から動的importする:
+- `https://cdn.jsdelivr.net/npm/pbf@3.3.0/+esm`（default export が `Pbf` クラス）
+- `https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@1.3.1/+esm`
+
+注意: **pbf v4以降/vector-tile v2以降はexport形状が変わる**（`PbfReader`等）。上記バージョンに固定すること。Node側テストでは最新版（`PbfReader`）で書いてよいが、ブラウザ側とバージョンが違うことをコメントに明記。
+
+### 点内包判定（zoning.js）
+
+1. lon/lat → z=16のタイル(x,y)とタイル内ローカル座標(0〜extent)に変換（Webメルカトル、`tilemath.js`）
+2. `feature.loadGeometry()`で得たリングに対しray-casting法。外環＋穴（MVTは偶奇規則でよい: 全リングに対して交差数の偶奇で判定）
+3. 複数ヒット時は最初のフィーチャを採用
+
+### 日照レイキャスト（sunlight.js）
+
+```
+origin = Cartesian3.fromDegrees(lon, lat, baseHeight + 1.2)
+enu = Transforms.eastNorthUpToFixedFrame(origin)
+dirENU = [cos(el)*sin(az), cos(el)*cos(az), sin(el)]  // az: 北=0, 東=90°
+dirECEF = Matrix4.multiplyByPointAsVector(enu, dirENU)
+ray = new Ray(origin, normalize(dirECEF))
+hit = scene.pickFromRay(ray, [除外: ピン等のEntity])
+```
+- `pickFromRay`はレンダリング済みタイルにしか当たらない。診断開始時にカメラを地点上空400m・pitch -60°へ向け、`tileset.allTilesLoaded`を最大10秒待ってから計算する。
+- 1日あたり31サンプル×3日分=93レイ。1フレームに数本ずつ`postRender`で処理し、UIをブロックしない（またはrequestAnimationFrameループ）。
+
+## 5. UI設計
+
+```
+┌────────────────────────────────────────────────┐
+│ [既存: 左コントロールパネル]      [検索: 中野区____ 🔍] │
+│                                    ┌──────────────┐ │
+│                                    │ 📍 東京都中野区弥生町…│ │
+│         (3D地図)                    │ 🌊 洪水: 0.5〜3.0m   │ │
+│           📍ピン                    │ ⛰️ 土砂: 区域外       │ │
+│                                    │ 🏘️ 第一種住居地域     │ │
+│                                    │    建蔽60% 容積300%  │ │
+│                                    │ ☀️ 日照(冬至) 4.3h    │ │
+│                                    │   [██░░██████░░] 7-17時│ │
+│                                    │ 🏢 建物: 高さ12.4m…   │ │
+│                                    │  出典: ハザードマップ…  │ │
+│                                    └──────────────┘ │
+└────────────────────────────────────────────────┘
+```
+
+- 検索ボックスは上部中央（左パネルと重ならない位置、モバイルでは左パネル下）
+- 診断カードは既存`#infoPanel`を拡張して`#diagnosisPanel`に改称。建物セクションは既存の属性テーブルを流用
+- 「地点を診断」トグルは左パネルの新セクション「診断」に配置。ONの間はカーソルをcrosshairに
+- ピンは`viewer.entities`のpoint+label（billboard画像は使わない＝外部アセット不要）
+
+## 6. 実装フェーズ
+
+依存関係順。各フェーズ末尾の確認を通してから次へ。
+
+| フェーズ | 内容 | 完了条件 (DoD) |
+|---|---|---|
+| P0 | ESモジュール分割リファクタ（挙動不変）+ package.json/テスト土台 | 既存スモーク（付録C）が全項目パス。`git mv`相当でapp.js→js/main.js |
+| P1 | `tilemath.js` + `solar.js` + Node単体テスト | `node test/solar.test.mjs`パス（南中高度±1°）。tilemathの座標変換もテスト |
+| P2 | `test/data-expectations.mjs`で期待値確定 → `hazard.js` + `zoning.js`（Nodeで動くロジックはNodeでテスト、fetch部はブラウザ用） | Node直読みで「弥生町の浸水深ランク」「中野五丁目の用途地域」の期待値が確定し、コード内コメントに記録されている |
+| P3 | `geocode.js` + 検索UI + ピン + 診断モードトグル | ブラウザで検索→flyTo→ピンが動く（e2e） |
+| P4 | `diagnose.js` 統合（洪水・土砂・都市計画をカード表示） | e2e: 弥生町で浸水ランク表示、中野五丁目で商業系用途地域表示 |
+| P5 | `sunlight.js` 日照計算 + タイムラインUI | e2e: 日照時間が3日付とも0h超で表示され、エラーなし |
+| P6 | 仕上げ: README更新、モバイルCSS、出典表記、最終e2e+スクリーンショット | 全テストパス、スクリーンショット3枚以上 |
+
+## 7. リスクと対策
+
+| リスク | 対策 |
+|---|---|
+| `pickFromRay`がSwiftShader（テスト環境のソフトウェアGL）で不安定 | 実機では動く想定だが、テストでは「エラーにならず数値が返る」ことまでを確認対象とし、遮蔽の正確性はローカル比較（高層ビル脇 vs 公園）のassertを緩め（>=0h）にしてもよい。失敗時はカードに「日照: 計算できませんでした」を出す graceful degradation を必ず実装 |
+| 洪水タイルの凡例色が資料と異なる | P2で実タイルから期待値確定（付録B）。合わなければ表を実測値で更新 |
+| MVTのCDN ESMが読めない | 動的import失敗をcatchし「都市計画情報を取得できませんでした」を表示。代替CDN（unpkg）へフォールバック |
+| 住所検索AP)の仕様変更・レート | 1リクエスト/検索のみ。失敗時メッセージ表示 |
+| 診断地点の地面高さ推定誤差 | 建物クリック時は`_zmin`、他は`sampleHeightMostDetailed`、最後は35m。±2m程度の誤差は日照20分刻みでは許容 |
+| タイル読み込み待ちで診断が遅い | 項目ごとに独立して非同期表示。日照のみ「計算中…」を長めに許容 |
+
+## 8. テスト計画
+
+- 実行環境の制約: **このサンドボックスではブラウザの直接外部通信が遮断されている**。必ず`test/harness.mjs`のcurl中継パターン（`page.route`で外部ホストをインターセプトし、Nodeの`execFile('curl')`で取得・キャッシュして`route.fulfill`）を使うこと。中継対象ホスト: `cesium.com`, `assets.cms.plateau.reearth.io`, `cyberjapandata.gsi.go.jp`, `msearch.gsi.go.jp`, `disaportaldata.gsi.go.jp`, `cdn.jsdelivr.net`。
+- Chromium実行ファイル: `/opt/pw-browsers/chromium`、起動引数 `--no-sandbox --use-gl=swiftshader --enable-unsafe-swiftshader`。
+- ローカルサーバ: `python3 -m http.server 8123`（リポジトリルート）。
+- テスト地点（P2で期待値を確定してから使用）:
+  1. 神田川沿い（中野新橋駅付近 lon≈139.669, lat≈35.697 / 弥生町）→ 浸水ランクあり想定
+  2. 中野駅北口・中野五丁目 → 商業系用途地域想定
+  3. 上高田または江古田の住宅地 → 低層住居専用系想定
+- 本番デプロイ後の手動確認項目もREADMEに記載（GitHub Pages上での動作は中継なしの素のCORS）。
+
+## 9. スコープ外（今回はやらない）
+
+- 複数地点の比較・保存・共有URL
+- スコア化（「住みやすさ○点」）— 誤解を招くため事実表示に徹する
+- 内水氾濫・高潮・地震（データ有無が区によって異なるため次回）
+- 印刷用レイアウト
+
+## 10. 実装者（Opus）への注意事項
+
+- 開発ディレクトリ: `/workspace/nakano-3d`（mainブランチ）。**コミットはローカルまで。pushはしない**（レビュー後にオーケストレータが実施）。
+- コミットは意味単位（フェーズごとに1〜2個)。コミットメッセージは日本語で既存スタイルに合わせる。
+- 既存機能（レイヤー切替・高さ色分け・影・スポット移動・建物クリック）を壊さないこと。P0後に必ず既存スモーク相当を通す。
+- アプリ本体はビルドレスを維持（npm依存はtest/のみ）。`node_modules`はコミットしない。
+- 外部APIの実仕様が本計画と食い違ったら、計画に固執せず実測に合わせて修正し、PLAN.mdの該当箇所も直すこと。
+- UI文言は日本語。コード内コメントは最小限・日本語可。
+
+---
+
+## 付録A: 事前検証ログ（2026-07-27）
+
+- GSI住所検索: `?q=中野区中野五丁目` → `[{geometry:{coordinates:[139.66893,35.707859]},properties:{title:"東京都中野区中野五丁目"}}]`、`access-control-allow-origin: *`
+- disaportal洪水タイル: HTTP 200 / `image/png` / `access-control-allow-origin: *`
+- PLATEAU UseDistrict MVT: z=14,15,16でHTTP 200。レイヤー名`UseDistrict`、extent=65536、属性に`urf_function`等（本文§3）
+- PLATEAU建物3D Tiles: LOD1/LOD2ともHTTP 200（既存ビューアで表示済み）
+
+## 付録B: 期待値確定スクリプトの方針（P2）
+
+`test/data-expectations.mjs`（Node）で:
+1. テスト地点のlon/lat → z=17（洪水）/z=16（MVT）タイル座標とピクセル位置を計算
+2. curlでタイル取得、`pngjs`でデコードし該当ピクセルのRGBAを出力 / MVTは`PbfReader`+`vector-tile`でデコードしPIP判定
+3. 出力された実測値を`e2e.test.mjs`の期待値として固定（コメントに実測日とともに記録）
+
+## 付録C: 既存スモークテストの資産
+
+セッションのスクラッチパッドに動作実績のあるスクリプトがある（このリポジトリには未収録）:
+- Playwright+curl中継ハーネス、既存ビューアのスモーク（Cesium初期化・タイル読込・高さ色分け・洪水レイヤー・建物ピック46属性を確認済み）
+
+P0でこれらを`test/harness.mjs`として整備し直すこと。中継キャッシュは`test/output/relay-cache`（gitignore対象）。
