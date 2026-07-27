@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "serve": "python3 -m http.server 8123",
-    "test:unit": "node test/solar.test.mjs && node test/tilemath.test.mjs",
+    "test:unit": "node test/solar.test.mjs && node test/tilemath.test.mjs && node test/hazard.test.mjs",
     "test:e2e": "node test/e2e.test.mjs",
     "test": "npm run test:unit && npm run test:e2e",
     "expectations": "node test/data-expectations.mjs"
