@@ -145,6 +145,21 @@ try {
   await page.screenshot({ path: shotPath('03-flood-yayoicho.png') });
   await page.locator('#diagnosisPanel').screenshot({ path: shotPath('04-card-yayoicho.png') });
 
+  // ==== 4b. 上高田四丁目（土砂災害＝急傾斜地の崩壊 警戒区域） ====
+  console.log('\n--- 中野区上高田4丁目（土砂災害警戒区域あり） ---');
+  await diagnoseByAddress('中野区上高田4丁目');
+  const placeK = await waitSection('secPlace');
+  check('上高田の住所が表示される', placeK.includes('上高田'), placeK);
+  const landK = await waitSection('secLandslide');
+  console.log('  ⛰️ ' + landK);
+  check('上高田の急傾斜地が警戒区域（イエロー）',
+    /急傾斜地の崩壊\s*警戒区域（イエロー）/.test(landK), landK);
+  check('上高田の土石流・地すべりは区域外',
+    (landK.match(/区域外/g) || []).length === 2, landK);
+  check('警戒区域該当時の注記が出る', landK.includes('警戒区域に該当します'), landK);
+  await waitSection('secSun', 180000);
+  await page.locator('#diagnosisPanel').screenshot({ path: shotPath('09-card-landslide-kamitakada.png') });
+
   // ==== 5. クリック診断モード ====
   console.log('\n--- クリック診断モード ---');
   await page.evaluate(() => window.__nakano.diagnosis.close());
