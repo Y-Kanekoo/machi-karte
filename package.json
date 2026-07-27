@@ -1,0 +1,20 @@
+{
+  "name": "nakano-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "中野区 3D都市モデルビューア（テスト用のみnpm依存。アプリ本体はビルドレス・無依存）",
+  "license": "MIT",
+  "scripts": {
+    "serve": "python3 -m http.server 8123",
+    "test:unit": "node test/solar.test.mjs && node test/tilemath.test.mjs && node test/logic.test.mjs",
+    "test:e2e": "node test/e2e.test.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "expectations": "node test/data-expectations.mjs"
+  },
+  "devDependencies": {
+    "@mapbox/vector-tile": "^3.0.0",
+    "pbf": "^5.1.2",
+    "playwright": "^1.62.0",
+    "pngjs": "^7.0.0"
+  }
+}

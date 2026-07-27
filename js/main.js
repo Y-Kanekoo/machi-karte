@@ -2,35 +2,8 @@
 // データ: 国土交通省 Project PLATEAU 中野区 2025年度 (CC BY 4.0)
 // 配信: PLATEAU Streaming (assets.cms.plateau.reearth.io)
 
-'use strict';
-
-const TILESETS = {
-  bldgLod1:
-    'https://assets.cms.plateau.reearth.io/assets/00/0bafbd-0652-4f11-ab1f-ca88d81a98a7/13114_nakano-ku_pref_2025_citygml_1_op_bldg_3dtiles_13114_nakano-ku_lod1/tileset.json',
-  bldgLod2:
-    'https://assets.cms.plateau.reearth.io/assets/69/c68a38-eae5-4a70-b981-497109b3e7f7/13114_nakano-ku_pref_2025_citygml_1_op_bldg_3dtiles_13114_nakano-ku_lod2/tileset.json',
-  bldgLod2NoTex:
-    'https://assets.cms.plateau.reearth.io/assets/b7/d791c7-3f75-4050-b8bd-73bdc13b7b06/13114_nakano-ku_pref_2025_citygml_1_op_bldg_3dtiles_13114_nakano-ku_lod2_no_texture/tileset.json',
-  fldKandaL2:
-    'https://assets.cms.plateau.reearth.io/assets/90/585930-f5a4-4e06-8c93-22148c0d512c/13114_nakano-ku_pref_2025_citygml_1_op_fld_pref_kandagawa-ryuiki_3dtiles_l2_no_texture/tileset.json',
-  fldArakawaL2:
-    'https://assets.cms.plateau.reearth.io/assets/60/f43d45-f6e1-4e9f-9578-135c630c9bce/13114_nakano-ku_pref_2025_citygml_1_op_fld_pref_arakawa_kandagawa-zenpukujigawa-etc-2_3dtiles_l2_no_texture/tileset.json',
-  tranLod3:
-    'https://assets.cms.plateau.reearth.io/assets/53/bac53a-130c-42cb-b02b-063825ee2ede/13114_nakano-ku_pref_2025_citygml_1_op_tran_3dtiles_lod3/tileset.json',
-  wtrLod1:
-    'https://assets.cms.plateau.reearth.io/assets/98/907332-c134-4908-b890-a984769c70f1/13114_nakano-ku_pref_2025_citygml_1_op_wtr_3dtiles_lod1/tileset.json',
-};
-
-const PRESETS = {
-  nakanoSta:   { lon: 139.6659, lat: 35.7010, height: 500, heading: 0,   pitch: -40 },
-  sunplaza:    { lon: 139.6645, lat: 35.7040, height: 450, heading: 30,  pitch: -35 },
-  broadway:    { lon: 139.6656, lat: 35.7085, height: 400, heading: 180, pitch: -40 },
-  araiyakushi: { lon: 139.6674, lat: 35.7125, height: 450, heading: 0,   pitch: -40 },
-  tetsugakudo: { lon: 139.6790, lat: 35.7195, height: 500, heading: 220, pitch: -35 },
-  overview:    { lon: 139.6640, lat: 35.6900, height: 4500, heading: 0,  pitch: -55 },
-};
-
-const HEIGHT_PROP_CANDIDATES = ['計測高さ', 'bldg:measuredHeight', 'measuredHeight', '高さ'];
+import { TILESETS, PRESETS, HEIGHT_PROP_CANDIDATES } from './config.js';
+import { escapeHtml } from './util.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -237,27 +210,30 @@ function clearHighlight() {
   highlighted = null;
 }
 
+/** ピックした建物フィーチャの属性行HTMLを組み立てる */
+function buildingTableHtml(picked) {
+  const PRIORITY = ['名称', 'gml:name', '計測高さ', 'bldg:measuredHeight', '用途', 'bldg:usage', '地上階数', '地下階数', '建築年'];
+  const ids = picked.getPropertyIds().filter((n) => !n.startsWith('_'));
+  ids.sort((a, b) => {
+    const ia = PRIORITY.indexOf(a), ib = PRIORITY.indexOf(b);
+    return (ia === -1 ? PRIORITY.length : ia) - (ib === -1 ? PRIORITY.length : ib);
+  });
+  const rows = [];
+  for (const name of ids) {
+    const val = picked.getProperty(name);
+    if (val === undefined || val === null || val === '') continue;
+    rows.push(`<tr><th>${escapeHtml(name)}</th><td>${escapeHtml(String(val))}</td></tr>`);
+  }
+  return rows.join('') || '<tr><td>属性なし</td></tr>';
+}
+
 viewer.screenSpaceEventHandler.setInputAction((click) => {
   const picked = viewer.scene.pick(click.position);
   clearHighlight();
   if (picked instanceof Cesium.Cesium3DTileFeature) {
     picked.color = Cesium.Color.YELLOW.withAlpha(0.8);
     highlighted = picked;
-    const PRIORITY = ['名称', 'gml:name', '計測高さ', 'bldg:measuredHeight', '用途', 'bldg:usage', '地上階数', '地下階数', '建築年'];
-    const ids = picked.getPropertyIds().filter((n) => !n.startsWith('_'));
-    ids.sort((a, b) => {
-      const ia = PRIORITY.indexOf(a), ib = PRIORITY.indexOf(b);
-      return (ia === -1 ? PRIORITY.length : ia) - (ib === -1 ? PRIORITY.length : ib);
-    });
-    const rows = [];
-    for (const name of ids) {
-      const val = picked.getProperty(name);
-      if (val === undefined || val === null || val === '') continue;
-      rows.push(
-        `<tr><th>${escapeHtml(name)}</th><td>${escapeHtml(String(val))}</td></tr>`
-      );
-    }
-    infoTable.innerHTML = rows.join('') || '<tr><td>属性なし</td></tr>';
+    infoTable.innerHTML = buildingTableHtml(picked);
     infoPanel.classList.remove('hidden');
   } else {
     infoPanel.classList.add('hidden');
@@ -269,12 +245,6 @@ document.getElementById('closeInfo').addEventListener('click', () => {
   clearHighlight();
 });
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]));
-}
-
 // ---- Init --------------------------------------------------------------------
 
 (async () => {
@@ -282,3 +252,6 @@ function escapeHtml(s) {
   await showBuildings('lod2');
   flyTo(PRESETS.nakanoSta, 3.0);
 })();
+
+// テスト用フック（e2eから内部状態を参照するため）
+window.__nakano = { viewer, getTileset, loaded, flyTo, showBuildings };
