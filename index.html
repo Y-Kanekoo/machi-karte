@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>中野区 3D都市モデルビューア | PLATEAU</title>
+  <title>中野区 3Dビューア・街カルテ | PLATEAU</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="style.css" rel="stylesheet" />
@@ -11,9 +11,25 @@
 <body>
   <div id="cesiumContainer"></div>
 
+  <div id="searchBar">
+    <div class="search-row">
+      <input type="search" id="searchInput" placeholder="住所で診断（例: 中野区弥生町2丁目）"
+             autocomplete="off" aria-label="住所検索" />
+      <button id="searchBtn" type="button">🔍 診断</button>
+    </div>
+    <ul id="searchResults" class="hidden"></ul>
+    <div id="searchMsg" class="hidden"></div>
+  </div>
+
   <div id="controlPanel">
     <h1>中野区 3Dビューア</h1>
     <p class="subtitle">PLATEAU 3D都市モデル (2025年度版)</p>
+
+    <section>
+      <h2>街カルテ（地点診断）</h2>
+      <label><input type="checkbox" id="diagMode"> 地点を診断（地図をクリック）</label>
+      <p class="hint">洪水・土砂災害・用途地域・日照をまとめて表示します。上の検索ボックスからでも診断できます。</p>
+    </section>
 
     <section>
       <h2>建物モデル</h2>
@@ -58,12 +74,12 @@
     <div id="status">読み込み中…</div>
   </div>
 
-  <div id="infoPanel" class="hidden">
+  <div id="diagnosisPanel" class="hidden">
     <div class="info-header">
-      <h2>建物情報</h2>
-      <button id="closeInfo">×</button>
+      <h2>街カルテ</h2>
+      <button id="closeDiag" aria-label="閉じる">×</button>
     </div>
-    <table id="infoTable"></table>
+    <div id="diagBody"></div>
   </div>
 
   <div id="legend" class="hidden">

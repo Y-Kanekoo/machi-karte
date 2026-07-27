@@ -77,18 +77,18 @@ try {
   const after = await page.evaluate(() => window.__nakano.viewer.camera.positionCartographic.longitude);
   check('スポット移動でカメラ位置が変わる', Math.abs(after - before) > 1e-5, `${before} -> ${after}`);
 
-  // --- 7. 建物クリックで属性表示 ---
+  // --- 7. 建物クリックで属性表示（街カルテの「🏢建物」セクション） ---
   await page.click('button[data-preset="nakanoSta"]');
   await page.waitForTimeout(6000);
   const box = await page.locator('.cesium-widget canvas').boundingBox();
   let rows = 0;
   for (const [dx, dy] of [[0, 60], [-80, 80], [80, 40], [0, 120], [-150, 20], [150, 100]]) {
     await page.mouse.click(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy);
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(900);
     rows = await page.evaluate(() => {
-      const p = document.getElementById('infoPanel');
+      const p = document.getElementById('diagnosisPanel');
       if (p.classList.contains('hidden')) return 0;
-      return document.querySelectorAll('#infoTable tr').length;
+      return document.querySelectorAll('#secBuilding tr').length;
     });
     if (rows > 3) break;
   }

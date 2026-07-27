@@ -4,6 +4,7 @@
 
 import { TILESETS, PRESETS, HEIGHT_PROP_CANDIDATES } from './config.js';
 import { escapeHtml } from './util.js';
+import { initDiagnosis } from './diagnose.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -199,8 +200,6 @@ document.querySelectorAll('.presets button').forEach((btn) => {
 
 // ---- Feature picking ---------------------------------------------------------
 
-const infoPanel = document.getElementById('infoPanel');
-const infoTable = document.getElementById('infoTable');
 let highlighted = null;
 
 function clearHighlight() {
@@ -227,23 +226,64 @@ function buildingTableHtml(picked) {
   return rows.join('') || '<tr><td>属性なし</td></tr>';
 }
 
+// ---- 街カルテ（地点診断） -------------------------------------------------------
+
+const diagnosis = initDiagnosis({
+  viewer,
+  getCurrentBuildingTileset: () => currentBldg,
+  buildingTableHtml,
+  setStatus,
+});
+diagnosis.onClose(clearHighlight);
+
+/** クリック位置の経緯度を求める（建物表面 → 地表の順にフォールバック） */
+function pickLonLat(windowPosition) {
+  let pos = null;
+  if (viewer.scene.pickPositionSupported) {
+    const p = viewer.scene.pickPosition(windowPosition);
+    if (Cesium.defined(p)) pos = p;
+  }
+  if (!pos) {
+    const p = viewer.camera.pickEllipsoid(windowPosition, viewer.scene.globe.ellipsoid);
+    if (Cesium.defined(p)) pos = p;
+  }
+  if (!pos) return null;
+  const carto = Cesium.Cartographic.fromCartesian(pos);
+  return {
+    lon: Cesium.Math.toDegrees(carto.longitude),
+    lat: Cesium.Math.toDegrees(carto.latitude),
+  };
+}
+
 viewer.screenSpaceEventHandler.setInputAction((click) => {
   const picked = viewer.scene.pick(click.position);
   clearHighlight();
-  if (picked instanceof Cesium.Cesium3DTileFeature) {
+
+  const isBuilding = picked instanceof Cesium.Cesium3DTileFeature;
+  if (isBuilding) {
     picked.color = Cesium.Color.YELLOW.withAlpha(0.8);
     highlighted = picked;
-    infoTable.innerHTML = buildingTableHtml(picked);
-    infoPanel.classList.remove('hidden');
-  } else {
-    infoPanel.classList.add('hidden');
+  }
+
+  // 診断モードON、または建物クリック時に診断カードを開く
+  if (diagnosis.isActive() || isBuilding) {
+    const ll = pickLonLat(click.position);
+    if (ll) {
+      diagnosis.diagnose({
+        lon: ll.lon,
+        lat: ll.lat,
+        title: null,
+        picked: isBuilding ? picked : null,
+        // 建物クリックは今の視点を保ちたいのでカメラを動かさない
+        fly: !isBuilding,
+      });
+      return;
+    }
+  }
+  if (!isBuilding && !diagnosis.isActive()) {
+    diagnosis.close();
   }
 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-document.getElementById('closeInfo').addEventListener('click', () => {
-  infoPanel.classList.add('hidden');
-  clearHighlight();
-});
 
 // ---- Init --------------------------------------------------------------------
 
@@ -254,4 +294,4 @@ document.getElementById('closeInfo').addEventListener('click', () => {
 })();
 
 // テスト用フック（e2eから内部状態を参照するため）
-window.__nakano = { viewer, getTileset, loaded, flyTo, showBuildings };
+window.__nakano = { viewer, getTileset, loaded, flyTo, showBuildings, diagnosis };

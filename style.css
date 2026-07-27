@@ -11,7 +11,11 @@ html, body, #cesiumContainer {
   position: absolute;
   top: 10px;
   left: 10px;
-  width: 280px;
+  /* border-box にして width を padding 込みで指定する（モバイル幅で
+     calc(100% - 40px) + padding が画面幅を超えるのを防ぐ）。
+     312px = 従来の content 280px + 左右padding 32px で見た目は変わらない */
+  box-sizing: border-box;
+  width: 312px;
   max-height: calc(100% - 60px);
   overflow-y: auto;
   background: rgba(20, 26, 34, 0.88);
@@ -98,19 +102,311 @@ html, body, #cesiumContainer {
   font-size: 12px;
 }
 
-#infoPanel {
+#controlPanel .hint {
+  margin: 4px 0 2px;
+  font-size: 11px;
+  color: #9db2c8;
+  line-height: 1.4;
+}
+
+/* ---- 検索バー ------------------------------------------------------------- */
+
+#searchBar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: min(420px, calc(100% - 700px));
+  min-width: 260px;
+  z-index: 12;
+}
+
+.search-row {
+  display: flex;
+  gap: 6px;
+  background: rgba(20, 26, 34, 0.9);
+  border-radius: 10px;
+  padding: 6px;
+  backdrop-filter: blur(4px);
+}
+
+#searchInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+#searchInput::placeholder {
+  color: #8ea3b8;
+}
+
+#searchInput:focus {
+  outline: none;
+  border-color: #7fc4ff;
+}
+
+#searchBtn {
+  background: #2b64a8;
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+#searchBtn:hover:not(:disabled) {
+  background: #3a7fd0;
+}
+
+#searchBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+#searchResults {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: rgba(20, 26, 34, 0.95);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #eee;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#searchResults li {
+  padding: 7px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#searchResults li:hover {
+  background: rgba(127, 196, 255, 0.2);
+}
+
+#searchMsg {
+  margin-top: 4px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgba(20, 26, 34, 0.9);
+  color: #cfe3f5;
+  font-size: 12px;
+}
+
+#searchMsg.error {
+  color: #ffb0b0;
+}
+
+/* 診断モード中はカーソルを十字に */
+body.diag-mode #cesiumContainer canvas {
+  cursor: crosshair;
+}
+
+/* ---- 診断カード（街カルテ） ------------------------------------------------ */
+
+#diagnosisPanel {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 300px;
-  max-height: 60%;
+  box-sizing: border-box;
+  width: 348px;
+  max-height: calc(100% - 60px);
   overflow-y: auto;
-  background: rgba(20, 26, 34, 0.9);
+  background: rgba(20, 26, 34, 0.92);
   color: #eee;
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 12px;
-  z-index: 10;
+  z-index: 11;
+  backdrop-filter: blur(4px);
+}
+
+.diag-sec {
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+  padding: 8px 0 9px;
+}
+
+.diag-sec h3 {
+  font-size: 12px;
+  color: #7fc4ff;
+  margin: 0 0 5px;
+  font-weight: 600;
+}
+
+.diag-content {
+  line-height: 1.5;
+}
+
+.diag-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.diag-sub {
+  font-size: 11px;
+  color: #a9c0d6;
+  margin-top: 2px;
+}
+
+.diag-note {
+  font-size: 10.5px;
+  color: #93aac0;
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+.diag-fail {
+  color: #ffb0b0;
+  font-size: 11.5px;
+}
+
+.diag-badge {
+  display: inline-block;
+  padding: 4px 11px;
+  border-radius: 12px;
+  color: #1a2028;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.diag-badge.zone {
+  background: #7fc4ff;
+}
+
+.diag-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.diag-key {
+  color: #a9c0d6;
+  white-space: nowrap;
+}
+
+.diag-val {
+  text-align: right;
+}
+
+.diag-val.warn {
+  color: #ffd479;
+  font-weight: 600;
+}
+
+.diag-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.diag-table th,
+.diag-table td {
+  text-align: left;
+  padding: 3px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  vertical-align: top;
+  word-break: break-all;
+  font-size: 11.5px;
+}
+
+.diag-table th {
+  color: #7fc4ff;
+  white-space: nowrap;
+  font-weight: normal;
+}
+
+.diag-source {
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+  margin: 6px 0 0;
+  padding-top: 7px;
+  font-size: 10px;
+  color: #8ea3b8;
+  line-height: 1.5;
+}
+
+.diag-source a {
+  color: #7fc4ff;
+}
+
+/* 取得中スピナー */
+.diag-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #a9c0d6;
+  font-size: 11.5px;
+}
+
+.spinner {
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(127, 196, 255, 0.3);
+  border-top-color: #7fc4ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- 日照タイムライン ------------------------------------------------------ */
+
+.sun-day {
+  margin-bottom: 7px;
+}
+
+.sun-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  margin-bottom: 2px;
+}
+
+.sun-head b {
+  color: #ffd479;
+}
+
+.sun-bar {
+  display: flex;
+  height: 13px;
+  border-radius: 3px;
+  overflow: hidden;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sun-bar i {
+  flex: 1;
+  display: block;
+}
+
+.sun-bar i.lit {
+  background: #ffcf4d;
+}
+
+.sun-bar i.dark {
+  background: #3d4a5a;
+}
+
+.sun-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: #8ea3b8;
+  margin-top: -2px;
 }
 
 .info-header {
@@ -124,33 +420,18 @@ html, body, #cesiumContainer {
   margin: 0;
 }
 
-#closeInfo {
+#closeDiag {
   background: none;
   border: none;
   color: #aaa;
-  font-size: 18px;
+  font-size: 20px;
+  line-height: 1;
   cursor: pointer;
+  padding: 0 2px;
 }
 
-#infoTable {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 6px;
-}
-
-#infoTable th,
-#infoTable td {
-  text-align: left;
-  padding: 3px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  vertical-align: top;
-  word-break: break-all;
-}
-
-#infoTable th {
-  color: #7fc4ff;
-  white-space: nowrap;
-  font-weight: normal;
+#closeDiag:hover {
+  color: #fff;
 }
 
 #legend {
@@ -199,15 +480,52 @@ html, body, #cesiumContainer {
   display: none !important;
 }
 
-@media (max-width: 640px) {
-  #controlPanel {
-    width: calc(100% - 40px);
-    max-height: 45%;
+/* 中間幅: 検索バーを左パネルの右隣に寄せる */
+@media (max-width: 1100px) {
+  #searchBar {
+    left: auto;
+    right: 10px;
+    transform: none;
+    width: min(360px, calc(100% - 340px));
   }
-  #infoPanel {
+}
+
+@media (max-width: 760px) {
+  #searchBar {
+    left: 10px;
+    right: 10px;
+    transform: none;
+    width: auto;
+    min-width: 0;
+  }
+  #controlPanel {
+    top: 60px;
+    width: calc(100% - 40px);
+    max-height: 38%;
+  }
+  #diagnosisPanel {
     top: auto;
-    bottom: 30px;
-    width: calc(100% - 48px);
-    max-height: 40%;
+    bottom: 26px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-height: 52%;
+  }
+  #legend {
+    bottom: 26px;
+    left: 10px;
+    right: auto;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  #searchBtn {
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+  #diagnosisPanel {
+    font-size: 11.5px;
+    padding: 8px 11px;
   }
 }
