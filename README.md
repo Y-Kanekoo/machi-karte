@@ -6,7 +6,13 @@
 
 GitHub Pages: https://y-kanekoo.github.io/nakano-3d/
 
-（初回アクセス時はGitHub Actionsのデプロイ完了後に有効になります）
+**初回のみ有効化が必要です**（GitHub Actionsのトークンでは自動有効化できないため）:
+
+1. リポジトリの **Settings → Pages** を開く
+2. 「Build and deployment」の **Source** を **GitHub Actions** にする
+3. **Actions** タブから「Deploy to GitHub Pages」ワークフローを **Re-run**（または何かをpush）
+
+以降はmainへのpushごとに自動デプロイされます。
 
 ## 機能
 
