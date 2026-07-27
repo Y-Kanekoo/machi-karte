@@ -4,7 +4,9 @@
 // 既存の test/e2e.test.mjs（街カルテ本体）とは別ファイルにして、R1で追加した
 // 機能だけをまとめて検証する。期待値は 2026-07-27 実測の実データに基づく。
 
+import { PNG } from 'pngjs';
 import { launchViewer, waitForViewerReady, check, equal, near, report, shotPath, BASE_URL } from './harness.mjs';
+import { USE_DISTRICT_COLORS } from '../js/config.js';
 
 const t = await launchViewer({
   viewport: { width: 1440, height: 900 },
@@ -155,6 +157,195 @@ try {
   await p4.waitForTimeout(3000);
   check('範囲外座標では診断カードが開かない', await p4.isHidden('#diagnosisPanel'));
   await p4.close();
+
+  // ============================================================================
+  // 2. 用途地域カラーオーバーレイ（F1-3）
+  // ============================================================================
+  console.log('\n=== 2. 都市計画オーバーレイ ===');
+
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+
+  // --- 2a. 最小プロバイダ（全タイル単色）でCesiumの要件を満たしているか確認 ---
+  const solid = await page.evaluate(async () => {
+    const v = window.__nakano.viewer;
+    const before = v.imageryLayers.length;
+    const h = window.__nakano.overlays.addSolidTestLayer('#ff00ff');
+    await new Promise((r) => setTimeout(r, 3000));
+    const after = v.imageryLayers.length;
+    const stats = { ...h.provider.stats };
+    h.remove();
+    return { before, after, stats, removed: v.imageryLayers.length };
+  });
+  console.log('  単色プロバイダ: ' + JSON.stringify(solid));
+  equal('最小プロバイダでレイヤーが1枚増える', solid.after, solid.before + 1);
+  check('最小プロバイダがタイルを要求される', solid.stats.requested > 0, JSON.stringify(solid.stats));
+  check('最小プロバイダが失敗タイルを出さない', solid.stats.failed === 0, JSON.stringify(solid.stats));
+  equal('最小プロバイダを外すと元の枚数に戻る', solid.removed, solid.before);
+
+  // --- 2b. 用途地域ON ---
+  const layersBefore = await page.evaluate(() => window.__nakano.viewer.imageryLayers.length);
+  await page.check('#ov-use');
+  await page.waitForTimeout(1000);
+  const layersAfter = await page.evaluate(() => window.__nakano.viewer.imageryLayers.length);
+  equal('用途地域ONでimageryLayersが1枚増える', layersAfter, layersBefore + 1);
+  check('透明度スライダーが現れる', await page.isVisible('#overlayAlpha'));
+  check('凡例が表示される', await page.isVisible('#zoningLegend'));
+  const legendText = (await page.textContent('#zoningLegend')).replace(/\s+/g, ' ');
+  check('凡例に「用途地域」の見出しがある', legendText.includes('用途地域'), legendText.slice(0, 100));
+  check('凡例に商業地域がある', legendText.includes('商業地域'), legendText.slice(0, 200));
+  check('凡例に「その他」がある', legendText.includes('その他'), legendText.slice(0, 300));
+
+  // --- 2c. canvasピクセル検証（駅前上空を真上から見る） ---
+  // 建物3Dと空気遠近を切って、背景を淡色地図にしてから、オーバーレイを不透明にして色を読む
+  await page.evaluate(async () => {
+    const n = window.__nakano;
+    await n.showBuildings('none');
+    n.viewer.scene.globe.showGroundAtmosphere = false;
+    n.viewer.scene.skyAtmosphere.show = false;
+    n.overlays.setAlpha(1.0);
+  });
+  await page.check('input[name="imagery"][value="pale"]');
+
+  async function centerPixel(lon, lat, height = 900) {
+    await page.evaluate(
+      ({ lon, lat, height }) => {
+        window.__nakano.viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
+          orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
+        });
+      },
+      { lon, lat, height }
+    );
+    // タイルの取得と描画を待つ
+    await page.waitForTimeout(6000);
+    const box = await page.locator('.cesium-widget canvas').boundingBox();
+    const buf = await page.screenshot({
+      clip: { x: box.x + box.width / 2 - 4, y: box.y + box.height / 2 - 4, width: 8, height: 8 },
+    });
+    const png = PNG.sync.read(buf);
+    const i = (png.width * 4 + 4) * 4; // 8×8の中心
+    return [png.data[i], png.data[i + 1], png.data[i + 2]];
+  }
+
+  function hexToRgb(hex) {
+    return [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16));
+  }
+  function rgbDist(a, b) {
+    return Math.sqrt(a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0));
+  }
+
+  const commercial = hexToRgb(USE_DISTRICT_COLORS['商業地域']);
+  const pxStation = await centerPixel(139.6659, 35.7056);
+  console.log(`  中野駅前のピクセル: rgb(${pxStation}) / 商業地域=rgb(${commercial})`);
+  check('駅前のピクセルが商業地域の色に一致する（±40）',
+    rgbDist(pxStation, commercial) <= 40, `dist=${rgbDist(pxStation, commercial).toFixed(1)}`);
+  check('駅前のピクセルは赤系（R>G かつ R>B）',
+    pxStation[0] > pxStation[1] && pxStation[0] > pxStation[2], String(pxStation));
+
+  const midRise = hexToRgb(USE_DISTRICT_COLORS['第1種中高層住居専用地域']);
+  const pxNakano5 = await centerPixel(139.66893, 35.707859);
+  console.log(`  中野五丁目のピクセル: rgb(${pxNakano5}) / 第1種中高層住居専用地域=rgb(${midRise})`);
+  check('中野五丁目のピクセルが第1種中高層住居専用地域の色に一致する（±40）',
+    rgbDist(pxNakano5, midRise) <= 40, `dist=${rgbDist(pxNakano5, midRise).toFixed(1)}`);
+  check('中野五丁目のピクセルは緑系（G>R かつ G>B）',
+    pxNakano5[1] > pxNakano5[0] && pxNakano5[1] > pxNakano5[2], String(pxNakano5));
+
+  const provStats = await page.evaluate(() => ({ ...window.__nakano.overlays.getProvider('use').stats }));
+  console.log('  provider stats: ' + JSON.stringify(provStats));
+  check('MVTタイルを実際に描画している', provStats.drawn > 0, JSON.stringify(provStats));
+  check('タイルのデコード失敗がない', provStats.failed === 0, JSON.stringify(provStats));
+
+  // 見栄えのするスクリーンショット（斜め視点・初期透明度）
+  await page.evaluate(() => {
+    const n = window.__nakano;
+    n.overlays.setAlpha(0.55);
+    n.viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(139.6659, 35.7010, 1400),
+      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 },
+    });
+  });
+  await page.waitForTimeout(6000);
+  await page.screenshot({ path: shotPath('r1-03-overlay-use.png') });
+
+  // --- 2d. 透明度スライダー ---
+  await page.fill('#overlayAlpha', '80');
+  await page.dispatchEvent('#overlayAlpha', 'input');
+  await page.waitForTimeout(300);
+  const alpha80 = await page.evaluate(() => window.__nakano.overlays.getLayer('use').alpha);
+  near('スライダー80%でImageryLayer.alphaが0.8になる', alpha80, 0.8, 1e-6);
+  await page.fill('#overlayAlpha', '30');
+  await page.dispatchEvent('#overlayAlpha', 'input');
+  await page.waitForTimeout(300);
+  const alpha30 = await page.evaluate(() => window.__nakano.overlays.getLayer('use').alpha);
+  near('スライダー30%でImageryLayer.alphaが0.3になる', alpha30, 0.3, 1e-6);
+  check('凡例ラベルが同期する', (await page.textContent('#overlayAlphaLabel')).includes('30'));
+
+  // --- 2e. 防火・高度地区の同時表示 ---
+  await page.check('#ov-fire');
+  await page.check('#ov-height');
+  await page.waitForTimeout(2500);
+  const active = await page.evaluate(() => window.__nakano.overlays.getActive());
+  equal('3レイヤーが同時にONになる', active.join(','), 'use,fire,height');
+  const legend3 = (await page.textContent('#zoningLegend')).replace(/\s+/g, ' ');
+  check('凡例に防火地域が積まれる', legend3.includes('準防火地域'), legend3.slice(0, 400));
+  check('凡例に高度地区が積まれる', legend3.includes('高度地区'), legend3.slice(-200));
+  await page.screenshot({ path: shotPath('r1-04-overlay-all.png') });
+
+  // --- 2f. OFFでレイヤーが消える ---
+  const before3 = await page.evaluate(() => window.__nakano.viewer.imageryLayers.length);
+  await page.uncheck('#ov-use');
+  await page.uncheck('#ov-fire');
+  await page.uncheck('#ov-height');
+  await page.waitForTimeout(500);
+  const after3 = await page.evaluate(() => window.__nakano.viewer.imageryLayers.length);
+  equal('3レイヤーOFFでimageryLayersが3枚減る', after3, before3 - 3);
+  check('全OFFで凡例が隠れる', await page.isHidden('#zoningLegend'));
+  check('全OFFで透明度スライダーも隠れる', await page.isHidden('#overlayAlpha'));
+
+  // --- 2g. 背景地図を切り替えてもオーバーレイが残る（removeAllをやめた回帰） ---
+  await page.check('#ov-use');
+  await page.waitForTimeout(800);
+  await page.check('input[name="imagery"][value="photo"]');
+  await page.waitForTimeout(1200);
+  const stillOn = await page.evaluate(() => ({
+    active: window.__nakano.overlays.getActive(),
+    layers: window.__nakano.viewer.imageryLayers.length,
+  }));
+  equal('背景地図を切り替えてもオーバーレイが残る', stillOn.active.join(','), 'use');
+  equal('背景1枚＋オーバーレイ1枚', stillOn.layers, 2);
+  await page.uncheck('#ov-use');
+
+  // --- 2h. 点判定（診断カードの都市計画セクション）が回帰していない ---
+  await page.evaluate(() => window.__nakano.showBuildings('lod2'));
+  await diagnoseByAddress('中野区弥生町2丁目');
+  const zoneAfterOverlay = await waitSection(page, 'secZoning');
+  check('オーバーレイ導入後も点判定は近隣商業地域のまま',
+    zoneAfterOverlay.includes('近隣商業地域') && zoneAfterOverlay.includes('建蔽率 80%'),
+    zoneAfterOverlay);
+
+  // --- 2i. オーバーレイONの状態が共有URLに載る ---
+  await page.check('#ov-use');
+  await page.check('#ov-height');
+  await page.waitForTimeout(600);
+  await page.click('#shareBtn');
+  await page.waitForTimeout(400);
+  const hashOv = await page.evaluate(() => location.hash);
+  check('ハッシュに ov=use,height が入る', hashOv.includes('ov=use,height'), hashOv);
+
+  const p5 = await t.newPage(BASE_URL + hashOv);
+  await waitForViewerReady(p5);
+  await p5.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 120000 });
+  await p5.waitForTimeout(1500);
+  const restoredOv = await p5.evaluate(() => ({
+    active: window.__nakano.overlays.getActive(),
+    checked: ['use', 'fire', 'height'].filter((k) => document.getElementById('ov-' + k).checked),
+  }));
+  console.log('  復元されたオーバーレイ: ' + JSON.stringify(restoredOv));
+  equal('共有URLからオーバーレイが復元される', restoredOv.active.join(','), 'use,height');
+  equal('チェックボックスも同期する', restoredOv.checked.join(','), 'use,height');
+  await p5.close();
+  await page.uncheck('#ov-use');
+  await page.uncheck('#ov-height');
 
   // ============================================================================
   // JSエラー

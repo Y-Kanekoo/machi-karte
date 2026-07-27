@@ -6,6 +6,7 @@ import { TILESETS, PRESETS, HEIGHT_PROP_CANDIDATES } from './config.js';
 import { escapeHtml } from './util.js';
 import { initDiagnosis } from './diagnose.js';
 import { initShare } from './share.js';
+import { initZoningOverlay } from './zoning-overlay.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -258,10 +259,10 @@ const diagnosis = initDiagnosis({
 });
 diagnosis.onClose(clearHighlight);
 
-// ---- R1: 共有URL ----------------------------------------------------------------
+// ---- R1: 都市計画オーバーレイ / 共有URL --------------------------------------------
 
-const overlays = null; // P2で initZoningOverlay に差し替える
-const compare = null;  // P3で initCompare に差し替える
+const overlays = initZoningOverlay({ viewer });
+const compare = null; // P3で initCompare に差し替える
 const share = initShare({ viewer, diagnosis, overlays, compare, toast });
 
 /** クリック位置の経緯度を求める（建物表面 → 地表の順にフォールバック） */
