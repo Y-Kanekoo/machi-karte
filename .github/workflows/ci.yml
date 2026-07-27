@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 毎週月曜 03:00 UTC（JST 12:00）に実タイル照合込みで回す
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: 単体テスト (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # push/PR では外部データ取得を伴う照合をスキップする（外部サーバ都合で赤くならないように）。
+      # schedule / workflow_dispatch のときはフラグ無しで実タイル照合も行う。
+      - name: npm run test:unit
+        env:
+          SKIP_NETWORK: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '0' || '1' }}
+        run: npm run test:unit
+
+  # 実タイル照合が失敗したら issue を立てる（週次実行の見張り）
+  report-failure:
+    name: 実タイル照合の失敗を起票
+    needs: unit
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '週次の実タイル照合が失敗しました';
+            const body = [
+              '週次スケジュールの `npm run test:unit`（SKIP_NETWORK なし）が失敗しました。',
+              '外部データ（ハザードマップポータル／PLATEAU MVT）の更新で期待値がずれた可能性があります。',
+              '',
+              '- 実行: ' + `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '- 対処: `npm run expectations` で実測値を取り直し、test/hazard.test.mjs の期待値を更新してください。',
+            ].join('\n');
+            const existing = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open in:title "${title}"`,
+            });
+            if (existing.data.total_count > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.data.items[0].number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo, title, body,
+              });
+            }
+
+  # e2e は Chromium + 外部データで不安定要因が多いので手動実行のみ。
+  # GitHub Actions のランナーは外部へ直接出られるので HARNESS_DIRECT=1（中継なし）で動かす。
+  e2e:
+    name: e2e (手動実行のみ)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: 静的サーバを起動
+        run: |
+          python3 -m http.server 8123 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8123/ >/dev/null && break; sleep 1; done
+      - name: npm run test:smoke && npm run test:e2e
+        env:
+          HARNESS_DIRECT: '1'
+        run: |
+          npm run test:smoke
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: test/output/*.png
+          if-no-files-found: ignore
