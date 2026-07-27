@@ -26,8 +26,10 @@ let mvtLibPromise = null;
  * MVTデコード用ライブラリをCDNから動的importする。
  * pbf は v4 以降で export 形状が変わる（PbfReader）ため v3.3.0 に固定している。
  * jsDelivr が読めない場合は unpkg にフォールバック。
+ *
+ * zoning-overlay.js（タイルのラスタライズ）と共用するので export している。
  */
-async function loadMvtLib() {
+export async function loadMvtLib() {
   if (mvtLibPromise) return mvtLibPromise;
   mvtLibPromise = (async () => {
     let lastErr = null;
@@ -49,9 +51,19 @@ async function loadMvtLib() {
   return mvtLibPromise;
 }
 
+/**
+ * MVTタイルの ArrayBuffer キャッシュ（URL → Promise<Uint8Array|null>）。
+ * 点判定（このファイル）とオーバーレイ描画（zoning-overlay.js）で同じタイルを
+ * 二重に取りに行かないよう、モジュールスコープで共用する。
+ */
 const tileCache = new Map();
 
-async function fetchTile(url) {
+/**
+ * MVTタイルを取得する（同一URLは1回だけ実際にfetchする）。
+ * @param {string} url
+ * @returns {Promise<Uint8Array|null>} 404（配信範囲外）は null
+ */
+export async function fetchTileBuffer(url) {
   if (tileCache.has(url)) return tileCache.get(url);
   const p = (async () => {
     const res = await fetch(url);
@@ -62,6 +74,11 @@ async function fetchTile(url) {
   return p;
 }
 
+/** テスト・デバッグ用（キャッシュの効きを確認する） */
+export function tileCacheSize() {
+  return tileCache.size;
+}
+
 /**
  * 1レイヤー分のMVTを引いて、点を含む最初のフィーチャの属性を返す。
  * @returns {Promise<{layer:string, props:object}|null>}
@@ -69,7 +86,7 @@ async function fetchTile(url) {
 async function queryLayer(cfg, lon, lat) {
   const { Pbf, VectorTile } = await loadMvtLib();
   const t = lonLatToTileLocal(lon, lat, cfg.z, 1);
-  const buf = await fetchTile(tileUrl(cfg.url, cfg.z, t.x, t.y));
+  const buf = await fetchTileBuffer(tileUrl(cfg.url, cfg.z, t.x, t.y));
   if (!buf) return null;
   const tile = new VectorTile(new Pbf(buf));
   for (const name of Object.keys(tile.layers)) {

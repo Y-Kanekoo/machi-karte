@@ -18,6 +18,16 @@ export const OUTPUT_DIR = path.join(__dirname, 'output');
 export const CACHE_DIR = path.join(OUTPUT_DIR, 'relay-cache');
 export const BASE_URL = process.env.NAKANO_BASE_URL || 'http://localhost:8123/';
 
+/**
+ * HARNESS_DIRECT=1 で curl 中継をやめ、ブラウザに直接 fetch させる。
+ * GitHub Actions のランナーのように外部へ直接出られる環境向け
+ * （開発サンドボックスではブラウザの外部通信が遮断されているため中継が必須）。
+ */
+export const HARNESS_DIRECT = process.env.HARNESS_DIRECT === '1';
+
+/** SKIP_NETWORK=1 で実タイル照合（外部データ取得）をスキップする。CIの単体テスト用 */
+export const SKIP_NETWORK = process.env.SKIP_NETWORK === '1';
+
 /** 中継対象ホスト（PLAN.md §8） */
 export const RELAY_HOSTS = [
   'cesium.com',
@@ -71,51 +81,74 @@ export function curlFetch(url) {
  */
 export async function launchViewer(opts = {}) {
   const browser = await chromium.launch({
-    executablePath: '/opt/pw-browsers/chromium',
+    executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium',
     args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
   });
-  const page = await browser.newPage({
+  const context = await browser.newContext({
     viewport: opts.viewport || { width: 1440, height: 900 },
     deviceScaleFactor: 1,
+    ...(opts.contextOptions || {}),
   });
-
+  // クリップボード読み書きは e2e（headless）で明示的に許可しないと拒否される
+  if (opts.permissions !== false) {
+    await context.grantPermissions(opts.permissions || ['clipboard-read', 'clipboard-write'], {
+      origin: new URL(BASE_URL).origin,
+    }).catch((e) => console.warn('grantPermissions failed', e));
+  }
   const errors = [];
   const relay = { ok: 0, fail: 0, byHost: {} };
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(m.text().slice(0, 300));
-  });
-  page.on('pageerror', (e) => errors.push('PAGEERROR: ' + String(e).slice(0, 400)));
 
-  await page.route(RELAY_RE, async (route) => {
-    const url = route.request().url();
-    const host = new URL(url).host;
-    const res = await curlFetch(url);
-    relay.byHost[host] = (relay.byHost[host] || 0) + 1;
-    if (res.status >= 200 && res.status < 400) relay.ok++;
-    else relay.fail++;
-    await route.fulfill({
-      status: res.status,
-      contentType: res.type,
-      headers: {
-        'content-type': res.type,
-        'access-control-allow-origin': '*',
-        'cache-control': 'public, max-age=3600',
-      },
-      body: res.body,
+  // 共有URLの復元は「別ページで開き直す」検証をするので、
+  // 中継とエラー収集はページ単位ではなくコンテキスト単位で仕掛ける。
+  function watch(p) {
+    p.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text().slice(0, 300));
     });
-  });
+    p.on('pageerror', (e) => errors.push('PAGEERROR: ' + String(e).slice(0, 400)));
+    return p;
+  }
+
+  if (!HARNESS_DIRECT) {
+    await context.route(RELAY_RE, async (route) => {
+      const url = route.request().url();
+      const host = new URL(url).host;
+      const res = await curlFetch(url);
+      relay.byHost[host] = (relay.byHost[host] || 0) + 1;
+      if (res.status >= 200 && res.status < 400) relay.ok++;
+      else relay.fail++;
+      await route.fulfill({
+        status: res.status,
+        contentType: res.type,
+        headers: {
+          'content-type': res.type,
+          'access-control-allow-origin': '*',
+          'cache-control': 'public, max-age=3600',
+        },
+        body: res.body,
+      });
+    });
+  }
   // テレメトリ等は遮断
-  await page.route(/google|gstatic|doubleclick/, (route) => route.abort());
+  await context.route(/google|gstatic|doubleclick/, (route) => route.abort());
+
+  const page = watch(await context.newPage());
 
   if (opts.goto !== false) {
-    await page.goto(BASE_URL, { waitUntil: 'load', timeout: 180000 });
+    await page.goto(opts.url || BASE_URL, { waitUntil: 'load', timeout: 180000 });
   }
 
   return {
     browser,
+    context,
     page,
     errors,
     relay,
+    /** 同じ中継設定のまま新しいタブを開く（共有URLの復元検証用） */
+    newPage: async (url) => {
+      const p = watch(await context.newPage());
+      if (url) await p.goto(url, { waitUntil: 'load', timeout: 180000 });
+      return p;
+    },
     close: () => browser.close(),
   };
 }

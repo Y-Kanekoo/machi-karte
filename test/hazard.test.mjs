@@ -10,7 +10,7 @@
 import { PNG } from 'pngjs';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf'; // Node は pbf v5。ブラウザ側は CDN の pbf@3.3.0（default export）
-import { curlFetch, check, equal, report } from './harness.mjs';
+import { curlFetch, check, equal, report, SKIP_NETWORK } from './harness.mjs';
 import { lonLatToPixel, lonLatToTileLocal, tileUrl, pointInRings } from '../js/tilemath.js';
 import { HAZARD_TILES, ZONING_TILES } from '../js/config.js';
 import {
@@ -48,6 +48,10 @@ equal('非透明だが凡例外の色は区分不明',
   classifyLandslideColor([0, 0, 255, 255]).rank, '区域内（区分不明）');
 
 // ---- 2. 実タイルによる期待値（2026-07-27 実測） --------------------------------
+//
+// SKIP_NETWORK=1 のときはここから下（外部データ取得を伴う照合）を丸ごと飛ばす。
+// CIは外部サーバの都合で赤くなるのを避けるため既定でスキップし、週1のscheduleで
+// フラグ無し（実タイル照合込み）を実行する。
 
 async function floodRankAt(lon, lat) {
   const cfg = HAZARD_TILES.floodL2;
@@ -86,6 +90,9 @@ async function zoningAt(key, lon, lat) {
   return null;
 }
 
+if (SKIP_NETWORK) {
+  console.log('--- 実タイル照合: SKIP_NETWORK=1 のためスキップ ---');
+} else {
 console.log('--- 実タイル: 洪水浸水想定（想定最大規模） ---');
 equal('弥生町二丁目(139.673935,35.691502)', await floodRankAt(139.673935, 35.691502), '0.5m未満');
 equal('南台五丁目付近(139.663,35.688)', await floodRankAt(139.663, 35.688), '0.5〜3.0m');
@@ -142,5 +149,7 @@ console.log('--- 実タイル: 防火地域・高度地区 ---');
     !!z?.props.urf_function, JSON.stringify(z?.props?.urf_location));
   console.log(`    → ${z?.props.urf_function} (${z?.props.urf_location})`);
 }
+
+} // end SKIP_NETWORK
 
 report('hazard.test.mjs');

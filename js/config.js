@@ -78,6 +78,93 @@ export const ZONING_TILES = {
   },
 };
 
+// ---- R1: 共有・比較・見える化 ------------------------------------------------
+
+/**
+ * 対応エリア（中野区周辺）。
+ * 用途地域オーバーレイの配信範囲（ImageryProvider の rectangle）と、
+ * 現在地診断の「エリア内か」判定に使う。
+ * R4 で自治体を増やすときは、この定数を「自治体ごとの矩形テーブル」に差し替え、
+ * 選択中の自治体の矩形を返す関数経由で参照するようにする。
+ */
+export const AREA_RECT = { west: 139.60, south: 35.66, east: 139.72, north: 35.75 };
+
+/** 共有URLに載せる座標の妥当性チェック範囲（日本域） */
+export const JP_BOUNDS = { west: 122, south: 20, east: 154, north: 46 };
+
+/** 都市計画オーバーレイのキー（ZONING_TILES のキーと対応。表示順もこの順） */
+export const OVERLAY_KEYS = ['use', 'fire', 'height'];
+
+/** オーバーレイのタイルレベル。実測: PLATEAU の MVT は z=10〜16 配信（z=17 は404）。
+ *  z=10 は 2.6MB/タイルと重いので実用ズーム帯の 14〜16 に限定する。 */
+export const OVERLAY_MIN_LEVEL = 14;
+export const OVERLAY_MAX_LEVEL = 16;
+
+/** ラスタライズ済みタイルのメモリキャッシュ上限（LRU） */
+export const OVERLAY_TILE_CACHE_MAX = 100;
+
+/** オーバーレイの初期透明度 */
+export const OVERLAY_DEFAULT_ALPHA = 0.55;
+
+/**
+ * 用途地域の配色（都市計画図の慣用配色に準拠）。
+ * オーバーレイの塗り色と凡例の単一ソース。
+ */
+export const USE_DISTRICT_COLORS = {
+  '第1種低層住居専用地域': '#52A373',
+  '第2種低層住居専用地域': '#7DBE8E',
+  '第1種中高層住居専用地域': '#A8D8A0',
+  '第2種中高層住居専用地域': '#C6E6B3',
+  '第1種住居地域': '#F4E88B',
+  '第2種住居地域': '#F9DFA0',
+  '準住居地域': '#F5C97B',
+  '近隣商業地域': '#F2AEC4',
+  '商業地域': '#E77B8F',
+  '準工業地域': '#C7A9D6',
+  '工業地域': '#9FC6E8',
+  '工業専用地域': '#7FA8D9',
+};
+
+/** 用途地域の未知の値（凡例では「その他」） */
+export const USE_DISTRICT_OTHER_COLOR = '#BBBBBB';
+
+/** 防火地域・準防火地域の配色 */
+export const FIRE_COLORS = {
+  '防火地域': '#E06666',
+  '準防火地域': '#F0B060',
+};
+
+/** 高度地区は属性値の種類が少ないので単色 */
+export const HEIGHT_DISTRICT_COLOR = '#8FB6E0';
+
+/** 洪水ランク → 表示色（診断カードと比較表で共用） */
+export const FLOOD_COLORS = {
+  '区域外': '#7fd6a2',
+  '0.5m未満': '#f7f5a9',
+  '0.5〜3.0m': '#ffd8c0',
+  '3.0〜5.0m': '#ffb7b7',
+  '5.0〜10.0m': '#ff9191',
+  '10.0〜20.0m': '#f285c9',
+  '20.0m以上': '#dc7adc',
+};
+
+/** 比較できる最大地点数 */
+export const COMPARE_MAX = 3;
+/** 比較の重複追加とみなす距離（m） */
+export const COMPARE_DEDUPE_METERS = 10;
+/** 比較状態の sessionStorage キー */
+export const COMPARE_STORAGE_KEY = 'karte-compare';
+
+/** 診断履歴の保持件数 */
+export const HISTORY_MAX = 5;
+/** 診断履歴の sessionStorage キー */
+export const HISTORY_STORAGE_KEY = 'karte-history';
+/** カードのセクション開閉状態の sessionStorage キー */
+export const COLLAPSE_STORAGE_KEY = 'karte-collapsed';
+
+/** 現在地取得のタイムアウト（ms） */
+export const GEOLOCATION_TIMEOUT = 10000;
+
 /** MVTデコード用CDN（ブラウザ用。pbf v4以降はexport形状が変わるためv3系に固定） */
 export const MVT_CDN = [
   {

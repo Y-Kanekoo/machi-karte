@@ -8,19 +8,29 @@ import { search as geocodeSearch } from './geocode.js';
 import { queryFlood, queryLandslide } from './hazard.js';
 import { queryZoning } from './zoning.js';
 import { estimateSunlight, estimateBaseHeight, prepareTiles, MIN_SUN_ELEVATION } from './sunlight.js';
+import { FLOOD_COLORS, HEIGHT_PROP_CANDIDATES, AREA_RECT } from './config.js';
 
 const SPINNER = '<span class="diag-loading"><span class="spinner"></span>取得中…</span>';
 
-/** 洪水ランク → 表示色 */
-const FLOOD_COLORS = {
-  '区域外': '#7fd6a2',
-  '0.5m未満': '#f7f5a9',
-  '0.5〜3.0m': '#ffd8c0',
-  '3.0〜5.0m': '#ffb7b7',
-  '5.0〜10.0m': '#ff9191',
-  '10.0〜20.0m': '#f285c9',
-  '20.0m以上': '#dc7adc',
-};
+/** 対応エリア（中野区周辺）の内側か。区外では建物3Dと日照が使えない旨を出す */
+export function isInServiceArea(lon, lat) {
+  return (
+    lon >= AREA_RECT.west && lon <= AREA_RECT.east &&
+    lat >= AREA_RECT.south && lat <= AREA_RECT.north
+  );
+}
+
+/** ピックした建物フィーチャから計測高さ（m）を取り出す（比較表で使う） */
+function measuredHeightOf(picked) {
+  if (!picked) return null;
+  for (const key of HEIGHT_PROP_CANDIDATES) {
+    try {
+      const n = Number(picked.getProperty(key));
+      if (Number.isFinite(n) && n > 0) return n;
+    } catch (_) { /* 属性なし */ }
+  }
+  return null;
+}
 
 export function initDiagnosis(ctx) {
   const { viewer, getCurrentBuildingTileset, buildingTableHtml, setStatus } = ctx;
@@ -35,6 +45,7 @@ export function initDiagnosis(ctx) {
   const searchMsg = document.getElementById('searchMsg');
 
   const closeHandlers = [];
+  const resultHandlers = [];
   let pinEntity = null;
   let runToken = 0;
   let lastResult = null;
@@ -201,10 +212,16 @@ export function initDiagnosis(ctx) {
   // ---- 診断の実行 ----------------------------------------------------------
 
   /**
-   * @param {{lon:number, lat:number, title?:string|null, picked?:object|null, fly?:boolean}} req
+   * 地点診断を実行する。
+   * 洪水・土砂災害・都市計画（＝比較や共有で必要な「コア項目」）が揃うまで await できる。
+   * 日照は重いので待たずにバックグラウンドで進める。
+   *
+   * @param {{lon:number, lat:number, title?:string|null, picked?:object|null,
+   *          fly?:boolean, skipSunlight?:boolean}} req
+   * @returns {Promise<object>} lastResult（コア項目まで埋まった状態）
    */
   async function diagnose(req) {
-    const { lon, lat, title = null, picked = null, fly = true } = req;
+    const { lon, lat, title = null, picked = null, fly = true, skipSunlight = false } = req;
     const token = ++runToken;
     const alive = () => token === runToken;
 
@@ -212,7 +229,13 @@ export function initDiagnosis(ctx) {
     sectionShell();
     fill('secPlace', renderPlace(lon, lat, title));
     setPin(lon, lat, title || '診断地点');
-    lastResult = { lon, lat, title, flood: null, landslide: null, zoning: null, sunlight: null };
+    const result = {
+      lon, lat, title,
+      flood: null, landslide: null, zoning: null, sunlight: null,
+      buildingHeight: measuredHeightOf(picked),
+      inArea: isInServiceArea(lon, lat),
+    };
+    lastResult = result;
 
     // 建物属性（同期・ピック時のみ）
     if (picked) {
@@ -222,34 +245,56 @@ export function initDiagnosis(ctx) {
     }
 
     // 洪水
-    queryFlood(lon, lat)
-      .then((r) => { if (alive()) { lastResult.flood = r; fill('secFlood', renderFlood(r)); } })
+    const pFlood = queryFlood(lon, lat)
+      .then((r) => { if (alive()) { result.flood = r; fill('secFlood', renderFlood(r)); } })
       .catch((e) => {
         console.warn('flood failed', e);
         if (alive()) fill('secFlood', failMsg('洪水浸水想定を取得できませんでした'));
       });
 
     // 土砂災害
-    queryLandslide(lon, lat)
-      .then((r) => { if (alive()) { lastResult.landslide = r; fill('secLandslide', renderLandslide(r)); } })
+    const pLand = queryLandslide(lon, lat)
+      .then((r) => { if (alive()) { result.landslide = r; fill('secLandslide', renderLandslide(r)); } })
       .catch((e) => {
         console.warn('landslide failed', e);
         if (alive()) fill('secLandslide', failMsg('土砂災害警戒区域を取得できませんでした'));
       });
 
     // 都市計画
-    queryZoning(lon, lat)
-      .then((r) => { if (alive()) { lastResult.zoning = r; fill('secZoning', renderZoning(r)); } })
+    const pZone = queryZoning(lon, lat)
+      .then((r) => { if (alive()) { result.zoning = r; fill('secZoning', renderZoning(r)); } })
       .catch((e) => {
         console.warn('zoning failed', e);
         if (alive()) fill('secZoning', failMsg('都市計画情報を取得できませんでした'));
       });
 
     // 日照（重いので最後、カメラ移動＋タイル読み込み待ちを挟む）
-    runSunlight(lon, lat, picked, alive, fly).catch((e) => {
-      console.warn('sunlight failed', e);
-      if (alive()) fill('secSun', failMsg('日照: 計算できませんでした'));
-    });
+    if (skipSunlight) {
+      fill('secSun', '<div class="diag-note">日照は未計算です（比較URLからの復元では省略しています）。</div>');
+    } else if (!result.inArea) {
+      fill('secSun', failMsg('対応エリア外です（建物3Dは中野区のみ）。日照は計算できません。'));
+    } else {
+      runSunlight(lon, lat, picked, alive, fly).catch((e) => {
+        console.warn('sunlight failed', e);
+        if (alive()) fill('secSun', failMsg('日照: 計算できませんでした'));
+      });
+    }
+
+    if (!result.inArea) {
+      const sec = body.querySelector('[data-sec="building"]');
+      if (sec && !picked) {
+        sec.classList.remove('hidden');
+        fill('secBuilding', '<div class="diag-note">対応エリア外です（建物3Dは中野区のみ）。ハザードと都市計画は全国のデータで診断しています。</div>');
+      }
+    }
+
+    await Promise.all([pFlood, pLand, pZone]);
+    if (alive()) {
+      for (const fn of resultHandlers) {
+        try { fn(result); } catch (e) { console.warn('onResult handler failed', e); }
+      }
+    }
+    return result;
   }
 
   async function runSunlight(lon, lat, picked, alive, fly) {
@@ -275,6 +320,10 @@ export function initDiagnosis(ctx) {
     lastResult.sunlight = result;
     lastResult.baseHeight = baseInfo;
     fill('secSun', renderSunlight(result, baseInfo));
+    // 日照が揃った時点でも通知する（比較スナップショットを取り直せるように）
+    for (const fn of resultHandlers) {
+      try { fn(lastResult); } catch (e) { console.warn('onResult handler failed', e); }
+    }
   }
 
   function close() {
@@ -364,11 +413,23 @@ export function initDiagnosis(ctx) {
 
   return {
     diagnose,
+    /**
+     * 公開API: 座標を指定して診断する（share.js / compare.js から使う）。
+     * @param {number} lon @param {number} lat
+     * @param {{title?:string|null, fly?:boolean, skipSunlight?:boolean}} [opts]
+     */
+    runDiagnosisAt: (lon, lat, opts = {}) => {
+      if (opts.fly) flyToPoint(lon, lat);
+      return diagnose({ lon, lat, picked: null, ...opts });
+    },
     close,
     isActive: () => toggle.checked,
     setActive,
     onClose: (fn) => closeHandlers.push(fn),
+    /** 診断のコア項目が揃うたび（＋日照完了時）に呼ばれる */
+    onResult: (fn) => resultHandlers.push(fn),
     getLastResult: () => lastResult,
+    flyToPoint,
     searchAndDiagnose: async (q) => {
       searchInput.value = q;
       await doSearch();
