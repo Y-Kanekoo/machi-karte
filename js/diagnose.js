@@ -8,7 +8,37 @@ import { search as geocodeSearch } from './geocode.js';
 import { queryFlood, queryLandslide } from './hazard.js';
 import { queryZoning } from './zoning.js';
 import { estimateSunlight, estimateBaseHeight, prepareTiles, MIN_SUN_ELEVATION } from './sunlight.js';
-import { FLOOD_COLORS, HEIGHT_PROP_CANDIDATES, AREA_RECT } from './config.js';
+import {
+  FLOOD_COLORS,
+  HEIGHT_PROP_CANDIDATES,
+  AREA_RECT,
+  HISTORY_MAX,
+  HISTORY_STORAGE_KEY,
+  COLLAPSE_STORAGE_KEY,
+  GEOLOCATION_TIMEOUT,
+} from './config.js';
+
+/**
+ * sessionStorage の読み書き。
+ * プライベートモード等で例外になっても診断本体には影響させない（黙って既定値を返す）。
+ */
+function sessionGet(key, fallback) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    console.warn('sessionStorage read failed', key, e);
+    return fallback;
+  }
+}
+
+function sessionSet(key, value) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn('sessionStorage write failed', key, e);
+  }
+}
 
 const SPINNER = '<span class="diag-loading"><span class="spinner"></span>取得中…</span>';
 
@@ -118,6 +148,57 @@ export function initDiagnosis(ctx) {
         <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">Project PLATEAU</a>（都市計画決定情報・建物）／
         <a href="https://msearch.gsi.go.jp/" target="_blank" rel="noopener">国土地理院 住所検索API</a>
       </p>`;
+    applyCollapse();
+  }
+
+  // ---- セクションの折りたたみ（状態は sessionStorage に記憶） ---------------------
+
+  /** @returns {Record<string, boolean>} data-sec → 開いているか */
+  function collapseState() {
+    const s = sessionGet(COLLAPSE_STORAGE_KEY, {});
+    return s && typeof s === 'object' ? s : {};
+  }
+
+  function applyCollapse() {
+    const state = collapseState();
+    body.querySelectorAll('.diag-sec').forEach((sec) => {
+      const key = sec.dataset.sec;
+      const h3 = sec.querySelector('h3');
+      if (!h3 || !key) return;
+      h3.classList.add('collapsible');
+      h3.setAttribute('role', 'button');
+      h3.setAttribute('tabindex', '0');
+      h3.setAttribute('aria-expanded', String(state[key] !== false));
+      const toggle = () => {
+        const open = h3.getAttribute('aria-expanded') === 'true';
+        h3.setAttribute('aria-expanded', String(!open));
+        const next = collapseState();
+        next[key] = !open;
+        sessionSet(COLLAPSE_STORAGE_KEY, next);
+      };
+      h3.addEventListener('click', toggle);
+      h3.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
+  // ---- 診断履歴（直近5件） ---------------------------------------------------
+
+  function pushHistory(entry) {
+    const list = sessionGet(HISTORY_STORAGE_KEY, []);
+    const rest = (Array.isArray(list) ? list : []).filter(
+      (x) => Math.abs(x.lon - entry.lon) > 1e-5 || Math.abs(x.lat - entry.lat) > 1e-5
+    );
+    rest.unshift(entry);
+    sessionSet(HISTORY_STORAGE_KEY, rest.slice(0, HISTORY_MAX));
+  }
+
+  function readHistory() {
+    const list = sessionGet(HISTORY_STORAGE_KEY, []);
+    return (Array.isArray(list) ? list : []).filter(
+      (x) => x && Number.isFinite(x.lon) && Number.isFinite(x.lat)
+    );
   }
 
   const $ = (id) => document.getElementById(id);
@@ -226,6 +307,7 @@ export function initDiagnosis(ctx) {
     const alive = () => token === runToken;
 
     panel.classList.remove('hidden');
+    showSearchMsg(''); // 前の診断で出したメッセージを残さない
     sectionShell();
     fill('secPlace', renderPlace(lon, lat, title));
     setPin(lon, lat, title || '診断地点');
@@ -236,6 +318,7 @@ export function initDiagnosis(ctx) {
       inArea: isInServiceArea(lon, lat),
     };
     lastResult = result;
+    pushHistory({ title, lon, lat, at: Date.now() });
 
     // 建物属性（同期・ピック時のみ）
     if (picked) {
@@ -343,9 +426,67 @@ export function initDiagnosis(ctx) {
     searchMsg.classList.toggle('error', !!isError);
   }
 
+  // 候補リスト（住所検索の結果 or 診断履歴）と、キーボードで選択中の位置
+  let options = [];
+  let activeIndex = -1;
+
   function hideResults() {
     searchResults.classList.add('hidden');
     searchResults.innerHTML = '';
+    options = [];
+    activeIndex = -1;
+    searchInput.setAttribute('aria-expanded', 'false');
+    searchInput.removeAttribute('aria-activedescendant');
+  }
+
+  /** 選択位置を DOM と aria-activedescendant に反映する */
+  function highlightOption() {
+    searchResults.querySelectorAll('li').forEach((li, i) => {
+      li.setAttribute('aria-selected', String(i === activeIndex));
+    });
+    if (activeIndex >= 0) {
+      searchInput.setAttribute('aria-activedescendant', 'search-opt-' + activeIndex);
+      searchResults.querySelectorAll('li')[activeIndex]?.scrollIntoView({ block: 'nearest' });
+    } else {
+      searchInput.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  /**
+   * 候補リストを描画する（combobox/listbox のARIAを付ける）。
+   * @param {Array<{title:string, lon:number, lat:number}>} items
+   * @param {boolean} isHistory 履歴由来なら true（見た目を変える）
+   */
+  function renderOptions(items, isHistory = false) {
+    options = items;
+    activeIndex = -1;
+    searchResults.innerHTML = items
+      .map(
+        (r, i) =>
+          `<li id="search-opt-${i}" role="option" aria-selected="false" data-i="${i}"` +
+          `${isHistory ? ' class="history-item"' : ''}>${escapeHtml(r.title)}</li>`
+      )
+      .join('');
+    searchResults.classList.remove('hidden');
+    searchInput.setAttribute('aria-expanded', 'true');
+    searchInput.removeAttribute('aria-activedescendant');
+    searchResults.querySelectorAll('li').forEach((li) => {
+      li.addEventListener('click', () => pickResult(options[Number(li.dataset.i)]));
+    });
+  }
+
+  /** 入力が空のときに直近の診断履歴をドロップダウンで出す */
+  function showHistory() {
+    const list = readHistory();
+    if (!list.length) return;
+    renderOptions(
+      list.map((h) => ({
+        title: h.title || `${h.lon.toFixed(5)}, ${h.lat.toFixed(5)}`,
+        lon: h.lon,
+        lat: h.lat,
+      })),
+      true
+    );
   }
 
   function flyToPoint(lon, lat) {
@@ -381,13 +522,7 @@ export function initDiagnosis(ctx) {
         await pickResult(results[0]);
         return;
       }
-      searchResults.innerHTML = results
-        .map((r, i) => `<li data-i="${i}">${escapeHtml(r.title)}</li>`)
-        .join('');
-      searchResults.classList.remove('hidden');
-      searchResults.querySelectorAll('li').forEach((li) => {
-        li.addEventListener('click', () => pickResult(results[Number(li.dataset.i)]));
-      });
+      renderOptions(results);
     } catch (e) {
       console.warn('geocode failed', e);
       showSearchMsg('住所検索に失敗しました', true);
@@ -397,10 +532,81 @@ export function initDiagnosis(ctx) {
   }
 
   searchBtn.addEventListener('click', doSearch);
+
+  // ---- 検索のキーボード操作（↑↓で選択・Enterで確定・Escで閉じる） -----------------
+
   searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!options.length) return;
+      e.preventDefault();
+      const n = options.length;
+      activeIndex = e.key === 'ArrowDown'
+        ? (activeIndex + 1) % n
+        : (activeIndex <= 0 ? n - 1 : activeIndex - 1);
+      highlightOption();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // 候補を選んでいればそれで診断、選んでいなければ入力文字列で検索
+      if (activeIndex >= 0 && options[activeIndex]) pickResult(options[activeIndex]);
+      else doSearch();
+      return;
+    }
     if (e.key === 'Escape') hideResults();
   });
+
+  // ---- 診断履歴のドロップダウン ------------------------------------------------
+
+  // fill() でフォーカス済みの状態から click されても出せるよう focus/click 両方で拾う
+  const maybeShowHistory = () => {
+    if (!searchInput.value.trim() && !options.length) showHistory();
+  };
+  searchInput.addEventListener('focus', maybeShowHistory);
+  searchInput.addEventListener('click', maybeShowHistory);
+  searchInput.addEventListener('input', () => {
+    if (searchResults.querySelector('.history-item')) hideResults();
+  });
+
+  // ---- 現在地診断 --------------------------------------------------------------
+
+  const geoBtn = document.getElementById('geoBtn');
+
+  function diagnoseCurrentLocation() {
+    if (!navigator.geolocation) {
+      showSearchMsg('この端末では現在地を取得できません', true);
+      return;
+    }
+    hideResults();
+    showSearchMsg('現在地を取得中…');
+    if (geoBtn) geoBtn.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (geoBtn) geoBtn.disabled = false;
+        const lon = pos.coords.longitude;
+        const lat = pos.coords.latitude;
+        flyToPoint(lon, lat);
+        // diagnose() が検索メッセージを消すので、エリア外の案内はその後に出す
+        diagnose({ lon, lat, title: null, picked: null });
+        if (!isInServiceArea(lon, lat)) {
+          // エリア外でもハザード・都市計画のタイルは全国分あるので診断自体は実行する
+          showSearchMsg('対応エリア外です（建物3Dは中野区のみ）。ハザードと都市計画のみ診断します', true);
+        }
+      },
+      (err) => {
+        if (geoBtn) geoBtn.disabled = false;
+        const msg =
+          err.code === err.PERMISSION_DENIED ? '現在地の利用が許可されませんでした'
+            : err.code === err.TIMEOUT ? '現在地の取得がタイムアウトしました'
+              : '現在地を取得できませんでした';
+        showSearchMsg(msg, true);
+      },
+      // maximumAge=0: 直前の測位結果を使い回さない（移動直後でも今の位置を取る）
+      { enableHighAccuracy: false, timeout: GEOLOCATION_TIMEOUT, maximumAge: 0 }
+    );
+  }
+
+  if (geoBtn) geoBtn.addEventListener('click', diagnoseCurrentLocation);
 
   // ---- 診断モードトグル -----------------------------------------------------
 
@@ -430,6 +636,8 @@ export function initDiagnosis(ctx) {
     onResult: (fn) => resultHandlers.push(fn),
     getLastResult: () => lastResult,
     flyToPoint,
+    diagnoseCurrentLocation,
+    getHistory: readHistory,
     searchAndDiagnose: async (q) => {
       searchInput.value = q;
       await doSearch();

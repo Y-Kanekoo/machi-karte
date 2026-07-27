@@ -864,6 +864,11 @@ body.diag-mode #cesiumContainer canvas {
     padding: 6px 10px;
     gap: 7px;
   }
+  /* 比較バーが出ているときは診断カードを押し上げて重ならないようにする */
+  #compareBar:not(.hidden) ~ #diagnosisPanel {
+    bottom: 68px;
+    max-height: 46%;
+  }
   #toast {
     bottom: 78px;
   }

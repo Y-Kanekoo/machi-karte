@@ -477,6 +477,213 @@ try {
   check('消去で比較バーが隠れる', await page.isHidden('#compareBar'));
 
   // ============================================================================
+  // 4. UX改善バンドル（F1-4）
+  // ============================================================================
+  console.log('\n=== 4. UX改善 ===');
+
+  // --- 4a. 検索候補のキーボード操作 ---
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+  await page.fill('#searchInput', '');
+  await page.click('#searchInput');
+  await page.fill('#searchInput', '野方');
+  await page.keyboard.press('Enter'); // 候補リストを出す
+  await page.waitForSelector('#searchResults:not(.hidden) li', { timeout: 60000 });
+
+  const listA11y = await page.evaluate(() => ({
+    role: document.getElementById('searchResults').getAttribute('role'),
+    inputRole: document.getElementById('searchInput').getAttribute('role'),
+    expanded: document.getElementById('searchInput').getAttribute('aria-expanded'),
+    n: document.querySelectorAll('#searchResults li').length,
+    optionRoles: [...document.querySelectorAll('#searchResults li')].map((li) => li.getAttribute('role')),
+  }));
+  console.log('  候補リスト: ' + JSON.stringify(listA11y));
+  equal('候補リストが role="listbox"', listA11y.role, 'listbox');
+  equal('入力欄が role="combobox"', listA11y.inputRole, 'combobox');
+  equal('候補表示中は aria-expanded="true"', listA11y.expanded, 'true');
+  check('候補が複数出る', listA11y.n >= 2, String(listA11y.n));
+  check('各候補が role="option"', listA11y.optionRoles.every((r) => r === 'option'), JSON.stringify(listA11y.optionRoles));
+
+  await page.keyboard.press('ArrowDown');
+  const sel0 = await page.evaluate(() => ({
+    active: document.getElementById('searchInput').getAttribute('aria-activedescendant'),
+    selected: [...document.querySelectorAll('#searchResults li')].map((li) => li.getAttribute('aria-selected')),
+  }));
+  check('↓で1件目が選択される', sel0.selected[0] === 'true', JSON.stringify(sel0));
+  check('aria-activedescendantが1件目を指す', sel0.active === 'search-opt-0', JSON.stringify(sel0));
+
+  await page.keyboard.press('ArrowDown');
+  const sel1 = await page.evaluate(() =>
+    document.getElementById('searchInput').getAttribute('aria-activedescendant'));
+  equal('↓をもう一度で2件目', sel1, 'search-opt-1');
+  await page.keyboard.press('ArrowUp');
+  const sel2 = await page.evaluate(() =>
+    document.getElementById('searchInput').getAttribute('aria-activedescendant'));
+  equal('↑で1件目に戻る', sel2, 'search-opt-0');
+
+  await page.keyboard.press('Enter'); // 選択中の候補で診断
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
+  const placeKb = await waitSection(page, 'secPlace');
+  console.log('  📍 ' + placeKb);
+  check('キーボードだけで検索→候補選択→診断が完走する', placeKb.includes('野方'), placeKb);
+  const zoneKb = await waitSection(page, 'secZoning');
+  check('キーボード診断でも都市計画が出る', zoneKb.length > 0 && !zoneKb.includes('取得中'), zoneKb.slice(0, 60));
+
+  // Escapeで候補を閉じる
+  await page.fill('#searchInput', '野方');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#searchResults:not(.hidden) li', { timeout: 60000 });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  check('Escapeで候補が閉じる', await page.isHidden('#searchResults'));
+  equal('閉じたら aria-expanded="false"',
+    await page.getAttribute('#searchInput', 'aria-expanded'), 'false');
+
+  // --- 4b. セクションの折りたたみ ---
+  const beforeCollapse = await page.evaluate(() => {
+    const h = document.querySelector('.diag-sec[data-sec="flood"] h3');
+    return { expanded: h.getAttribute('aria-expanded'), visible: !!document.getElementById('secFlood').offsetParent };
+  });
+  equal('初期状態は展開', beforeCollapse.expanded, 'true');
+  check('初期状態は中身が見えている', beforeCollapse.visible);
+
+  await page.click('.diag-sec[data-sec="flood"] h3');
+  await page.waitForTimeout(200);
+  const afterCollapse = await page.evaluate(() => {
+    const h = document.querySelector('.diag-sec[data-sec="flood"] h3');
+    return { expanded: h.getAttribute('aria-expanded'), visible: !!document.getElementById('secFlood').offsetParent };
+  });
+  equal('クリックで aria-expanded="false"', afterCollapse.expanded, 'false');
+  check('折りたたむと中身が隠れる', !afterCollapse.visible);
+
+  // 再診断しても折りたたみ状態が残る（sessionStorage）
+  await quickDiagnose(139.66893, 35.707859, '東京都中野区中野五丁目');
+  const keptCollapse = await page.evaluate(() =>
+    document.querySelector('.diag-sec[data-sec="flood"] h3').getAttribute('aria-expanded'));
+  equal('再診断しても折りたたみ状態が残る', keptCollapse, 'false');
+  await page.click('.diag-sec[data-sec="flood"] h3'); // 元に戻す
+  await page.waitForTimeout(200);
+
+  // --- 4c. 診断履歴 ---
+  await page.fill('#searchInput', '');
+  await page.click('#searchInput');
+  await page.waitForTimeout(400);
+  const history = await page.evaluate(() => ({
+    visible: !document.getElementById('searchResults').classList.contains('hidden'),
+    items: [...document.querySelectorAll('#searchResults li')].map((li) => li.textContent.trim()),
+  }));
+  console.log('  履歴: ' + JSON.stringify(history));
+  check('入力が空でフォーカスすると履歴が出る', history.visible, JSON.stringify(history));
+  check('履歴は5件以内', history.items.length <= 5, String(history.items.length));
+  check('履歴に直近の診断地点が入る',
+    history.items.some((x) => x.includes('中野五丁目')), JSON.stringify(history.items));
+
+  await page.click('#searchResults li:first-child');
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
+  const placeHist = await waitSection(page, 'secPlace');
+  check('履歴から再診断できる', placeHist.length > 0 && !placeHist.includes('取得中'), placeHist);
+
+  // --- 4d. 現在地診断（区内） ---
+  await t.context.setGeolocation({ latitude: 35.7056, longitude: 139.6659 });
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+  await page.click('#geoBtn');
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
+  const placeGeo = await waitSection(page, 'secPlace');
+  console.log('  📍(現在地/区内) ' + placeGeo);
+  check('現在地（中野駅）で診断できる',
+    placeGeo.includes('139.6659') && placeGeo.includes('35.7056'), placeGeo);
+  const zoneGeo = await waitSection(page, 'secZoning');
+  check('現在地診断で商業地域が出る', zoneGeo.includes('商業地域'), zoneGeo.slice(0, 80));
+  check('区内なのでエリア外メッセージは出ない',
+    !(await page.textContent('#diagBody')).includes('対応エリア外'));
+
+  // --- 4e. 現在地診断（区外＝東京駅） ---
+  // 注: 計画では新宿駅だったが、AREA_RECT(east=139.72) の内側なので東京駅を使う
+  await t.context.setGeolocation({ latitude: 35.6812, longitude: 139.7671 });
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+  await page.click('#geoBtn');
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
+  const placeOut = await waitSection(page, 'secPlace');
+  console.log('  📍(現在地/区外) ' + placeOut);
+  check('区外の現在地でも地点が出る', placeOut.includes('139.7671'), placeOut);
+  const msgOut = await page.textContent('#searchMsg');
+  check('区外は検索バーに「対応エリア外」と出る', msgOut.includes('対応エリア外'), msgOut);
+  const bodyOut = (await page.textContent('#diagBody')).replace(/\s+/g, ' ');
+  check('区外でもカードにエリア外の説明が出る', bodyOut.includes('対応エリア外'), bodyOut.slice(0, 200));
+  const floodOut = await waitSection(page, 'secFlood');
+  const zoneOut = await waitSection(page, 'secZoning');
+  console.log('  区外 🌊 ' + floodOut + ' / 🏘️ ' + zoneOut.slice(0, 60));
+  check('区外でもハザード判定は実行される', floodOut.length > 0 && !floodOut.includes('取得中'), floodOut);
+  check('区外でも都市計画セクションは埋まる', zoneOut.length > 0 && !zoneOut.includes('取得中'), zoneOut.slice(0, 80));
+  check('区外では日照が「エリア外」表示', (await page.textContent('#secSun')).includes('エリア外'),
+    await page.textContent('#secSun'));
+
+  // --- 4f. a11y の最低限 ---
+  const a11y = await page.evaluate(() => ({
+    live: document.getElementById('diagnosisPanel').getAttribute('aria-live'),
+    // Cesium ウィジェット自身のボタン（全画面ボタン等）は対象外にして、自前UIだけ見る
+    unlabeled: [...document.querySelectorAll(
+      '#controlPanel button, #searchBar button, #diagnosisPanel button, #compareBar button, #compareModal button'
+    )]
+      .filter((b) => b.offsetParent !== null && !b.getAttribute('aria-label') && !b.textContent.trim())
+      .map((b) => b.id || b.className),
+    badgeColor: getComputedStyle(document.querySelector('.diag-badge') || document.body).color,
+  }));
+  console.log('  a11y: ' + JSON.stringify(a11y));
+  equal('診断カードが aria-live="polite"', a11y.live, 'polite');
+  check('ラベルのないボタンが無い', a11y.unlabeled.length === 0, JSON.stringify(a11y.unlabeled));
+  check('バッジの文字色が #1a2028 のまま', a11y.badgeColor === 'rgb(26, 32, 40)', a11y.badgeColor);
+
+  // --- 4g. モバイル幅で新UIが崩れないこと ---
+  await page.evaluate(() => {
+    window.__nakano.diagnosis.close();
+    window.__nakano.compare.clearAll();
+  });
+  await quickDiagnose(139.673935, 35.691502, '東京都中野区弥生町二丁目');
+  await page.click('#compareAddBtn');
+  await quickDiagnose(139.635, 35.725, '東京都中野区鷺宮三丁目');
+  await page.click('#compareAddBtn');
+  await page.check('#ov-use');
+  await page.setViewportSize({ width: 390, height: 780 });
+  await page.waitForTimeout(2500);
+  const mobile = await page.evaluate(() => {
+    const r = (id) => document.getElementById(id).getBoundingClientRect();
+    return {
+      w: window.innerWidth,
+      scrollW: document.documentElement.scrollWidth,
+      panel: [r('diagnosisPanel').left, r('diagnosisPanel').right],
+      bar: [r('compareBar').left, r('compareBar').right],
+      legend: [r('zoningLegend').left, r('zoningLegend').right],
+      search: [r('searchBar').left, r('searchBar').right],
+    };
+  });
+  console.log('  モバイル: ' + JSON.stringify(mobile));
+  check('モバイル: 横スクロールが発生しない', mobile.scrollW <= mobile.w + 1, JSON.stringify(mobile));
+  check('モバイル: 診断カードが画面内',
+    mobile.panel[0] >= -1 && mobile.panel[1] <= mobile.w + 1, JSON.stringify(mobile.panel));
+  check('モバイル: 比較バーが画面内',
+    mobile.bar[0] >= -1 && mobile.bar[1] <= mobile.w + 1, JSON.stringify(mobile.bar));
+  check('モバイル: 用途地域の凡例が画面内',
+    mobile.legend[0] >= -1 && mobile.legend[1] <= mobile.w + 1, JSON.stringify(mobile.legend));
+  check('モバイル: 検索バーが画面内',
+    mobile.search[0] >= -1 && mobile.search[1] <= mobile.w + 1, JSON.stringify(mobile.search));
+  await page.screenshot({ path: shotPath('r1-07-mobile.png') });
+
+  await page.click('#compareShowBtn');
+  await page.waitForSelector('#compareModal:not(.hidden)');
+  await page.waitForTimeout(500);
+  const mobileModal = await page.evaluate(() => ({
+    scrollW: document.documentElement.scrollWidth,
+    w: window.innerWidth,
+    panel: document.querySelector('.cmp-panel').getBoundingClientRect().right,
+  }));
+  check('モバイル: 比較モーダルでも横スクロールしない',
+    mobileModal.scrollW <= mobileModal.w + 1, JSON.stringify(mobileModal));
+  await page.screenshot({ path: shotPath('r1-08-mobile-compare.png') });
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.uncheck('#ov-use');
+
+  // ============================================================================
   // JSエラー
   // ============================================================================
   const fatal = t.errors.filter(
