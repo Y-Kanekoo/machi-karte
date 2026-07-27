@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>中野区 3D都市モデルビューア | PLATEAU</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <div id="controlPanel">
+    <h1>中野区 3Dビューア</h1>
+    <p class="subtitle">PLATEAU 3D都市モデル (2025年度版)</p>
+
+    <section>
+      <h2>建物モデル</h2>
+      <label><input type="radio" name="bldg" value="lod2" checked> LOD2（テクスチャ付き・高精細）</label>
+      <label><input type="radio" name="bldg" value="lod2notex"> LOD2（テクスチャなし）</label>
+      <label><input type="radio" name="bldg" value="lod1"> LOD1（箱型・軽量）</label>
+      <label><input type="radio" name="bldg" value="none"> 非表示</label>
+      <label class="sub"><input type="checkbox" id="heightColor"> 高さで色分け</label>
+      <label class="sub"><input type="checkbox" id="shadows"> 影を表示（日照シミュレーション）</label>
+      <div id="timeControl" class="hidden">
+        <input type="range" id="timeSlider" min="6" max="18" step="0.25" value="12">
+        <span id="timeLabel">12:00</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>防災・その他レイヤー</h2>
+      <label><input type="checkbox" id="fldKanda"> 洪水浸水想定（神田川流域・L2）</label>
+      <label><input type="checkbox" id="fldArakawa"> 洪水浸水想定（荒川水系 神田川等・L2）</label>
+      <label><input type="checkbox" id="tran"> 道路（LOD3）</label>
+      <label><input type="checkbox" id="wtr"> 水部（LOD1）</label>
+    </section>
+
+    <section>
+      <h2>背景地図</h2>
+      <label><input type="radio" name="imagery" value="photo" checked> 航空写真（地理院）</label>
+      <label><input type="radio" name="imagery" value="pale"> 淡色地図（地理院）</label>
+    </section>
+
+    <section>
+      <h2>スポットへ移動</h2>
+      <div class="presets">
+        <button data-preset="nakanoSta">中野駅</button>
+        <button data-preset="sunplaza">サンプラザ跡・四季の森</button>
+        <button data-preset="broadway">中野ブロードウェイ</button>
+        <button data-preset="araiyakushi">新井薬師</button>
+        <button data-preset="tetsugakudo">哲学堂公園</button>
+        <button data-preset="overview">全体俯瞰</button>
+      </div>
+    </section>
+
+    <div id="status">読み込み中…</div>
+  </div>
+
+  <div id="infoPanel" class="hidden">
+    <div class="info-header">
+      <h2>建物情報</h2>
+      <button id="closeInfo">×</button>
+    </div>
+    <table id="infoTable"></table>
+  </div>
+
+  <div id="legend" class="hidden">
+    <strong>建物高さ</strong>
+    <div class="legend-row"><span class="swatch" style="background:#4575b4"></span>〜12m</div>
+    <div class="legend-row"><span class="swatch" style="background:#91bfdb"></span>12〜31m</div>
+    <div class="legend-row"><span class="swatch" style="background:#fee090"></span>31〜60m</div>
+    <div class="legend-row"><span class="swatch" style="background:#fc8d59"></span>60〜100m</div>
+    <div class="legend-row"><span class="swatch" style="background:#d73027"></span>100m〜</div>
+  </div>
+
+  <div id="attribution">
+    出典: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">国土交通省 Project PLATEAU</a>（中野区 3D都市モデル 2025年度・CC BY 4.0）／
+    <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
