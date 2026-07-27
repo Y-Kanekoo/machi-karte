@@ -529,3 +529,348 @@ body.diag-mode #cesiumContainer canvas {
     padding: 8px 11px;
   }
 }
+
+/* ---- R1: 共有・比較・都市計画オーバーレイ ------------------------------------ */
+
+/* 診断カードのヘッダ操作ボタン（カード再描画で消えないようヘッダ固定部に置く） */
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.card-actions button {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 5px;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.card-actions button:hover {
+  color: #fff;
+  background: rgba(127, 196, 255, 0.18);
+}
+
+.card-actions button:focus-visible {
+  outline: 2px solid #7fc4ff;
+  outline-offset: 1px;
+}
+
+#closeDiag,
+#compareCloseBtn {
+  font-size: 20px;
+}
+
+/* 折りたたみ見出し */
+.diag-sec h3.collapsible {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.diag-sec h3.collapsible::before {
+  content: "▾";
+  font-size: 9px;
+  color: #7fc4ff;
+  transition: transform 0.15s;
+}
+
+.diag-sec h3.collapsible[aria-expanded="false"]::before {
+  transform: rotate(-90deg);
+}
+
+.diag-sec h3.collapsible[aria-expanded="false"] + .diag-content {
+  display: none;
+}
+
+/* 現在地ボタン */
+#geoBtn {
+  background: #2b64a8;
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+#geoBtn:hover:not(:disabled) {
+  background: #3a7fd0;
+}
+
+#geoBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 検索候補のキーボード選択 */
+#searchResults li[aria-selected="true"] {
+  background: rgba(127, 196, 255, 0.3);
+}
+
+#searchResults li.history-item::before {
+  content: "🕘 ";
+  opacity: 0.7;
+}
+
+/* トースト */
+#toast {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 26, 34, 0.94);
+  color: #eee;
+  border: 1px solid rgba(127, 196, 255, 0.35);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 13px;
+  z-index: 30;
+  pointer-events: none;
+  max-width: calc(100% - 40px);
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* 都市計画レイヤーの透明度スライダー */
+#overlayAlphaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0 0 8px;
+}
+
+#overlayAlphaRow input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+#overlayAlphaRow label {
+  display: inline;
+  color: #cfe3f5;
+  white-space: nowrap;
+}
+
+#overlayAlphaRow span {
+  color: #cfe3f5;
+  min-width: 34px;
+  text-align: right;
+}
+
+/* 用途地域などの凡例（建物高さ凡例 #legend とは別DOM。同時表示時は縦に積む） */
+#zoningLegend {
+  position: absolute;
+  bottom: 40px;
+  right: 10px;
+  background: rgba(20, 26, 34, 0.85);
+  color: #eee;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  z-index: 10;
+  max-height: 46%;
+  overflow-y: auto;
+}
+
+#zoningLegend .legend-block + .legend-block {
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 6px;
+}
+
+/* #zoningLegend が出ているときは建物高さ凡例をその上に積む */
+#zoningLegend:not(.hidden) ~ #legend {
+  bottom: auto;
+  top: 10px;
+  right: 368px;
+}
+
+/* 比較バー */
+#compareBar {
+  position: absolute;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(20, 26, 34, 0.92);
+  color: #eee;
+  border-radius: 22px;
+  padding: 7px 14px;
+  font-size: 13px;
+  z-index: 13;
+  backdrop-filter: blur(4px);
+  box-sizing: border-box;
+  max-width: calc(100% - 20px);
+}
+
+#compareBar button {
+  background: #2b64a8;
+  border: none;
+  color: #fff;
+  border-radius: 14px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+#compareBar button:hover:not(:disabled) {
+  background: #3a7fd0;
+}
+
+#compareBar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#compareClearBtn {
+  background: #4a5766 !important;
+}
+
+/* 比較モーダル */
+#compareModal {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 18, 0.72);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.cmp-panel {
+  background: rgba(20, 26, 34, 0.98);
+  color: #eee;
+  border-radius: 12px;
+  padding: 12px 16px 16px;
+  width: min(880px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+
+.cmp-scroll {
+  overflow-x: auto;
+}
+
+.cmp-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.cmp-table th,
+.cmp-table td {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.cmp-table thead th {
+  background: rgba(127, 196, 255, 0.1);
+  min-width: 150px;
+}
+
+.cmp-table tbody th {
+  color: #a9c0d6;
+  font-weight: normal;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cmp-table td.warn {
+  color: #ffd479;
+  font-weight: 600;
+}
+
+.cmp-table td.cmp-na {
+  color: #7d8ea0;
+}
+
+.cmp-title {
+  font-weight: 600;
+  color: #fff;
+  font-size: 12.5px;
+}
+
+.cmp-sub {
+  font-size: 10px;
+  color: #8ea3b8;
+  margin-top: 1px;
+}
+
+.cmp-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+}
+
+.cmp-actions button {
+  background: rgba(127, 196, 255, 0.16);
+  border: none;
+  color: #cfe3f5;
+  border-radius: 10px;
+  padding: 3px 7px;
+  font-size: 10.5px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.cmp-actions button:hover {
+  background: rgba(127, 196, 255, 0.32);
+}
+
+.cmp-note {
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  color: #93aac0;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  #zoningLegend {
+    bottom: 26px;
+    right: 10px;
+    left: auto;
+    max-height: 34%;
+    font-size: 10px;
+  }
+  #zoningLegend:not(.hidden) ~ #legend {
+    top: auto;
+    bottom: 26px;
+    right: auto;
+    left: 10px;
+  }
+  #compareBar {
+    bottom: 26px;
+    font-size: 12px;
+    padding: 6px 10px;
+    gap: 7px;
+  }
+  #toast {
+    bottom: 78px;
+  }
+  .cmp-panel {
+    padding: 10px 12px 12px;
+  }
+  #compareModal {
+    padding: 10px;
+  }
+}

@@ -80,10 +80,14 @@ export function curlFetch(url) {
  * @returns {Promise<{browser, page, errors: string[], relay: {ok:number,fail:number,byHost:object}, close: () => Promise<void>}>}
  */
 export async function launchViewer(opts = {}) {
-  const browser = await chromium.launch({
-    executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium',
+  // 開発サンドボックスでは同梱の Chromium を使う。存在しない環境（CIランナー等）では
+  // Playwright が自分で用意したブラウザにフォールバックする。
+  const launchOpts = {
     args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
-  });
+  };
+  const chromiumPath = process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium';
+  if (fs.existsSync(chromiumPath)) launchOpts.executablePath = chromiumPath;
+  const browser = await chromium.launch(launchOpts);
   const context = await browser.newContext({
     viewport: opts.viewport || { width: 1440, height: 900 },
     deviceScaleFactor: 1,

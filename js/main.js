@@ -5,6 +5,7 @@
 import { TILESETS, PRESETS, HEIGHT_PROP_CANDIDATES } from './config.js';
 import { escapeHtml } from './util.js';
 import { initDiagnosis } from './diagnose.js';
+import { initShare } from './share.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -176,10 +177,17 @@ for (const [id, key] of Object.entries(CHECK_LAYERS)) {
   });
 }
 
+// 背景地図の切り替え。
+// removeAll() だと都市計画オーバーレイまで消えてしまうので、
+// 最下段（index 0）の背景レイヤーだけを差し替える。
+let baseImageryLayer = viewer.imageryLayers.get(0);
 document.querySelectorAll('input[name="imagery"]').forEach((el) => {
   el.addEventListener('change', () => {
-    viewer.imageryLayers.removeAll();
-    viewer.imageryLayers.addImageryProvider(el.value === 'pale' ? gsiPale : gsiPhoto);
+    const next = new Cesium.ImageryLayer(el.value === 'pale' ? gsiPale : gsiPhoto);
+    viewer.imageryLayers.add(next, 0);
+    // ImageryLayer.destroy() は provider を壊さないので、毎回新しい層を作って古い層は破棄してよい
+    if (baseImageryLayer) viewer.imageryLayers.remove(baseImageryLayer, true);
+    baseImageryLayer = next;
   });
 });
 
@@ -226,6 +234,19 @@ function buildingTableHtml(picked) {
   return rows.join('') || '<tr><td>属性なし</td></tr>';
 }
 
+// ---- トースト（共有・比較の操作フィードバック） -----------------------------------
+
+let toastTimer = null;
+const toastEl = document.getElementById('toast');
+
+function toast(msg, ms = 2000) {
+  if (!toastEl) return;
+  toastEl.textContent = msg;
+  toastEl.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.add('hidden'), ms);
+}
+
 // ---- 街カルテ（地点診断） -------------------------------------------------------
 
 const diagnosis = initDiagnosis({
@@ -233,8 +254,15 @@ const diagnosis = initDiagnosis({
   getCurrentBuildingTileset: () => currentBldg,
   buildingTableHtml,
   setStatus,
+  toast,
 });
 diagnosis.onClose(clearHighlight);
+
+// ---- R1: 共有URL ----------------------------------------------------------------
+
+const overlays = null; // P2で initZoningOverlay に差し替える
+const compare = null;  // P3で initCompare に差し替える
+const share = initShare({ viewer, diagnosis, overlays, compare, toast });
 
 /** クリック位置の経緯度を求める（建物表面 → 地表の順にフォールバック） */
 function pickLonLat(windowPosition) {
@@ -287,11 +315,26 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
 
 // ---- Init --------------------------------------------------------------------
 
+/** 共有URLの復元が終わった（または復元対象が無かった）ことを示す Promise（e2eから待てる） */
+let restored = null;
+
 (async () => {
   flyTo(PRESETS.overview, 0);
   await showBuildings('lod2');
-  flyTo(PRESETS.nakanoSta, 3.0);
+  // 共有URLがあればそちらを優先する（既定の中野駅プリセットへは飛ばさない）
+  const hasHash = !!location.hash && location.hash.length > 1;
+  if (!hasHash) flyTo(PRESETS.nakanoSta, 3.0);
+  restored = share.restoreFromHash().catch((e) => {
+    console.warn('share: restore failed', e);
+    return null;
+  });
+  const state = await restored;
+  if (!state && hasHash) flyTo(PRESETS.nakanoSta, 3.0);
 })();
 
 // テスト用フック（e2eから内部状態を参照するため）
-window.__nakano = { viewer, getTileset, loaded, flyTo, showBuildings, diagnosis };
+window.__nakano = {
+  viewer, getTileset, loaded, flyTo, showBuildings,
+  diagnosis, overlays, compare, share, toast,
+  getRestored: () => restored,
+};
