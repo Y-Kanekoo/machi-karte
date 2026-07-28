@@ -6,6 +6,7 @@
 import { escapeHtml } from './util.js';
 import { search as geocodeSearch } from './geocode.js';
 import { queryFlood, queryFloodKeizoku, queryFloodL1, queryLandslide } from './hazard.js';
+import { queryNearestShelters, formatDistance } from './shelter.js';
 import { queryZoning } from './zoning.js';
 import { estimateSunlight, estimateBaseHeight, prepareTiles, MIN_SUN_ELEVATION } from './sunlight.js';
 import {
@@ -131,6 +132,10 @@ export function initDiagnosis(ctx) {
         <h3>⛰️ 土砂災害警戒区域</h3>
         <div class="diag-content" id="secLandslide">${SPINNER}</div>
       </section>
+      <section class="diag-sec" data-sec="shelter">
+        <h3>🏫 避難所</h3>
+        <div class="diag-content" id="secShelter">${SPINNER}</div>
+      </section>
       <section class="diag-sec" data-sec="zoning">
         <h3>🏘️ 都市計画</h3>
         <div class="diag-content" id="secZoning">${SPINNER}</div>
@@ -147,7 +152,8 @@ export function initDiagnosis(ctx) {
         出典:
         <a href="https://disaportal.gsi.go.jp/" target="_blank" rel="noopener">ハザードマップポータルサイト</a>（洪水・土砂災害）／
         <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">Project PLATEAU</a>（都市計画決定情報・建物）／
-        <a href="https://msearch.gsi.go.jp/" target="_blank" rel="noopener">国土地理院 住所検索API</a>
+        <a href="https://msearch.gsi.go.jp/" target="_blank" rel="noopener">国土地理院 住所検索API</a>／
+        <a href="https://catalog.data.metro.tokyo.lg.jp/" target="_blank" rel="noopener">中野区オープンデータ</a>（避難所・CC BY 4.0）
       </p>`;
     applyCollapse();
   }
@@ -292,6 +298,37 @@ export function initDiagnosis(ctx) {
     return rows + `<div class="diag-note">${escapeHtml(note)}</div>`;
   }
 
+  /**
+   * 避難所セクション。最寄りの震災時／水害時を1件ずつ（直線距離）。
+   * 経路距離・開設状況は保証できないので注記で明示する。
+   * @param {{quake:object|null, flood:object|null, error:string|null}} r
+   */
+  function renderShelter(r) {
+    if (r.error) return failMsg(r.error);
+    const line = (label, s) =>
+      kvRow(label, s ? `${s.name}（${formatDistance(s.distance)}）` : '該当なし');
+    const parts = [line('震災時', r.quake), line('水害時', r.flood)];
+    parts.push(`<div class="diag-note">${escapeHtml(
+      '中野区オープンデータの位置からの直線距離です。経路距離や当日の開設状況は中野区の発表をご確認ください。'
+    )}</div>`);
+    parts.push(`<button type="button" class="diag-btn" data-act="shelters" aria-pressed="${
+      shelterLayerOn()}">${escapeHtml(shelterBtnLabel())}</button>`);
+    return parts.join('');
+  }
+
+  /** 左パネルの避難所トグル。カードのボタンはこのチェックボックスの表示にすぎない */
+  const shelterCheckbox = () => document.getElementById('shelterLayer');
+  const shelterLayerOn = () => !!shelterCheckbox()?.checked;
+  const shelterBtnLabel = () => (shelterLayerOn() ? '地図の避難所を隠す' : '地図に避難所を表示');
+
+  /** 左パネル側でトグルされたときにカードのボタン表示を追従させる（main.js から呼ぶ） */
+  function updateShelterButton() {
+    const btn = body.querySelector('button[data-act="shelters"]');
+    if (!btn) return;
+    btn.textContent = shelterBtnLabel();
+    btn.setAttribute('aria-pressed', String(shelterLayerOn()));
+  }
+
   function renderZoning(z) {
     if (z.error) return failMsg(z.error);
     const rows = [];
@@ -360,7 +397,7 @@ export function initDiagnosis(ctx) {
     const result = {
       lon, lat, title,
       flood: null, floodKeizoku: null, floodL1: null,
-      landslide: null, zoning: null, sunlight: null,
+      landslide: null, shelters: null, zoning: null, sunlight: null,
       buildingHeight: measuredHeightOf(picked),
       inArea: isInServiceArea(lon, lat),
     };
@@ -402,6 +439,14 @@ export function initDiagnosis(ctx) {
         if (alive()) fill('secLandslide', failMsg('土砂災害警戒区域を取得できませんでした'));
       });
 
+    // 避難所（同梱GeoJSON。初回だけ読み込み、以降はキャッシュ）
+    const pShelter = queryNearestShelters(lon, lat)
+      .then((r) => { if (alive()) { result.shelters = r; fill('secShelter', renderShelter(r)); } })
+      .catch((e) => {
+        console.warn('shelter failed', e);
+        if (alive()) fill('secShelter', failMsg('避難所データを読み込めませんでした'));
+      });
+
     // 都市計画
     const pZone = queryZoning(lon, lat)
       .then((r) => { if (alive()) { result.zoning = r; fill('secZoning', renderZoning(r)); } })
@@ -430,7 +475,7 @@ export function initDiagnosis(ctx) {
       }
     }
 
-    await Promise.all([pFlood, pLand, pZone]);
+    await Promise.all([pFlood, pLand, pZone, pShelter]);
     if (alive()) {
       for (const fn of resultHandlers) {
         try { fn(result); } catch (e) { console.warn('onResult handler failed', e); }
@@ -476,6 +521,21 @@ export function initDiagnosis(ctx) {
   }
 
   closeBtn.addEventListener('click', close);
+
+  // ---- カード内のボタン ------------------------------------------------------
+  // セクションは innerHTML で作り直されるので、個々のボタンではなく本文に委譲して拾う。
+  body.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('button[data-act]');
+    if (!btn) return;
+    if (btn.dataset.act === 'shelters') {
+      const cb = shelterCheckbox();
+      if (!cb) return;
+      cb.checked = !cb.checked;
+      // 左パネル側のハンドラに処理させる（表示状態の単一ソースはチェックボックス）
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
+      updateShelterButton();
+    }
+  });
 
   // ---- 検索UI --------------------------------------------------------------
 
@@ -691,6 +751,8 @@ export function initDiagnosis(ctx) {
     isActive: () => toggle.checked,
     setActive,
     onClose: (fn) => closeHandlers.push(fn),
+    /** 左パネルの避難所トグルが変わったときにカードのボタン表示を合わせる */
+    updateShelterButton,
     /** 診断のコア項目が揃うたび（＋日照完了時）に呼ばれる */
     onResult: (fn) => resultHandlers.push(fn),
     getLastResult: () => lastResult,

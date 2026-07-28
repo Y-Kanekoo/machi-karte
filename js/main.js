@@ -8,6 +8,7 @@ import { initDiagnosis } from './diagnose.js';
 import { initShare } from './share.js';
 import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
+import { createShelterLayer } from './shelter.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -260,6 +261,23 @@ const diagnosis = initDiagnosis({
 });
 diagnosis.onClose(clearHighlight);
 
+// ---- R2: 避難所レイヤー ----------------------------------------------------------
+// Entityは専用の CustomDataSource に入るので、診断ピン（viewer.entities）とは独立。
+// 表示状態の単一ソースは左パネルのチェックボックスで、カード内のボタンはその表示。
+
+const shelterLayer = createShelterLayer(viewer);
+const shelterCheckbox = document.getElementById('shelterLayer');
+const shelterLegend = document.getElementById('shelterLegend');
+
+shelterCheckbox.addEventListener('change', async () => {
+  const on = shelterCheckbox.checked;
+  shelterLegend.classList.toggle('hidden', !on);
+  diagnosis.updateShelterButton();
+  if (on) setStatus('避難所データを読み込み中…');
+  const n = await shelterLayer.setVisible(on);
+  if (on) setStatus(n ? '' : '避難所データを読み込めませんでした');
+});
+
 // ---- R1: 都市計画オーバーレイ / 地点比較 / 共有URL -----------------------------------
 
 const overlays = initZoningOverlay({ viewer });
@@ -347,6 +365,6 @@ let restored = null;
 // テスト用フック（e2eから内部状態を参照するため）
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
-  diagnosis, overlays, compare, share, toast,
+  diagnosis, overlays, compare, share, toast, shelterLayer,
   getRestored: () => restored,
 };

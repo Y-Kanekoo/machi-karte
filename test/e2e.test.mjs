@@ -22,6 +22,42 @@ async function waitSection(id, timeout = 90000) {
   return (await page.textContent('#' + id)).replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * 診断カード内のボタンを押す。
+ * SwiftShader環境ではCesiumの再描画で Playwright の actionability（stable）判定が
+ * タイムアウトすることがあるため、DOM の click() を直接呼ぶ。
+ */
+async function clickCardButton(act) {
+  // polling を rAF ではなく 500ms のタイマーにする。SwiftShader + Cesium の描画で
+  // rAF が詰まると waitForSelector / 既定の waitForFunction がタイムアウトするため。
+  await page.waitForFunction(
+    (a) => {
+      const b = document.querySelector(`#diagBody button[data-act="${a}"]`);
+      return !!b && !b.disabled;
+    },
+    act,
+    { timeout: 60000, polling: 500 }
+  );
+  await page.evaluate(
+    (a) => document.querySelector(`#diagBody button[data-act="${a}"]`).click(),
+    act
+  );
+}
+
+/**
+ * 左パネルのチェックボックスをDOMから直接切り替える。
+ * 避難所レイヤーON＋高高度の俯瞰では Cesium の描画で Playwright の
+ * actionability 判定（check/uncheck）がタイムアウトするため。
+ */
+async function setPanelCheckbox(id, on) {
+  await page.evaluate(({ i, v }) => {
+    const cb = document.getElementById(i);
+    if (cb.checked === v) return;
+    cb.checked = v;
+    cb.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { i: id, v: on });
+}
+
 async function diagnoseByAddress(q) {
   await page.fill('#searchInput', q);
   await page.click('#searchBtn');
@@ -165,6 +201,16 @@ try {
   check('区域内で継続時間が無い場合の説明が出る',
     floodY.includes('継続時間のデータは配信されていません'), floodY);
 
+  const shelterY = await waitSection('secShelter');
+  console.log('  🏫 ' + shelterY);
+  check('弥生町の最寄り震災時避難所が「第二中学校（約260m）」',
+    /震災時\s*第二中学校（約260m）/.test(shelterY), shelterY);
+  check('弥生町の最寄り水害時避難所が「中野本郷小学校（約520m）」',
+    /水害時\s*中野本郷小学校（約520m）/.test(shelterY), shelterY);
+  check('直線距離である旨の注記がある', shelterY.includes('直線距離'), shelterY);
+  check('避難所セクションに地図表示ボタンがある',
+    await page.locator('#secShelter button[data-act="shelters"]').count() === 1);
+
   // ==== 4b. 上高田四丁目（土砂災害＝急傾斜地の崩壊 警戒区域） ====
   console.log('\n--- 中野区上高田4丁目（土砂災害警戒区域あり） ---');
   await diagnoseByAddress('中野区上高田4丁目');
@@ -206,8 +252,75 @@ try {
   console.log('  結果オブジェクト: ' + JSON.stringify(floodRanks));
   check('lastResultに継続時間が入る', floodRanks.keizoku === '12時間未満', JSON.stringify(floodRanks));
   check('lastResultに計画規模が入る', floodRanks.l1 === '0.5〜1.0m', JSON.stringify(floodRanks));
+  const shelterM = await waitSection('secShelter');
+  console.log('  🏫 ' + shelterM);
+  check('南台の最寄り震災時避難所が「南台小学校（約440m）」',
+    /震災時\s*南台小学校（約440m）/.test(shelterM), shelterM);
   await waitSection('secSun', 180000);
   await page.locator('#diagnosisPanel').screenshot({ path: shotPath('r2-01-card-minamidai.png') });
+
+  // ==== 4d. 避難所レイヤー（R2） ====
+  console.log('\n--- 避難所レイヤー ---');
+  check('初期状態では避難所レイヤーOFF', !(await page.isChecked('#shelterLayer')));
+  check('初期状態では凡例が隠れている', await page.isHidden('#shelterLegend'));
+
+  await setPanelCheckbox('shelterLayer', true);
+  await page.waitForFunction(
+    () => window.__nakano.shelterLayer.count() > 0, null, { timeout: 60000, polling: 500 }
+  );
+  const shelterStats = await page.evaluate(() => ({
+    count: window.__nakano.shelterLayer.count(),
+    visible: window.__nakano.shelterLayer.isVisible(),
+    pins: window.__nakano.viewer.entities.values.length,
+    types: window.__nakano.shelterLayer.dataSource.entities.values.reduce((a, e) => {
+      const t = e.properties.shelterType.getValue();
+      a[t] = (a[t] || 0) + 1;
+      return a;
+    }, {}),
+  }));
+  console.log('  ' + JSON.stringify(shelterStats));
+  check('避難所Entityが90件以上', shelterStats.count >= 90, JSON.stringify(shelterStats));
+  check('種別3つに色分けされている',
+    Object.keys(shelterStats.types).sort().join(',') === 'flood,quake,wide',
+    JSON.stringify(shelterStats.types));
+  check('レイヤーが表示状態', shelterStats.visible === true);
+  check('診断ピン（viewer.entities）とは別管理', shelterStats.pins <= 1, `pins=${shelterStats.pins}`);
+  check('避難所の凡例が出る', await page.isVisible('#shelterLegend'));
+  const shelterBtnOn = await page.textContent('#secShelter button[data-act="shelters"]');
+  check('カードのボタン表示が「隠す」に変わる', shelterBtnOn.includes('隠す'), shelterBtnOn);
+
+  // カード内のボタンからもトグルできる（左パネルのチェックボックスと双方向）。
+  // 俯瞰に飛ぶ前に確かめる（高高度＋102Entityの描画中はPlaywrightのpollingが詰まりやすい）
+  await clickCardButton('shelters');
+  await page.waitForTimeout(500);
+  check('カードのボタンでレイヤーがOFFになる',
+    !(await page.isChecked('#shelterLayer')) &&
+    !(await page.evaluate(() => window.__nakano.shelterLayer.isVisible())));
+  check('OFFで凡例も隠れる', await page.isHidden('#shelterLegend'));
+  const shelterBtnOff = await page.textContent('#secShelter button[data-act="shelters"]');
+  check('カードのボタン表示が「表示」に戻る', shelterBtnOff.includes('表示'), shelterBtnOff);
+
+  // 俯瞰スクリーンショット用に再度ON（今度は左パネルから）
+  await setPanelCheckbox('shelterLayer', true);
+  await page.waitForTimeout(500);
+  check('左パネルから再度ONにできる',
+    await page.evaluate(() => window.__nakano.shelterLayer.isVisible()));
+  await page.evaluate(() =>
+    window.__nakano.flyTo({ lon: 139.664, lat: 35.708, height: 6000, heading: 0, pitch: -85 }, 0)
+  );
+  await page.waitForTimeout(4000);
+  await page.screenshot({ path: shotPath('r2-02-shelters-overview.png') });
+
+  // 元の視点に戻してからOFFにする（高高度＋102Entityのまま操作すると描画負荷で不安定）
+  await page.evaluate(() => window.__nakano.flyTo(
+    { lon: 139.6659, lat: 35.7010, height: 500, heading: 0, pitch: -40 }, 0
+  ));
+  await page.waitForTimeout(2000);
+  await setPanelCheckbox('shelterLayer', false);
+  await page.waitForTimeout(500);
+  check('左パネルからOFFにできる',
+    !(await page.evaluate(() => window.__nakano.shelterLayer.isVisible())));
+  await page.waitForTimeout(2000);
 
   // ==== 5. クリック診断モード ====
   console.log('\n--- クリック診断モード ---');
