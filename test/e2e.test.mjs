@@ -111,6 +111,10 @@ try {
   check('内水注記のリンク先が中野区の公式ページ',
     (await page.getAttribute('#secFlood a', 'href') || '').includes('city.tokyo-nakano.lg.jp'),
     await page.getAttribute('#secFlood a', 'href'));
+  // R2 F2-4: 区域外では浸水深3Dのボタンを押せない
+  check('区域外では浸水深3Dボタンが無効',
+    await page.getAttribute('#secFlood button[data-act="flooddepth"]', 'disabled') !== null,
+    String(await page.getAttribute('#secFlood button[data-act="flooddepth"]', 'disabled')));
 
   const land5 = await waitSection('secLandslide');
   console.log('  ⛰️ ' + land5);
@@ -258,6 +262,73 @@ try {
     /震災時\s*南台小学校（約440m）/.test(shelterM), shelterM);
   await waitSection('secSun', 180000);
   await page.locator('#diagnosisPanel').screenshot({ path: shotPath('r2-01-card-minamidai.png') });
+
+  // ==== 4c-2. 浸水深の3D表示（R2 F2-4） ====
+  console.log('\n--- 浸水深の3D表示 ---');
+  check('区域内では浸水深3Dボタンが有効',
+    await page.getAttribute('#secFlood button[data-act="flooddepth"]', 'disabled') === null);
+  check('水面の説明文がカードに出る',
+    (await page.textContent('#secFlood')).includes('柱状で示した目安'),
+    (await page.textContent('#secFlood')).slice(-160));
+
+  const entitiesBefore = await page.evaluate(() => window.__nakano.viewer.entities.values.length);
+  await clickCardButton('flooddepth');
+  await page.waitForFunction(
+    () => window.__nakano.viewer.entities.values.some((e) => !!e.ellipse),
+    null, { timeout: 30000 }
+  );
+  const viz = await page.evaluate(() => {
+    const e = window.__nakano.viewer.entities.values.find((x) => !!x.ellipse);
+    const t = Cesium.JulianDate.now();
+    return {
+      name: e.name,
+      radius: e.ellipse.semiMajorAxis.getValue(t),
+      height: e.ellipse.height.getValue(t),
+      extruded: e.ellipse.extrudedHeight.getValue(t),
+      total: window.__nakano.viewer.entities.values.length,
+    };
+  });
+  console.log('  ' + JSON.stringify(viz));
+  check('水面Entityが1つ増える', viz.total === entitiesBefore + 1, `${entitiesBefore} -> ${viz.total}`);
+  check('水面の半径が150m', Math.abs(viz.radius - 150) < 0.01, String(viz.radius));
+  // 南台は「0.5〜3.0m」なので上限3.0m ぶん立ち上がる
+  check('水面の厚みが浸水深の上限（3.0m）',
+    Math.abs((viz.extruded - viz.height) - 3.0) < 0.01, `${viz.height} -> ${viz.extruded}`);
+  check('地面高さが妥当な範囲（中野区は概ね20〜60m）',
+    viz.height > 10 && viz.height < 120, String(viz.height));
+  const vizBtnOn = await page.textContent('#secFlood button[data-act="flooddepth"]');
+  check('ボタン表示が「3D表示を消す」に変わる', vizBtnOn.includes('消す'), vizBtnOn);
+
+  // 建物と水面の高さ関係が見えるよう、低いピッチで寄って撮る
+  await page.evaluate(() =>
+    window.__nakano.flyTo({ lon: 139.6626, lat: 35.6866, height: 120, heading: 30, pitch: -12 }, 0)
+  );
+  await page.waitForTimeout(5000);
+  await page.screenshot({ path: shotPath('r2-03-flood3d-minamidai.png') });
+
+  // もう一度押すと消える
+  await clickCardButton('flooddepth');
+  await page.waitForTimeout(500);
+  check('もう一度押すと水面が消える',
+    await page.evaluate(() => !window.__nakano.viewer.entities.values.some((e) => !!e.ellipse)));
+
+  // カードを閉じても消える（onClose の後始末）
+  await clickCardButton('flooddepth');
+  await page.waitForFunction(
+    () => window.__nakano.viewer.entities.values.some((e) => !!e.ellipse),
+    null, { timeout: 30000 }
+  );
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+  const afterClose = await page.evaluate(() => window.__nakano.viewer.entities.values.length);
+  check('カードを閉じると水面もピンも消える', afterClose === 0, `entities=${afterClose}`);
+
+  // 続く避難所レイヤーの検証のためカードを開き直す
+  await page.evaluate(() =>
+    window.__nakano.diagnosis.runDiagnosisAt(139.663, 35.688, {
+      title: '南台五丁目付近（神田川沿い）', fly: true, skipSunlight: true,
+    })
+  );
+  await waitSection('secShelter');
 
   // ==== 4d. 避難所レイヤー（R2） ====
   console.log('\n--- 避難所レイヤー ---');

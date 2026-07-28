@@ -188,6 +188,10 @@ export const SHELTER_TYPES = {
 /** 避難所ラベルを表示する距離（m）。102件のラベル重なりと描画負荷を抑える */
 export const SHELTER_LABEL_MAX_DISTANCE = 2500;
 
+/** 浸水深3D表示の円柱の半径（m）と、深さの上限（「20.0m以上」＝Infinity のキャップ） */
+export const FLOOD_VIZ_RADIUS = 150;
+export const FLOOD_VIZ_MAX_DEPTH = 20;
+
 /** 比較できる最大地点数 */
 export const COMPARE_MAX = 3;
 /** 比較の重複追加とみなす距離（m） */

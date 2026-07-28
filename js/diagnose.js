@@ -7,8 +7,22 @@ import { escapeHtml } from './util.js';
 import { search as geocodeSearch } from './geocode.js';
 import { queryFlood, queryFloodKeizoku, queryFloodL1, queryLandslide } from './hazard.js';
 import { queryNearestShelters, formatDistance } from './shelter.js';
+import {
+  showFloodDepth,
+  clearFloodDepth,
+  isFloodDepthVisible,
+  canShowFloodDepth,
+  floodVizDepth,
+  resolveBaseHeight,
+} from './floodviz.js';
 import { queryZoning } from './zoning.js';
-import { estimateSunlight, estimateBaseHeight, prepareTiles, MIN_SUN_ELEVATION } from './sunlight.js';
+import {
+  estimateSunlight,
+  estimateBaseHeight,
+  prepareTiles,
+  MIN_SUN_ELEVATION,
+  DEFAULT_BASE_HEIGHT,
+} from './sunlight.js';
 import {
   FLOOD_COLORS,
   HEIGHT_PROP_CANDIDATES,
@@ -18,6 +32,8 @@ import {
   COLLAPSE_STORAGE_KEY,
   GEOLOCATION_TIMEOUT,
   NAKANO_HAZARDMAP_URL,
+  FLOOD_VIZ_RADIUS,
+  FLOOD_VIZ_MAX_DEPTH,
 } from './config.js';
 
 /**
@@ -257,6 +273,20 @@ export function initDiagnosis(ctx) {
     const l1Val = !l1 ? '取得できませんでした' : l1.rank;
     parts.push(kvRow('計画規模の想定', l1Val, !!l1 && l1.rank !== '区域外' && l1.rank !== '判定不能'));
 
+    // F2-4: 浸水深の3D表示（区域外・判定不能では押せない）
+    const can = canShowFloodDepth(r);
+    parts.push(`<button type="button" class="diag-btn" data-act="flooddepth"` +
+      ` aria-pressed="${isFloodDepthVisible()}"${can ? '' : ' disabled'}>${
+        escapeHtml(floodDepthBtnLabel())}</button>`);
+    if (can) {
+      const { depth, capped } = floodVizDepth(r.depthMax);
+      parts.push(`<div class="diag-note">${escapeHtml(
+        `左パネルの洪水レイヤー（PLATEAU）は区全域の想定を面で表示します。この水面は診断地点の`
+        + `想定浸水深の上限（${depth.toFixed(1)}m）を、周囲${FLOOD_VIZ_RADIUS}mに柱状で示した目安です。`
+        + (capped ? `「${r.rank}」は${FLOOD_VIZ_MAX_DEPTH}mで表示しています。` : '')
+      )}</div>`);
+    }
+
     const note = outOfZone
       ? '想定最大規模の洪水でも浸水想定区域には含まれません。'
       : r.rank === '判定不能'
@@ -329,6 +359,51 @@ export function initDiagnosis(ctx) {
     btn.setAttribute('aria-pressed', String(shelterLayerOn()));
   }
 
+  // ---- 浸水深の3D表示（F2-4） ---------------------------------------------------
+
+  const floodDepthBtnLabel = () =>
+    (isFloodDepthVisible() ? '💧 3D表示を消す' : '💧 浸水深を3Dで表示');
+
+  function updateFloodDepthButton() {
+    const btn = body.querySelector('button[data-act="flooddepth"]');
+    if (!btn) return;
+    btn.textContent = floodDepthBtnLabel();
+    btn.setAttribute('aria-pressed', String(isFloodDepthVisible()));
+  }
+
+  /**
+   * 水面のON/OFF。地面高さは日照計算で求めた値があれば流用し、
+   * 無ければその場で estimateBaseHeight を呼ぶ（地形なし構成なので建物と整合する）。
+   */
+  async function toggleFloodDepth(btn) {
+    if (isFloodDepthVisible()) {
+      clearFloodDepth();
+      updateFloodDepthButton();
+      return;
+    }
+    const r = lastResult;
+    if (!r || !canShowFloodDepth(r.flood)) return;
+    btn.disabled = true;
+    try {
+      const base = Number.isFinite(r.baseHeight?.height)
+        ? r.baseHeight
+        : await estimateBaseHeight(viewer, r.lon, r.lat, null);
+      r.baseHeight = base;
+      showFloodDepth(viewer, {
+        lon: r.lon,
+        lat: r.lat,
+        depthMax: r.flood.depthMax,
+        // 建物タイル未読込の地点では 0m（楕円体）が返るので、その場合は既定値に寄せる
+        baseHeight: resolveBaseHeight(base.height, DEFAULT_BASE_HEIGHT),
+      });
+    } catch (e) {
+      console.warn('flood depth 3D failed', e);
+    } finally {
+      btn.disabled = false;
+    }
+    updateFloodDepthButton();
+  }
+
   function renderZoning(z) {
     if (z.error) return failMsg(z.error);
     const rows = [];
@@ -391,6 +466,7 @@ export function initDiagnosis(ctx) {
 
     panel.classList.remove('hidden');
     showSearchMsg(''); // 前の診断で出したメッセージを残さない
+    clearFloodDepth();  // 前の地点の水面を残さない（日照のレイキャストにも影響させない）
     sectionShell();
     fill('secPlace', renderPlace(lon, lat, title));
     setPin(lon, lat, title || '診断地点');
@@ -517,6 +593,7 @@ export function initDiagnosis(ctx) {
     runToken++;
     panel.classList.add('hidden');
     clearPin();
+    clearFloodDepth();
     for (const h of closeHandlers) h();
   }
 
@@ -534,6 +611,10 @@ export function initDiagnosis(ctx) {
       // 左パネル側のハンドラに処理させる（表示状態の単一ソースはチェックボックス）
       cb.dispatchEvent(new Event('change', { bubbles: true }));
       updateShelterButton();
+      return;
+    }
+    if (btn.dataset.act === 'flooddepth') {
+      toggleFloodDepth(btn);
     }
   });
 
