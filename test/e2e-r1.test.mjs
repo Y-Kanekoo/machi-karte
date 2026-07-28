@@ -141,7 +141,17 @@ try {
   check('復元先でもピンが立つ', pin2 === 1, `entities=${pin2}`);
 
   await p2.screenshot({ path: shotPath('r1-01-share-restore.png') });
-  await p2.locator('#diagnosisPanel').screenshot({ path: shotPath('r1-02-share-card.png') });
+  // 日照計算中はスピナー・進捗でパネルが動き続け、要素スクリーンショットの
+  // 安定待ちがSwiftShader環境でタイムアウトすることがある。計算完了を待ってから撮る
+  await p2.waitForFunction(
+    () => !document.querySelector('#diagnosisPanel .spinner'),
+    null, { timeout: 150000 }
+  ).catch(() => {});
+  await p2.locator('#diagnosisPanel').screenshot({
+    path: shotPath('r1-02-share-card.png'),
+    animations: 'disabled',
+    timeout: 90000,
+  });
   await p2.close();
 
   // --- 壊れたハッシュ / 範囲外座標は黙って無視する ---
@@ -419,7 +429,11 @@ try {
   check('日照未計算の案内文が出る', (await page.textContent('#compareModalBody')).includes('地図で表示'));
 
   await page.screenshot({ path: shotPath('r1-05-compare-table.png') });
-  await page.locator('.cmp-panel').screenshot({ path: shotPath('r1-06-compare-panel.png') });
+  await page.locator('.cmp-panel').screenshot({
+    path: shotPath('r1-06-compare-panel.png'),
+    animations: 'disabled',
+    timeout: 90000,
+  });
 
   // Escapeで閉じる
   await page.keyboard.press('Escape');
