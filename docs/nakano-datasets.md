@@ -28,6 +28,33 @@ PLATEAUデータカタログAPI（`https://api.plateauview.mlit.go.jp/datacatalo
 | 用途地域 | 1 | `https://assets.cms.plateau.reearth.io/assets/70/76a8aa-a308-4050-b7ae-6a62af2a88c1/13114_nakano-ku_pref_2025_citygml_1_op_urf_UseDistrict_mvt_lod1/{z}/{x}/{y}.mvt` |
 | 水部 | 0 | `https://assets.cms.plateau.reearth.io/assets/9c/8b0756-4288-4710-8dc4-b1bf777d081f/13114_nakano-ku_pref_2025_citygml_1_op_wtr_mvt_lod0/{z}/{x}/{y}.mvt` |
 
+## ハザードマップポータル ラスタタイル（中野区で200が返るもの）
+
+PLATEAU外だが街カルテで使っている全国配信のラスタタイル（`https://disaportaldata.gsi.go.jp/raster/...`、z=2〜17、CORS `*`）。2026-07-28 に中野区の代表地点で再確認。
+
+| データ | パス | 中野区での配信状況 |
+|---|---|---|
+| 洪水浸水想定区域（想定最大規模） | `01_flood_l2_shinsuishin_data` | あり（河川沿い） |
+| 洪水浸水想定区域（計画規模・現在の凡例） | `01_flood_l1_shinsuishin_newlegend_data` | あり。**`01_flood_l1_shinsuishin_data`（newlegendなし）は404** |
+| 洪水浸水継続時間（想定最大規模） | `01_flood_l2_keizoku_data` | 河川沿いのタイルのみ。台地側はタイルごと404 |
+| 土砂災害警戒区域（急傾斜地の崩壊） | `05_kyukeishakeikaikuiki` | あり（上高田等の13タイル） |
+| 土砂災害警戒区域（土石流・地すべり） | `05_dosekiryukeikaikuiki` / `05_jisuberikeikaikuiki` | 中野区に指定なし（全404） |
+| 内水（雨水出水）浸水想定 | `02_naisui_data` / `02_naisui_pref_data/13/` | **中野区は配信なし**（掲載市町村一覧に中野区なし。東京都は昭島市・福生市のみ） |
+
+## 中野区オープンデータ（PLATEAU外・同梱データの出典）
+
+東京都オープンデータカタログサイト（CKAN）経由の中野区データ。いずれも CC BY 4.0（`license_id` をAPIで確認、カタログ最終更新 2025-12-12）、UTF-8 with BOM のCSV、`access-control-allow-origin: *`。
+
+| データ | 件数 | リソースURL |
+|---|---|---|
+| 震災時の避難所一覧 | 45 | `https://www2.wagmap.jp/nakanodatamap/nakanodatamap/opendatafile/map_32/CSV/opendata_5000342.csv` |
+| 水害時避難所 | 44 | `https://www2.wagmap.jp/nakanodatamap/nakanodatamap/opendatafile/map_28/CSV/opendata_18000130.csv` |
+| 広域避難場所 | 13 | `https://www2.wagmap.jp/nakanodatamap/nakanodatamap/opendatafile/map_32/CSV/opendata_6000680.csv` |
+
+`tools/fetch-shelters.mjs`（`npm run shelters`）で `data/shelters.geojson` に変換して同梱しています。
+
+不採用にした代替: 国土数値情報 避難施設P20（2012年度作成・非商用条件で鮮度もライセンスも劣る）／東京都下水道局の浸水予想区域図CSV（神田川流域北側だけで27.3MBの10mメッシュ点データで静的サイト同梱の規模を超える）／中野区オープンデータの「浸水深」「浸水継続時間」CSV（ランクごとの代表点1個ずつの凡例アノテーションで面判定には使えない）。
+
 ## CityGML（元データ）
 
 生のCityGML（属性フル収録）が必要な場合は [G空間情報センターのPLATEAUページ](https://front.geospatial.jp/plateau_portal_site/) から「中野区」で検索してダウンロードできます。FBX/OBJ形式（Unity・Blender向け）も同梱されています。
