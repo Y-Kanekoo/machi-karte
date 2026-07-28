@@ -1,0 +1,1674 @@
+{
+ "type": "FeatureCollection",
+ "metadata": {
+  "generated": "2026-07-28",
+  "title": "中野区の避難所・避難場所",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/deed.ja",
+  "attribution": "中野区オープンデータ（東京都オープンデータカタログサイト経由）",
+  "catalog": "https://catalog.data.metro.tokyo.lg.jp/",
+  "note": "本ファイルは tools/fetch-shelters.mjs で上記CSVから生成した派生物です。直線距離の目安表示に使うもので、開設状況は中野区の発表をご確認ください。",
+  "generator": "tools/fetch-shelters.mjs",
+  "count": 102,
+  "sources": [
+   {
+    "dataset": "震災時の避難所一覧",
+    "type": "quake",
+    "label": "震災時の避難所",
+    "url": "https://www2.wagmap.jp/nakanodatamap/nakanodatamap/opendatafile/map_32/CSV/opendata_5000342.csv",
+    "count": 45,
+    "retrieved": "2026-07-28"
+   },
+   {
+    "dataset": "水害時避難所",
+    "type": "flood",
+    "label": "水害時避難所",
+    "url": "https://www2.wagmap.jp/nakanodatamap/nakanodatamap/opendatafile/map_28/CSV/opendata_18000130.csv",
+    "count": 44,
+    "retrieved": "2026-07-28"
+   },
+   {
+    "dataset": "広域避難場所",
+    "type": "wide",
+    "label": "広域避難場所",
+    "url": "https://www2.wagmap.jp/nakanodatamap/nakanodatamap/opendatafile/map_32/CSV/opendata_6000680.csv",
+    "count": 13,
+    "retrieved": "2026-07-28"
+   }
+  ]
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.668317,
+     35.681857
+    ]
+   },
+   "properties": {
+    "name": "旧南台小学校",
+    "address": "中野区南台4-4-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.663468,
+     35.684061
+    ]
+   },
+   "properties": {
+    "name": "南台小学校",
+    "address": "中野区南台3-44-9",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.662432,
+     35.682569
+    ]
+   },
+   "properties": {
+    "name": "南中野中学校",
+    "address": "中野区南台5-22-17",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.673129,
+     35.685839
+    ]
+   },
+   "properties": {
+    "name": "東京大学教育学部附属中等教育学校",
+    "address": "中野区南台1-15-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.668504,
+     35.688111
+    ]
+   },
+   "properties": {
+    "name": "南部すこやか福祉センター等",
+    "address": "中野区弥生町5-11-26",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.669942,
+     35.687423
+    ]
+   },
+   "properties": {
+    "name": "みなみの小学校",
+    "address": "中野区弥生町4-27-11",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.679672,
+     35.692156
+    ]
+   },
+   "properties": {
+    "name": "中野本郷小学校",
+    "address": "中野区弥生町1-25-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.677385,
+     35.69599
+    ]
+   },
+   "properties": {
+    "name": "中野第一小学校",
+    "address": "中野区本町3-16-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.68359,
+     35.698635
+    ]
+   },
+   "properties": {
+    "name": "中野東中学校等複合施設",
+    "address": "中野区中央1-41-4",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.683746,
+     35.700843
+    ]
+   },
+   "properties": {
+    "name": "塔山小学校",
+    "address": "中野区中央1-49-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.680484,
+     35.698642
+    ]
+   },
+   "properties": {
+    "name": "宝仙学園",
+    "address": "中野区中央2-28-3",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.677551,
+     35.702169
+    ]
+   },
+   "properties": {
+    "name": "谷戸小学校",
+    "address": "中野区中野1-26-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.671354,
+     35.692561
+    ]
+   },
+   "properties": {
+    "name": "第二中学校",
+    "address": "中野区本町5-25-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661913,
+     35.696453
+    ]
+   },
+   "properties": {
+    "name": "新渡戸文化学園",
+    "address": "中野区本町6-38-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.674207,
+     35.700373
+    ]
+   },
+   "properties": {
+    "name": "中部すこやか福祉センター",
+    "address": "中野区中央3-19-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.666164,
+     35.700469
+    ]
+   },
+   "properties": {
+    "name": "桃花小学校",
+    "address": "中野区中央5-43-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.672256,
+     35.703904
+    ]
+   },
+   "properties": {
+    "name": "桃園第二小学校",
+    "address": "中野区中野1-57-12",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.679583,
+     35.706755
+    ]
+   },
+   "properties": {
+    "name": "明治大学付属中野中学校･高等学校",
+    "address": "中野区東中野3-3-4",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.67148,
+     35.709736
+    ]
+   },
+   "properties": {
+    "name": "大妻中野中学校･高等学校",
+    "address": "中野区上高田2-3-7",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.678968,
+     35.709806
+    ]
+   },
+   "properties": {
+    "name": "白桜小学校",
+    "address": "中野区上高田1-2-28",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.674473,
+     35.717109
+    ]
+   },
+   "properties": {
+    "name": "第七中学校",
+    "address": "中野区上高田5-35-3",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.678415,
+     35.715342
+    ]
+   },
+   "properties": {
+    "name": "第五中学校",
+    "address": "中野区上高田4-28-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.668391,
+     35.717525
+    ]
+   },
+   "properties": {
+    "name": "令和小学校",
+    "address": "中野区新井4-19-26",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661247,
+     35.70954
+    ]
+   },
+   "properties": {
+    "name": "中野中学校",
+    "address": "中野区中野4-12-3",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.65956,
+     35.717391
+    ]
+   },
+   "properties": {
+    "name": "旧沼袋小学校",
+    "address": "中野区沼袋3-13-2",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.657294,
+     35.723834
+    ]
+   },
+   "properties": {
+    "name": "緑野中学校",
+    "address": "中野区丸山1-1-19",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.673335,
+     35.729407
+    ]
+   },
+   "properties": {
+    "name": "江原小学校",
+    "address": "中野区江原町1-39-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.666768,
+     35.726355
+    ]
+   },
+   "properties": {
+    "name": "江古田小学校",
+    "address": "中野区江古田2-13-28",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.659786,
+     35.714893
+    ]
+   },
+   "properties": {
+    "name": "平和の森小学校",
+    "address": "中野区新井3-29-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.656505,
+     35.716704
+    ]
+   },
+   "properties": {
+    "name": "中野工科高等学校",
+    "address": "中野区野方3-5-5",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.651572,
+     35.721319
+    ]
+   },
+   "properties": {
+    "name": "北原小学校",
+    "address": "中野区野方6-30-6",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.657358,
+     35.725599
+    ]
+   },
+   "properties": {
+    "name": "緑野小学校",
+    "address": "中野区丸山1-17-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.652395,
+     35.7135
+    ]
+   },
+   "properties": {
+    "name": "啓明小学校",
+    "address": "中野区大和町1-18-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.649713,
+     35.716182
+    ]
+   },
+   "properties": {
+    "name": "旧明和中学校",
+    "address": "中野区若宮1-1-18",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.645041,
+     35.714476
+    ]
+   },
+   "properties": {
+    "name": "美鳩小学校",
+    "address": "中野区大和町4-26-5",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.644274,
+     35.719098
+    ]
+   },
+   "properties": {
+    "name": "鷺宮高等学校",
+    "address": "中野区若宮3-46-8",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.641568,
+     35.719109
+    ]
+   },
+   "properties": {
+    "name": "明和中学校",
+    "address": "中野区若宮3-53-16",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.636443,
+     35.722469
+    ]
+   },
+   "properties": {
+    "name": "鷺宮スポーツ・コミュニティプラザ",
+    "address": "中野区白鷺3-1-13",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.630648,
+     35.720888
+    ]
+   },
+   "properties": {
+    "name": "宝仙学園（旧西中野小学校）",
+    "address": "中野区白鷺3-9-2",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.639327,
+     35.724122
+    ]
+   },
+   "properties": {
+    "name": "旧鷺宮小学校",
+    "address": "中野区鷺宮3-31-4",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.635839,
+     35.724149
+    ]
+   },
+   "properties": {
+    "name": "鷺の杜小学校",
+    "address": "中野区鷺宮4-7-3",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.628531,
+     35.728343
+    ]
+   },
+   "properties": {
+    "name": "北中野中学校",
+    "address": "中野区上鷺宮5-7-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.629517,
+     35.727441
+    ]
+   },
+   "properties": {
+    "name": "武蔵台小学校",
+    "address": "中野区上鷺宮5-1-1",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.635131,
+     35.731444
+    ]
+   },
+   "properties": {
+    "name": "上鷺宮小学校",
+    "address": "中野区上鷺宮1-24-36",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.635131,
+     35.731444
+    ]
+   },
+   "properties": {
+    "name": "上鷺宮小学校",
+    "address": "中野区上鷺宮1-24-36",
+    "type": "quake",
+    "typeLabel": "震災時の避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.673114,
+     35.685637
+    ]
+   },
+   "properties": {
+    "name": "東京大学教育学部附属中等教育学校",
+    "address": "南台1-15-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.669817,
+     35.687389
+    ]
+   },
+   "properties": {
+    "name": "みなみの小学校",
+    "address": "弥生町4-27-11",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.668333,
+     35.681852
+    ]
+   },
+   "properties": {
+    "name": "南台小学校",
+    "address": "南台4-4-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.668222,
+     35.688203
+    ]
+   },
+   "properties": {
+    "name": "南部すこやか福祉センター等",
+    "address": "弥生町5-11-26",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.677496,
+     35.696005
+    ]
+   },
+   "properties": {
+    "name": "中野第一小学校",
+    "address": "本町3-16-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.673114,
+     35.685637
+    ]
+   },
+   "properties": {
+    "name": "東京大学教育学部附属中等教育学校",
+    "address": "南台1-15-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.680698,
+     35.699143
+    ]
+   },
+   "properties": {
+    "name": "宝仙学園",
+    "address": "中央2-28-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.672224,
+     35.70365
+    ]
+   },
+   "properties": {
+    "name": "中野中学校跡施設",
+    "address": "中野1-57-12",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.670061,
+     35.694986
+    ]
+   },
+   "properties": {
+    "name": "中野本郷小学校",
+    "address": "本町4-27-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661719,
+     35.69652
+    ]
+   },
+   "properties": {
+    "name": "新渡戸文化学園",
+    "address": "本町6-38-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.674127,
+     35.700131
+    ]
+   },
+   "properties": {
+    "name": "中部すこやか福祉センター",
+    "address": "中央3-19-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.665586,
+     35.700656
+    ]
+   },
+   "properties": {
+    "name": "桃花小学校",
+    "address": "中央5-43-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.672224,
+     35.70365
+    ]
+   },
+   "properties": {
+    "name": "中野中学校跡施設",
+    "address": "中野1-57-12",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661468,
+     35.709528
+    ]
+   },
+   "properties": {
+    "name": "中野中学校",
+    "address": "中野4-12-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.679712,
+     35.706746
+    ]
+   },
+   "properties": {
+    "name": "明治大学付属中野中学校・高等学校",
+    "address": "東中野3-3-4",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.675825,
+     35.707531
+    ]
+   },
+   "properties": {
+    "name": "桃園第二小学校",
+    "address": "中野6-13-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.671471,
+     35.709789
+    ]
+   },
+   "properties": {
+    "name": "大妻中野中学校・高等学校",
+    "address": "上高田2-3-7",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.679712,
+     35.706746
+    ]
+   },
+   "properties": {
+    "name": "明治大学付属中野中学校・高等学校",
+    "address": "東中野3-3-4",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.675825,
+     35.707531
+    ]
+   },
+   "properties": {
+    "name": "桃園第二小学校",
+    "address": "中野6-13-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.671471,
+     35.709789
+    ]
+   },
+   "properties": {
+    "name": "大妻中野中学校・高等学校",
+    "address": "上高田2-3-7",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.671471,
+     35.709789
+    ]
+   },
+   "properties": {
+    "name": "大妻中野中学校・高等学校",
+    "address": "上高田2-3-7",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.67803,
+     35.715262
+    ]
+   },
+   "properties": {
+    "name": "第五中学校",
+    "address": "上高田4-28-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.67451,
+     35.716933
+    ]
+   },
+   "properties": {
+    "name": "旧上高田小学校",
+    "address": "上高田5-35-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661468,
+     35.709528
+    ]
+   },
+   "properties": {
+    "name": "中野中学校",
+    "address": "中野4-12-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.67451,
+     35.716933
+    ]
+   },
+   "properties": {
+    "name": "旧上高田小学校",
+    "address": "上高田5-35-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.67451,
+     35.716933
+    ]
+   },
+   "properties": {
+    "name": "旧上高田小学校",
+    "address": "上高田5-35-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.67344,
+     35.729442
+    ]
+   },
+   "properties": {
+    "name": "江原小学校",
+    "address": "江原町1-39-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.66825,
+     35.724738
+    ]
+   },
+   "properties": {
+    "name": "第七中学校",
+    "address": "江古田2-9-11",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.666742,
+     35.726124
+    ]
+   },
+   "properties": {
+    "name": "江古田小学校",
+    "address": "江古田2-13-28",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.66825,
+     35.724738
+    ]
+   },
+   "properties": {
+    "name": "第七中学校",
+    "address": "江古田2-9-11",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.657113,
+     35.723978
+    ]
+   },
+   "properties": {
+    "name": "緑野中学校",
+    "address": "丸山1-1-19",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661468,
+     35.709528
+    ]
+   },
+   "properties": {
+    "name": "中野中学校",
+    "address": "中野4-12-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.65741,
+     35.725273
+    ]
+   },
+   "properties": {
+    "name": "緑野小学校",
+    "address": "丸山1-17-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.65167,
+     35.720872
+    ]
+   },
+   "properties": {
+    "name": "北原小学校",
+    "address": "野方6-30-6",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.65245,
+     35.713296
+    ]
+   },
+   "properties": {
+    "name": "啓明小学校",
+    "address": "大和町1-18-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.65245,
+     35.713296
+    ]
+   },
+   "properties": {
+    "name": "啓明小学校",
+    "address": "大和町1-18-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.631172,
+     35.720785
+    ]
+   },
+   "properties": {
+    "name": "旧西中野小学校",
+    "address": "白鷺3-9-2",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.636449,
+     35.722476
+    ]
+   },
+   "properties": {
+    "name": "鷺宮スポーツコミュニティプラザ",
+    "address": "白鷺3-1-13",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.639513,
+     35.724791
+    ]
+   },
+   "properties": {
+    "name": "旧鷺宮小学校",
+    "address": "鷺宮3-31-4",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.628248,
+     35.728047
+    ]
+   },
+   "properties": {
+    "name": "北中野中学校",
+    "address": "上鷺宮5-7-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.635534,
+     35.731401
+    ]
+   },
+   "properties": {
+    "name": "上鷺宮小学校",
+    "address": "上鷺宮1-24-36",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.629593,
+     35.727967
+    ]
+   },
+   "properties": {
+    "name": "武蔵台小学校",
+    "address": "上鷺宮5-1-1",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.683747,
+     35.698649
+    ]
+   },
+   "properties": {
+    "name": "中野東中学校等複合施設",
+    "address": "中央1-41-4",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.635898,
+     35.724025
+    ]
+   },
+   "properties": {
+    "name": "鷺の杜小学校",
+    "address": "鷺宮4-7-3",
+    "type": "flood",
+    "typeLabel": "水害時避難所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.630874,
+     35.728683
+    ]
+   },
+   "properties": {
+    "name": "都立武蔵丘高校一帯",
+    "address": "中野区上鷺宮",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.634451,
+     35.720957
+    ]
+   },
+   "properties": {
+    "name": "公社鷺宮西住宅一帯",
+    "address": "中野区白鷺",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.637139,
+     35.718654
+    ]
+   },
+   "properties": {
+    "name": "白鷺一丁目地区",
+    "address": "中野区白鷺、若宮",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.657406,
+     35.688513
+    ]
+   },
+   "properties": {
+    "name": "コーシャハイム中野弥生町・立正佼成会大聖堂一帯",
+    "address": "中野区弥生町・杉並区和田",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661842,
+     35.716086
+    ]
+   },
+   "properties": {
+    "name": "平和の森公園一帯",
+    "address": "中野区新井",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.661981,
+     35.707454
+    ]
+   },
+   "properties": {
+    "name": "中野区役所一帯",
+    "address": "中野区中野・杉並区高円寺北",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.666816,
+     35.72999
+    ]
+   },
+   "properties": {
+    "name": "江古田の森公園一帯",
+    "address": "中野区江古田",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.669601,
+     35.691882
+    ]
+   },
+   "properties": {
+    "name": "本町五丁目公園一帯",
+    "address": "中野区本町、弥生町",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.673644,
+     35.721382
+    ]
+   },
+   "properties": {
+    "name": "哲学堂公園一帯",
+    "address": "中野区上高田、松が丘・新宿区西落合、中井",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.673826,
+     35.685665
+    ]
+   },
+   "properties": {
+    "name": "東京大学附属中等教育学校一帯",
+    "address": "中野区南台",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.689471,
+     35.690176
+    ]
+   },
+   "properties": {
+    "name": "新宿中央公園・高層ビル群一帯（新宿区）",
+    "address": "新宿区西新宿",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.69343,
+     35.712948
+    ]
+   },
+   "properties": {
+    "name": "落合中央公園（新宿区）",
+    "address": "新宿区上落合",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     139.70022,
+     35.70644
+    ]
+   },
+   "properties": {
+    "name": "百人町三・四丁目地区(新宿区)",
+    "address": "新宿区百人町",
+    "type": "wide",
+    "typeLabel": "広域避難場所"
+   }
+  }
+ ]
+}

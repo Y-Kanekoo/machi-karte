@@ -172,6 +172,22 @@ export const FLOOD_COLORS = {
 export const NAKANO_HAZARDMAP_URL =
   'https://www.city.tokyo-nakano.lg.jp/bosai/hazardmap/hazardmap.html';
 
+/**
+ * 同梱の避難所GeoJSON（tools/fetch-shelters.mjs で生成）。
+ * import.meta.url 起点なので GitHub Pages のサブパス配信でも解決できる。
+ */
+export const SHELTERS_URL = new URL('../data/shelters.geojson', import.meta.url).href;
+
+/** 避難所の種別（GeoJSONの properties.type と対応）。ラベルと色の単一ソース */
+export const SHELTER_TYPES = {
+  quake: { label: '震災時の避難所', color: '#5ecb7a' },
+  flood: { label: '水害時避難所',   color: '#5aa9f0' },
+  wide:  { label: '広域避難場所',   color: '#f0a44a' },
+};
+
+/** 避難所ラベルを表示する距離（m）。102件のラベル重なりと描画負荷を抑える */
+export const SHELTER_LABEL_MAX_DISTANCE = 2500;
+
 /** 比較できる最大地点数 */
 export const COMPARE_MAX = 3;
 /** 比較の重複追加とみなす距離（m） */
