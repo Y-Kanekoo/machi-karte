@@ -15,8 +15,12 @@ import { lonLatToPixel, lonLatToTileLocal, tileUrl, pointInRings } from '../js/t
 import { HAZARD_TILES, ZONING_TILES } from '../js/config.js';
 import {
   classifyFloodColor,
+  classifyFloodL1Color,
+  classifyKeizokuColor,
   classifyLandslideColor,
   FLOOD_LEGEND,
+  FLOOD_LEGEND_L1,
+  KEIZOKU_LEGEND,
   COLOR_MATCH_THRESHOLD,
 } from '../js/hazard.js';
 
@@ -37,6 +41,39 @@ check('判定不能の距離が閾値超',
   classifyFloodColor([0, 128, 0, 255]).distance > COLOR_MATCH_THRESHOLD);
 // 半透明の境界ピクセルは区域外に寄せる
 equal('アルファ小(30)は区域外', classifyFloodColor([255, 216, 192, 30]).rank, '区域外');
+
+console.log('--- 洪水（計画規模・新凡例）の色分類 ---');
+equal('L1: 完全透過は区域外', classifyFloodL1Color([0, 0, 0, 0]).rank, '区域外');
+equal('L1: nullは区域外', classifyFloodL1Color(null).rank, '区域外');
+for (const l of FLOOD_LEGEND_L1) {
+  equal(`L1凡例色 [${l.rgb}] → ${l.rank}`, classifyFloodL1Color([...l.rgb, 255]).rank, l.rank);
+}
+// 細分色と既存色の分離（RGB距離 20.2。最近傍でも取り違えないこと）
+equal('L1: 細分色[248,225,166]は0.5〜1.0m',
+  classifyFloodL1Color([248, 225, 166, 255]).rank, '0.5〜1.0m');
+equal('L1: 既存色[247,245,169]は0.5m未満',
+  classifyFloodL1Color([247, 245, 169, 255]).rank, '0.5m未満');
+check('L1: 細分色と既存色のRGB距離が20前後',
+  Math.abs(Math.hypot(248 - 247, 225 - 245, 166 - 169) - 20.2) < 0.2,
+  String(Math.hypot(248 - 247, 225 - 245, 166 - 169)));
+equal('L1: 細分色は0.5〜1.0mのdepthMaxが1',
+  classifyFloodL1Color([248, 225, 166, 255]).depthMax, 1);
+// L2用テーブルに細分色を混ぜていないこと（L2で引くと既存色に丸められる）
+equal('L2テーブルには細分色がない', classifyFloodColor([248, 225, 166, 255]).rank, '0.5m未満');
+check('L2の凡例は6色のまま', FLOOD_LEGEND.length === 6, String(FLOOD_LEGEND.length));
+check('L1の凡例は8色', FLOOD_LEGEND_L1.length === 8, String(FLOOD_LEGEND_L1.length));
+
+console.log('--- 浸水継続時間の色分類 ---');
+equal('継続: 完全透過はデータなし', classifyKeizokuColor([0, 0, 0, 0]).rank, 'データなし');
+equal('継続: null（タイル404）はデータなし', classifyKeizokuColor(null).rank, 'データなし');
+for (const l of KEIZOKU_LEGEND) {
+  equal(`継続凡例色 [${l.rgb}] → ${l.rank}`, classifyKeizokuColor([...l.rgb, 255]).rank, l.rank);
+}
+check('継続の凡例は7ランク', KEIZOKU_LEGEND.length === 7, String(KEIZOKU_LEGEND.length));
+equal('継続: 近傍色（±12ずれ）も最近傍で判定',
+  classifyKeizokuColor([160 - 12, 210 + 8, 255 - 10, 255]).rank, '12時間未満');
+equal('継続: アルファ小(30)はデータなし', classifyKeizokuColor([160, 210, 255, 30]).rank, 'データなし');
+equal('継続: 凡例と無関係な色は判定不能', classifyKeizokuColor([0, 200, 0, 255]).rank, '判定不能');
 
 console.log('--- 土砂災害の色分類 ---');
 equal('透過は区域外', classifyLandslideColor([0, 0, 0, 0]).rank, '区域外');
@@ -61,6 +98,28 @@ async function floodRankAt(lon, lat) {
   const png = PNG.sync.read(res.body);
   const i = (png.width * t.py + t.px) * 4;
   return classifyFloodColor([png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]]).rank;
+}
+
+/** 浸水継続時間のランク（タイル404 = データなし） */
+async function keizokuRankAt(lon, lat) {
+  const cfg = HAZARD_TILES.floodKeizoku;
+  const t = lonLatToPixel(lon, lat, cfg.z);
+  const res = await curlFetch(tileUrl(cfg.url, t.z, t.x, t.y));
+  if (res.status !== 200) return 'データなし';
+  const png = PNG.sync.read(res.body);
+  const i = (png.width * t.py + t.px) * 4;
+  return classifyKeizokuColor([png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]]).rank;
+}
+
+/** 洪水（計画規模）のランク（タイル404 = 区域外） */
+async function floodL1RankAt(lon, lat) {
+  const cfg = HAZARD_TILES.floodL1;
+  const t = lonLatToPixel(lon, lat, cfg.z);
+  const res = await curlFetch(tileUrl(cfg.url, t.z, t.x, t.y));
+  if (res.status !== 200) return '区域外';
+  const png = PNG.sync.read(res.body);
+  const i = (png.width * t.py + t.px) * 4;
+  return classifyFloodL1Color([png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]]).rank;
 }
 
 async function landslideRankAt(key, lon, lat) {
@@ -100,6 +159,24 @@ equal('沼袋付近(139.662,35.720)', await floodRankAt(139.662, 35.72), '0.5〜
 equal('中野五丁目(139.66893,35.707859)', await floodRankAt(139.66893, 35.707859), '区域外');
 equal('中野駅北口サンモール(139.6656,35.7072)', await floodRankAt(139.6656, 35.7072), '区域外');
 equal('鷺宮(139.635,35.725)', await floodRankAt(139.635, 35.725), '区域外');
+
+console.log('--- 実タイル: 浸水継続時間（想定最大規模） ---');
+// 2026-07-28 に test/data-expectations.mjs で再確認（R2計画書 §3.1 の表と一致）
+equal('南台五丁目(139.663,35.688)', await keizokuRankAt(139.663, 35.688), '12時間未満');
+equal('南台・神田川沿い(139.6632,35.68847)', await keizokuRankAt(139.6632, 35.68847), '12時間〜1日');
+equal('沼袋(139.662,35.720)', await keizokuRankAt(139.662, 35.72), '12時間未満');
+// 洪水L2は「0.5m未満」なのに継続時間は透明（＝データなし）という実例
+equal('弥生町二丁目は透明=データなし', await keizokuRankAt(139.673935, 35.691502), 'データなし');
+equal('本町四丁目は透明=データなし', await keizokuRankAt(139.670731, 35.695683), 'データなし');
+equal('中野五丁目はタイル404=データなし', await keizokuRankAt(139.66893, 35.707859), 'データなし');
+
+console.log('--- 実タイル: 洪水浸水想定（計画規模・newlegend） ---');
+equal('南台五丁目(139.663,35.688)', await floodL1RankAt(139.663, 35.688), '0.5〜1.0m');
+equal('南台・神田川沿い(139.6632,35.68847)', await floodL1RankAt(139.6632, 35.68847), '0.5〜3.0m');
+equal('沼袋(139.662,35.720)', await floodL1RankAt(139.662, 35.72), '区域外');
+equal('弥生町二丁目(139.673935,35.691502)', await floodL1RankAt(139.673935, 35.691502), '区域外');
+equal('中野五丁目(139.66893,35.707859)', await floodL1RankAt(139.66893, 35.707859), '区域外');
+equal('上高田四丁目(139.67868,35.713402)', await floodL1RankAt(139.67868, 35.713402), '区域外');
 
 console.log('--- 実タイル: 土砂災害警戒区域 ---');
 equal('上高田四丁目 急傾斜地', await landslideRankAt('steepSlope', 139.67868, 35.713402), '警戒区域（イエロー）');

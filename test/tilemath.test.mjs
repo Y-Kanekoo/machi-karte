@@ -9,6 +9,7 @@ import {
   tileUrl,
   pointInRing,
   pointInRings,
+  distanceMeters,
 } from '../js/tilemath.js';
 import { check, near, equal, report } from './harness.mjs';
 
@@ -89,5 +90,25 @@ const hole = [
 check('穴の中は外部（偶奇規則）', !pointInRings(5, 5, [square, hole]));
 check('穴の外・外環の内は内部', pointInRings(1.5, 5, [square, hole]));
 check('外環の外は外部', !pointInRings(20, 5, [square, hole]));
+
+// --- Haversine距離（R2: 最寄り避難所・比較の重複判定で共用） ---
+// 独立検算（Python geopy相当・球面半径6371008.8m）:
+//   緯度1度（35.7→36.7、同経度）= 111194.9m / 経度0.0001度（緯度35.7）= 9.03m
+near('同一地点は0m', distanceMeters(139.6659, 35.7056, 139.6659, 35.7056), 0, 1e-9);
+near('緯度1度は約111.2km', distanceMeters(139.6659, 35.7, 139.6659, 36.7), 111194.9, 1);
+near('緯度0.0001度は約11.1m', distanceMeters(139.6659, 35.7056, 139.6659, 35.7057), 11.12, 0.05);
+near('経度0.0001度（緯度35.7）は約9.0m',
+  distanceMeters(139.6659, 35.7056, 139.666, 35.7056), 9.03, 0.05);
+// 中野駅 → 鷺宮（Python独立検算 3526.47m。誤差1%以内）
+{
+  const d = distanceMeters(139.6659, 35.7056, 139.635, 35.725);
+  check('中野駅〜鷺宮が約3.53km', Math.abs(d - 3526.47) / 3526.47 < 0.01, `${d.toFixed(0)}m`);
+}
+check('引数の順序が対称', Math.abs(
+  distanceMeters(139.6659, 35.7056, 139.635, 35.725) -
+  distanceMeters(139.635, 35.725, 139.6659, 35.7056)
+) < 1e-9);
+// 赤道1度 = 111.195km（球面近似の妥当性チェック）
+near('赤道の経度1度は約111.2km', distanceMeters(0, 0, 1, 0), 111194.9, 1);
 
 report('tilemath.test.mjs');

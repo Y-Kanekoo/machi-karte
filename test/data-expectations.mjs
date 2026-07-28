@@ -16,7 +16,14 @@ import { PbfReader } from 'pbf';
 import { curlFetch } from './harness.mjs';
 import { lonLatToPixel, lonLatToTileLocal, tileUrl, pointInRings } from '../js/tilemath.js';
 import { HAZARD_TILES, ZONING_TILES, GEOCODE_URL } from '../js/config.js';
-import { FLOOD_LEGEND, classifyFloodColor } from '../js/hazard.js';
+import {
+  FLOOD_LEGEND,
+  FLOOD_LEGEND_L1,
+  KEIZOKU_LEGEND,
+  classifyFloodColor,
+  classifyFloodL1Color,
+  classifyKeizokuColor,
+} from '../js/hazard.js';
 
 // GSI住所検索で確定した座標（2026-07-27 実測）
 const POINTS = [
@@ -29,9 +36,27 @@ const POINTS = [
   { name: '中野新橋駅付近',     lon: 139.669,    lat: 35.697 },
 ];
 
+// R2（防災強化）で追加した地点。§3.1 の表と対応
+const R2_POINTS = [
+  ...POINTS,
+  { name: '南台五丁目',         lon: 139.663,   lat: 35.688 },
+  { name: '南台・神田川沿い',   lon: 139.66320, lat: 35.68847 },
+  { name: '沼袋',               lon: 139.662,   lat: 35.720 },
+];
+
 function rgba(png, px, py) {
   const i = (png.width * py + px) * 4;
   return [png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]];
+}
+
+/** タイル内の色分布（上位10色）を [key, count] の配列で返す */
+function colorHistogram(png, top = 10) {
+  const hist = new Map();
+  for (let i = 0; i < png.data.length; i += 4) {
+    const k = `${png.data[i]},${png.data[i + 1]},${png.data[i + 2]},${png.data[i + 3]}`;
+    hist.set(k, (hist.get(k) || 0) + 1);
+  }
+  return [...hist.entries()].sort((a, b) => b[1] - a[1]).slice(0, top);
 }
 
 async function loadPng(url) {
@@ -86,6 +111,102 @@ console.log('\n--- 弥生町タイルに含まれる色の分布（上位10） -
       });
     console.log(`    凡例表: ${FLOOD_LEGEND.map((l) => l.rank).join(' / ')}`);
   }
+}
+
+// ---- 1b. 浸水継続時間（想定最大規模） R2 --------------------------------------
+
+console.log('\n=== 浸水継続時間（想定最大規模） z=16 ===');
+for (const p of R2_POINTS) {
+  const cfg = HAZARD_TILES.floodKeizoku;
+  const t = lonLatToPixel(p.lon, p.lat, cfg.z);
+  const { status, png } = await loadPng(tileUrl(cfg.url, t.z, t.x, t.y));
+  if (!png) {
+    console.log(`  ${p.name.padEnd(16)} HTTP ${status} タイルなし → データなし`);
+    continue;
+  }
+  const c = rgba(png, t.px, t.py);
+  const cls = classifyKeizokuColor(c);
+  console.log(
+    `  ${p.name.padEnd(16)} tile=${t.x}/${t.y} px=(${t.px},${t.py}) rgba=[${c}] → ${cls.rank} (距離 ${cls.distance.toFixed(1)})`
+  );
+}
+
+console.log('\n--- 継続時間タイルに含まれる色の分布（南台／弥生町） ---');
+for (const p of [
+  { name: '南台', lon: 139.663, lat: 35.688 },
+  { name: '弥生町', lon: 139.673935, lat: 35.691502 },
+]) {
+  const cfg = HAZARD_TILES.floodKeizoku;
+  const t = lonLatToPixel(p.lon, p.lat, cfg.z);
+  const { status, png } = await loadPng(tileUrl(cfg.url, t.z, t.x, t.y));
+  if (!png) { console.log(`  ${p.name}: HTTP ${status}`); continue; }
+  console.log(`  ${p.name} tile=${t.x}/${t.y}`);
+  for (const [k, n] of colorHistogram(png)) {
+    const c = k.split(',').map(Number);
+    const cls = classifyKeizokuColor(c);
+    console.log(`    [${k}] × ${n} → ${cls.rank} (距離 ${cls.distance.toFixed(1)})`);
+  }
+}
+console.log(`  凡例表: ${KEIZOKU_LEGEND.map((l) => l.rank).join(' / ')}`);
+
+console.log('\n--- 継続時間の凡例画像に含まれる色（上位12） ---');
+{
+  const { status, png } = await loadPng(
+    'https://disaportal.gsi.go.jp/hazardmap/copyright/img/shinsui_legend_l2_keizoku.png'
+  );
+  if (!png) console.log(`  HTTP ${status}`);
+  else {
+    for (const [k, n] of colorHistogram(png, 12)) {
+      const c = k.split(',').map(Number);
+      const hit = KEIZOKU_LEGEND.find((l) => l.rgb.every((v, i) => v === c[i]));
+      console.log(`    [${k}] × ${n}${hit ? ` → 凡例表の「${hit.rank}」と一致` : ''}`);
+    }
+  }
+}
+
+// ---- 1c. 洪水浸水想定（計画規模・新凡例） R2 ------------------------------------
+
+console.log('\n=== 洪水浸水想定（計画規模・newlegend） z=16 ===');
+for (const p of R2_POINTS) {
+  const cfg = HAZARD_TILES.floodL1;
+  const t = lonLatToPixel(p.lon, p.lat, cfg.z);
+  const { status, png } = await loadPng(tileUrl(cfg.url, t.z, t.x, t.y));
+  if (!png) {
+    console.log(`  ${p.name.padEnd(16)} HTTP ${status} タイルなし → 区域外`);
+    continue;
+  }
+  const c = rgba(png, t.px, t.py);
+  const cls = classifyFloodL1Color(c);
+  console.log(
+    `  ${p.name.padEnd(16)} tile=${t.x}/${t.y} px=(${t.px},${t.py}) rgba=[${c}] → ${cls.rank} (距離 ${cls.distance.toFixed(1)})`
+  );
+}
+
+console.log('\n--- 計画規模タイルに含まれる色の分布（南台） ---');
+{
+  const cfg = HAZARD_TILES.floodL1;
+  const t = lonLatToPixel(139.663, 35.688, cfg.z);
+  const { status, png } = await loadPng(tileUrl(cfg.url, t.z, t.x, t.y));
+  if (!png) console.log(`  HTTP ${status}`);
+  else {
+    for (const [k, n] of colorHistogram(png)) {
+      const c = k.split(',').map(Number);
+      const cls = classifyFloodL1Color(c);
+      console.log(`    [${k}] × ${n} → ${cls.rank} (距離 ${cls.distance.toFixed(1)})`);
+    }
+  }
+  console.log(`  凡例表(L1): ${FLOOD_LEGEND_L1.map((l) => l.rank).join(' / ')}`);
+}
+
+// 参考: newlegend なしのパスは中野区で配信されない（§3.1の注意書きの再確認）
+{
+  const t = lonLatToPixel(139.663, 35.688, 16);
+  const url = tileUrl(
+    'https://disaportaldata.gsi.go.jp/raster/01_flood_l1_shinsuishin_data/{z}/{x}/{y}.png',
+    t.z, t.x, t.y
+  );
+  const { status } = await loadPng(url);
+  console.log(`  参考: 01_flood_l1_shinsuishin_data（newlegendなし）南台 → HTTP ${status}`);
 }
 
 // ---- 2. 土砂災害警戒区域 -----------------------------------------------------

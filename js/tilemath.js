@@ -52,6 +52,28 @@ export function lonLatToTileLocal(lon, lat, z, extent = 4096) {
   };
 }
 
+/** 地球半径（WGS84の平均半径, m）。Haversine距離に使う */
+const EARTH_RADIUS_M = 6371008.8;
+
+/**
+ * 2地点間の大円距離（m）。Haversine公式。
+ *
+ * 最寄り避難所の直線距離（数百m〜数km）と比較の重複判定（10m）の
+ * 両方で使う共通実装。純関数なので Node からもそのままテストできる。
+ *
+ * @param {number} lon1 @param {number} lat1 @param {number} lon2 @param {number} lat2
+ * @returns {number} 距離（m）
+ */
+export function distanceMeters(lon1, lat1, lon2, lat2) {
+  const rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad;
+  const dLon = (lon2 - lon1) * rad;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
 /** タイル番号の左上隅の経緯度（逆変換。テスト・検算用） */
 export function tileToLonLat(x, y, z) {
   const n = Math.pow(2, z);

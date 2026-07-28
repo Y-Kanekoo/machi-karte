@@ -8,6 +8,7 @@
 
 import { COMPARE_MAX, COMPARE_STORAGE_KEY, COMPARE_DEDUPE_METERS, FLOOD_COLORS } from './config.js';
 import { escapeHtml } from './util.js';
+import { distanceMeters as haversineMeters } from './tilemath.js';
 
 // ---- 純粋関数（Node単体テスト対象） -------------------------------------------
 
@@ -57,12 +58,12 @@ export function worstLandslide(list) {
   return best;
 }
 
-/** 2地点間のおおよその距離（m）。10m程度の重複判定にしか使わないので平面近似で十分 */
+/**
+ * 2地点間の距離（m）。実体は tilemath.js の Haversine 実装
+ * （R2で避難所の直線距離と共通化した。ここは {lon,lat} を取る比較用ラッパ）。
+ */
 export function distanceMeters(a, b) {
-  const latRad = ((a.lat + b.lat) / 2) * (Math.PI / 180);
-  const dx = (b.lon - a.lon) * 111320 * Math.cos(latRad);
-  const dy = (b.lat - a.lat) * 110540;
-  return Math.sqrt(dx * dx + dy * dy);
+  return haversineMeters(a.lon, a.lat, b.lon, b.lat);
 }
 
 /** 比較表の行定義（行=診断項目）。値の取り出しも含めて純粋に保つ */

@@ -41,6 +41,20 @@ export const HAZARD_TILES = {
     z: 16,
     label: '洪水浸水想定（想定最大規模）',
   },
+  // 洪水浸水継続時間（想定最大規模） z=2〜17
+  // 中野区は神田川・善福寺川・妙正寺川沿いのタイルのみ配信あり（台地側は404）
+  floodKeizoku: {
+    url: 'https://disaportaldata.gsi.go.jp/raster/01_flood_l2_keizoku_data/{z}/{x}/{y}.png',
+    z: 16,
+    label: '浸水継続時間（想定最大規模）',
+  },
+  // 洪水浸水想定区域（計画規模・新凡例） z=2〜17
+  // `01_flood_l1_shinsuishin_data`（newlegendなし）は中野区404。必ず newlegend を使う
+  floodL1: {
+    url: 'https://disaportaldata.gsi.go.jp/raster/01_flood_l1_shinsuishin_newlegend_data/{z}/{x}/{y}.png',
+    z: 16,
+    label: '洪水浸水想定（計画規模）',
+  },
   // 土砂災害警戒区域 z=2〜17
   debrisFlow: {
     url: 'https://disaportaldata.gsi.go.jp/raster/05_dosekiryukeikaikuiki/{z}/{x}/{y}.png',
