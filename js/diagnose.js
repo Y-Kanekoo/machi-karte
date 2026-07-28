@@ -5,7 +5,7 @@
 
 import { escapeHtml } from './util.js';
 import { search as geocodeSearch } from './geocode.js';
-import { queryFlood, queryLandslide } from './hazard.js';
+import { queryFlood, queryFloodKeizoku, queryFloodL1, queryLandslide } from './hazard.js';
 import { queryZoning } from './zoning.js';
 import { estimateSunlight, estimateBaseHeight, prepareTiles, MIN_SUN_ELEVATION } from './sunlight.js';
 import {
@@ -16,6 +16,7 @@ import {
   HISTORY_STORAGE_KEY,
   COLLAPSE_STORAGE_KEY,
   GEOLOCATION_TIMEOUT,
+  NAKANO_HAZARDMAP_URL,
 } from './config.js';
 
 /**
@@ -218,15 +219,60 @@ export function initDiagnosis(ctx) {
       <div class="diag-sub">東経 ${lon.toFixed(6)} / 北緯 ${lat.toFixed(6)}</div>`;
   }
 
-  function renderFlood(r) {
+  /** 「キー｜値」の1行。value が要注意なら warn クラスを付ける */
+  function kvRow(key, value, warn = false) {
+    return `<div class="diag-row"><span class="diag-key">${escapeHtml(key)}</span>` +
+      `<span class="diag-val${warn ? ' warn' : ''}">${escapeHtml(value)}</span></div>`;
+  }
+
+  /**
+   * 洪水セクション。想定最大規模（L2）のバッジに加えて
+   * 浸水継続時間（F2-1）と計画規模（F2-5）の行を並べる。
+   *
+   * 継続時間の表示ルール（R2 §2.1。透明を「浸水しない」と読ませないため）:
+   *   - 洪水ランクが「区域外」          → 「―」（そもそも浸水想定区域の外）
+   *   - 洪水ランクあり＋継続時間が透明  → 「データなし」（浸水するが継続時間の配信がない）
+   *
+   * @param {object} r      queryFlood の結果（想定最大規模）
+   * @param {object|null} k queryFloodKeizoku の結果（取得失敗時は null）
+   * @param {object|null} l1 queryFloodL1 の結果（取得失敗時は null）
+   */
+  function renderFlood(r, k, l1) {
     const color = FLOOD_COLORS[r.rank] || '#cccccc';
-    const note = r.rank === '区域外'
+    const outOfZone = r.rank === '区域外';
+    const parts = [`<div class="diag-badge" style="background:${color}">${escapeHtml(r.rank)}</div>`];
+
+    const keizokuVal = !k ? '取得できませんでした'
+      : outOfZone ? '―'
+        : k.rank;
+    parts.push(kvRow('浸水継続時間', keizokuVal,
+      !!k && !outOfZone && k.rank !== 'データなし' && k.rank !== '判定不能'));
+
+    const l1Val = !l1 ? '取得できませんでした' : l1.rank;
+    parts.push(kvRow('計画規模の想定', l1Val, !!l1 && l1.rank !== '区域外' && l1.rank !== '判定不能'));
+
+    const note = outOfZone
       ? '想定最大規模の洪水でも浸水想定区域には含まれません。'
       : r.rank === '判定不能'
         ? 'タイルの色が凡例と一致しませんでした。'
         : '想定最大規模（おおむね1000年に1回程度）の降雨による想定です。';
-    return `<div class="diag-badge" style="background:${color}">${escapeHtml(r.rank)}</div>
-      <div class="diag-note">${escapeHtml(note)}</div>`;
+    parts.push(`<div class="diag-note">${escapeHtml(note)}</div>`);
+    parts.push(`<div class="diag-note">${escapeHtml(
+      '「浸水継続時間」は浸水が引くまでのおおよその目安、「計画規模」はおおむね30〜100年に1回程度の降雨による想定です。'
+      + (!outOfZone && k && k.rank === 'データなし'
+        ? 'この地点は浸水想定区域内ですが、継続時間のデータは配信されていません。'
+        : '')
+    )}</div>`);
+    // 凡例注記: 重ねるハザードマップの原文どおり、自治体により意味が変わりうる
+    if (k && k.rank === '2週間〜4週間') {
+      parts.push(`<div class="diag-note">${escapeHtml(
+        '「2週間〜4週間」の色は、自治体により「2週間以上」を意味する場合があります。'
+      )}</div>`);
+    }
+    parts.push(`<div class="diag-note">内水（雨水出水）の浸水想定は本ツール未対応です。` +
+      `<a href="${NAKANO_HAZARDMAP_URL}" target="_blank" rel="noopener">中野区ハザードマップ</a>` +
+      `をご確認ください。いずれも参考情報であり、避難の判断は必ず公式の発表に従ってください。</div>`);
+    return parts.join('');
   }
 
   function renderLandslide(list) {
@@ -313,7 +359,8 @@ export function initDiagnosis(ctx) {
     setPin(lon, lat, title || '診断地点');
     const result = {
       lon, lat, title,
-      flood: null, landslide: null, zoning: null, sunlight: null,
+      flood: null, floodKeizoku: null, floodL1: null,
+      landslide: null, zoning: null, sunlight: null,
       buildingHeight: measuredHeightOf(picked),
       inArea: isInServiceArea(lon, lat),
     };
@@ -327,9 +374,21 @@ export function initDiagnosis(ctx) {
       fill('secBuilding', `<table class="diag-table">${buildingTableHtml(picked)}</table>`);
     }
 
-    // 洪水
-    const pFlood = queryFlood(lon, lat)
-      .then((r) => { if (alive()) { result.flood = r; fill('secFlood', renderFlood(r)); } })
+    // 洪水（想定最大規模＋浸水継続時間＋計画規模）。
+    // 継続時間・計画規模は補助情報なので、取れなくても本体（想定最大規模）は表示する。
+    const soft = (label) => (e) => { console.warn(label + ' failed', e); return null; };
+    const pFlood = Promise.all([
+      queryFlood(lon, lat),
+      queryFloodKeizoku(lon, lat).catch(soft('flood keizoku')),
+      queryFloodL1(lon, lat).catch(soft('flood L1')),
+    ])
+      .then(([f, k, l1]) => {
+        if (!alive()) return;
+        result.flood = f;
+        result.floodKeizoku = k;
+        result.floodL1 = l1;
+        fill('secFlood', renderFlood(f, k, l1));
+      })
       .catch((e) => {
         console.warn('flood failed', e);
         if (alive()) fill('secFlood', failMsg('洪水浸水想定を取得できませんでした'));

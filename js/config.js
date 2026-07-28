@@ -162,6 +162,16 @@ export const FLOOD_COLORS = {
   '20.0m以上': '#dc7adc',
 };
 
+// ---- R2: 防災強化 --------------------------------------------------------------
+
+/**
+ * 中野区ハザードマップ（水害・土砂災害）の案内ページ。
+ * 内水（雨水出水）は本ツール未対応なので、その注記からここへ誘導する。
+ * 2026-07-28 に HTTP 200 を確認。
+ */
+export const NAKANO_HAZARDMAP_URL =
+  'https://www.city.tokyo-nakano.lg.jp/bosai/hazardmap/hazardmap.html';
+
 /** 比較できる最大地点数 */
 export const COMPARE_MAX = 3;
 /** 比較の重複追加とみなす距離（m） */

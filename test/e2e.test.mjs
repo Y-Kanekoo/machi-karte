@@ -65,6 +65,16 @@ try {
   const flood5 = await waitSection('secFlood');
   console.log('  🌊 ' + flood5);
   check('中野五丁目の洪水判定が「区域外」', flood5.includes('区域外'), flood5);
+  // R2: 区域外なので継続時間は「―」（「データなし」と区別する）／計画規模も区域外
+  check('中野五丁目の浸水継続時間が「―」',
+    /浸水継続時間\s*―/.test(flood5), flood5);
+  check('中野五丁目の計画規模が「区域外」',
+    /計画規模の想定\s*区域外/.test(flood5), flood5);
+  check('内水未対応の注記とリンクがある',
+    flood5.includes('内水') && flood5.includes('中野区ハザードマップ'), flood5);
+  check('内水注記のリンク先が中野区の公式ページ',
+    (await page.getAttribute('#secFlood a', 'href') || '').includes('city.tokyo-nakano.lg.jp'),
+    await page.getAttribute('#secFlood a', 'href'));
 
   const land5 = await waitSection('secLandslide');
   console.log('  ⛰️ ' + land5);
@@ -133,7 +143,9 @@ try {
   const floodY = await waitSection('secFlood');
   console.log('  🌊 ' + floodY);
   check('弥生町の洪水判定が「0.5m未満」', floodY.includes('0.5m未満'), floodY);
-  check('弥生町は区域外ではない', !floodY.includes('区域外'), floodY);
+  // R2でセクションに継続時間・計画規模の行が増えたので、想定最大規模のバッジだけを見る
+  const floodBadgeY = (await page.textContent('#secFlood .diag-badge')).trim();
+  check('弥生町の想定最大規模バッジは区域外ではない', floodBadgeY !== '区域外', floodBadgeY);
 
   const zoneY = await waitSection('secZoning');
   console.log('  🏘️ ' + zoneY);
@@ -144,6 +156,14 @@ try {
   await waitSection('secSun', 180000);
   await page.screenshot({ path: shotPath('03-flood-yayoicho.png') });
   await page.locator('#diagnosisPanel').screenshot({ path: shotPath('04-card-yayoicho.png') });
+
+  // ==== 4a-2. 弥生町: 浸水想定区域内だが継続時間の配信がない実例（R2） ====
+  check('弥生町の浸水継続時間は「データなし」',
+    /浸水継続時間\s*データなし/.test(floodY), floodY);
+  check('弥生町の計画規模は「区域外」',
+    /計画規模の想定\s*区域外/.test(floodY), floodY);
+  check('区域内で継続時間が無い場合の説明が出る',
+    floodY.includes('継続時間のデータは配信されていません'), floodY);
 
   // ==== 4b. 上高田四丁目（土砂災害＝急傾斜地の崩壊 警戒区域） ====
   console.log('\n--- 中野区上高田4丁目（土砂災害警戒区域あり） ---');
@@ -159,6 +179,35 @@ try {
   check('警戒区域該当時の注記が出る', landK.includes('警戒区域に該当します'), landK);
   await waitSection('secSun', 180000);
   await page.locator('#diagnosisPanel').screenshot({ path: shotPath('09-card-landslide-kamitakada.png') });
+
+  // ==== 4c. 南台五丁目付近（浸水継続時間・計画規模の本命地点。R2） ====
+  //
+  // 「中野区南台5丁目」の住所検索は (139.66214, 35.681908) を返し、そこは計画規模が
+  // 「0.5m未満」になる。R2計画書 §3.1 の実測地点は神田川寄りの (139.663, 35.688) なので、
+  // 公開APIで座標を直接指定して診断する。
+  console.log('\n--- 南台五丁目付近（139.663, 35.688） ---');
+  await page.evaluate(() =>
+    window.__nakano.diagnosis.runDiagnosisAt(139.663, 35.688, {
+      title: '南台五丁目付近（神田川沿い）', fly: true,
+    })
+  );
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
+  const floodM = await waitSection('secFlood');
+  console.log('  🌊 ' + floodM);
+  check('南台の想定最大規模が「0.5〜3.0m」', floodM.includes('0.5〜3.0m'), floodM);
+  check('南台の浸水継続時間が「12時間未満」',
+    /浸水継続時間\s*12時間未満/.test(floodM), floodM);
+  check('南台の計画規模が「0.5〜1.0m」',
+    /計画規模の想定\s*0\.5〜1\.0m/.test(floodM), floodM);
+  const floodRanks = await page.evaluate(() => {
+    const r = window.__nakano.diagnosis.getLastResult();
+    return { l2: r?.flood?.rank, keizoku: r?.floodKeizoku?.rank, l1: r?.floodL1?.rank };
+  });
+  console.log('  結果オブジェクト: ' + JSON.stringify(floodRanks));
+  check('lastResultに継続時間が入る', floodRanks.keizoku === '12時間未満', JSON.stringify(floodRanks));
+  check('lastResultに計画規模が入る', floodRanks.l1 === '0.5〜1.0m', JSON.stringify(floodRanks));
+  await waitSection('secSun', 180000);
+  await page.locator('#diagnosisPanel').screenshot({ path: shotPath('r2-01-card-minamidai.png') });
 
   // ==== 5. クリック診断モード ====
   console.log('\n--- クリック診断モード ---');
