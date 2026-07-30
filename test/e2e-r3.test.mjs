@@ -5,13 +5,19 @@
 // P1時点の対象は F3-3（プリロード置換）の先行2項目:
 //   1. 住所検索の診断でカメラが上空400m（従来の prepareTiles）へ強制テレポートしないこと
 //   2. 置き換え後も日照の既存アサーション群（3日付・93セル・raysCast>50・エラーなし）が成立すること
-// F3-1（階数UI）・F3-2（日影マップ）の項目はP2以降でこのファイルに追加する。
+// P2でF3-1（視点高さセレクタ＝階数指定日照）の項目を追加した。F3-2（日影マップ）はP4以降。
 //
 // 実装方針（R3計画書「P0後の設計確定」#11）:
 //   canvas 上のマウス操作は使わない。Cesium のエラーパネルがポインタイベントを奪って
 //   page.click が30秒タイムアウトする事象があるため、DOM直叩きと window.__nakano フックで操作する。
+//   建物クリック相当は viewer.scene.pick でフィーチャを拾い、diagnosis.diagnose({picked}) に渡す
+//   （P1実装記録の方法。window.__nakano.viewer / window.__nakano.diagnosis は main.js が既に公開済み
+//   なので、このテストのために main.js へ新規フックを追加する必要はなかった）。
 
 import { launchViewer, waitForViewerReady, check, report, shotPath } from './harness.mjs';
+
+/** js/diagnose.js の recalcSunlight が古い再計算をキャンセルしたときに出す観測用ログ */
+const CANCEL_LOG_PREFIX = '[R3-P2] sun-recalc-cancelled';
 
 /** 従来 prepareTiles のテレポート先（この姿勢が観測されたら回帰） */
 const TELEPORT_HEIGHT = 400;
@@ -22,6 +28,13 @@ const FLYTO_PITCH_DEG = -50;
 
 const t = await launchViewer({ viewport: { width: 1440, height: 900 } });
 const { page } = t;
+
+/** [R3-P2] プレフィックスのconsole.logを集める（キャンセル発生の観測用。P0実装記録と同じ手法） */
+const r3p2Logs = [];
+page.on('console', (m) => {
+  const txt = m.text();
+  if (txt.startsWith('[R3-P2]')) r3p2Logs.push(txt);
+});
 
 /** 指定セクションの取得中スピナーが消えるのを待ってテキストを返す */
 async function waitSection(id, timeout = 180000) {
@@ -176,7 +189,276 @@ try {
 
   await page.locator('#diagnosisPanel').screenshot({ path: shotPath('r3-01-card-nakano5.png') });
 
-  // ==== 3. JSエラー ====
+  // ==== 3. F3-1: 建物クリックで視点高さセレクタに「屋上」が出る・1階と屋上の日照差 ====
+  console.log('\n--- F3-1: 建物クリックの視点高さセレクタ ---');
+
+  // 建物が並ぶ駅前へ。マウス操作はせず scene.pick + diagnosis.diagnose({picked}) で
+  // 「建物クリック相当」を再現する（P0実装記録: page.click はエラーパネルにポインタを奪われ得る）。
+  await page.evaluate(() =>
+    window.__nakano.flyTo({ lon: 139.6659, lat: 35.7010, height: 500, heading: 0, pitch: -40 }, 0)
+  );
+  await page.waitForTimeout(6000);
+
+  // 画面内をグリッド走査し、_zmin/_zmax を持つ建物フィーチャ（＝屋上が出せる建物）を拾う。
+  const pickInfo = await page.evaluate(() => {
+    const scene = window.__nakano.viewer.scene;
+    const canvas = scene.canvas;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    for (let fy = 0.28; fy <= 0.88; fy += 0.04) {
+      for (let fx = 0.12; fx <= 0.88; fx += 0.04) {
+        const x = Math.round(W * fx), y = Math.round(H * fy);
+        let p = null;
+        try { p = scene.pick(new Cesium.Cartesian2(x, y)); } catch (_) { continue; }
+        if (!(p instanceof Cesium.Cesium3DTileFeature)) continue;
+        let zmin = null, zmax = null;
+        try { zmin = Number(p.getProperty('_zmin')); } catch (_) { /* noop */ }
+        try { zmax = Number(p.getProperty('_zmax')); } catch (_) { /* noop */ }
+        if (!Number.isFinite(zmin) || !Number.isFinite(zmax) || zmax - zmin < 3) continue;
+        let pos = null;
+        try { if (scene.pickPositionSupported) pos = scene.pickPosition(new Cesium.Cartesian2(x, y)); } catch (_) { /* noop */ }
+        if (!Cesium.defined(pos)) continue;
+        const carto = Cesium.Cartographic.fromCartesian(pos);
+        window.__r3p2Feature = p;
+        return {
+          found: true,
+          lon: Cesium.Math.toDegrees(carto.longitude),
+          lat: Cesium.Math.toDegrees(carto.latitude),
+          zmin, zmax,
+        };
+      }
+    }
+    return { found: false };
+  });
+  console.log('  ピック結果: ' + JSON.stringify(pickInfo));
+  check('画面内から屋上を出せる建物フィーチャ（zmin/zmax差3m以上）を取得できる',
+    pickInfo.found, JSON.stringify(pickInfo));
+  if (!pickInfo.found) throw new Error('建物フィーチャが見つからず F3-1 のテストを継続できない');
+
+  await page.evaluate(({ lon, lat }) => {
+    window.__nakano.diagnosis
+      .diagnose({ lon, lat, title: null, picked: window.__r3p2Feature, fly: false })
+      .catch((e) => console.warn('diagnose(picked) failed', e));
+  }, { lon: pickInfo.lon, lat: pickInfo.lat });
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 30000 });
+  const bldgSunText1 = await waitSection('secSun', 180000);
+  console.log('  ☀️ (建物・既定) ' + bldgSunText1.slice(0, 260));
+
+  const floorOptions = await page.evaluate(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    if (!sel) return null;
+    return Array.from(sel.options).map((o) => ({ value: o.value, text: o.textContent, selected: o.selected }));
+  });
+  console.log('  セレクタ: ' + JSON.stringify(floorOptions));
+  check('視点高さセレクタが表示される',
+    Array.isArray(floorOptions) && floorOptions.length > 0, JSON.stringify(floorOptions));
+  check('セレクタに「屋上」が出る',
+    !!floorOptions?.some((o) => o.value === 'roof' && o.text.includes('屋上')), JSON.stringify(floorOptions));
+  check('建物クリックの既定選択は1階（従来既定＝地面+1.2m相当）と一致',
+    floorOptions?.find((o) => o.selected)?.value === 'f1', JSON.stringify(floorOptions));
+
+  const bldg1F = await page.evaluate(() => {
+    const r = window.__nakano.diagnosis.getLastResult();
+    return {
+      raysCast: r?.sunlight?.raysCast,
+      totalHours: r?.sunlight?.days?.reduce((a, d) => a + d.hours, 0),
+      originHeight: r?.sunlight?.originHeight,
+      cancelled: r?.sunlight?.cancelled,
+    };
+  });
+  console.log('  1階（既定）: ' + JSON.stringify(bldg1F));
+  check('建物クリックの既定表示でも日照が計算されている（初期表示では再計算しない）',
+    bldg1F.raysCast > 50, JSON.stringify(bldg1F));
+
+  // 屋上へ切り替え → 400msデバウンス後に再計算される
+  await page.evaluate(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    sel.value = 'roof';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  // デバウンス直後は旧タイムラインが .stale のまま「再計算中…」が出るはず
+  await page.waitForFunction(
+    () => !!document.querySelector('#secSun .sun-recalc-status'), null, { timeout: 3000 }
+  ).catch(() => {});
+  const staleState = await page.evaluate(() => ({
+    stale: document.querySelectorAll('#secSun .sun-day.stale').length,
+    status: !!document.querySelector('#secSun .sun-recalc-status'),
+    selectValue: document.getElementById('sunFloorSelect')?.value,
+  }));
+  console.log('  デバウンス直後: ' + JSON.stringify(staleState));
+  check('セレクタ変更直後は旧タイムラインがstale表示になる（.stale）',
+    staleState.stale === 3, JSON.stringify(staleState));
+  check('再計算中… の進捗表示が出る', staleState.status, JSON.stringify(staleState));
+  check('セレクタのDOM値は選択直後から屋上になっている', staleState.selectValue === 'roof', JSON.stringify(staleState));
+
+  await page.waitForFunction(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    return sel && sel.value === 'roof' && !document.querySelector('#secSun .sun-recalc-status');
+  }, null, { timeout: 60000, polling: 500 });
+
+  const bldgRoof = await page.evaluate(() => {
+    const r = window.__nakano.diagnosis.getLastResult();
+    return {
+      raysCast: r?.sunlight?.raysCast,
+      totalHours: r?.sunlight?.days?.reduce((a, d) => a + d.hours, 0),
+      originHeight: r?.sunlight?.originHeight,
+      cancelled: r?.sunlight?.cancelled,
+      dom: {
+        days: document.querySelectorAll('#secSun .sun-day').length,
+        cells: document.querySelectorAll('#secSun .sun-bar i').length,
+        stale: document.querySelectorAll('#secSun .sun-day.stale').length,
+      },
+    };
+  });
+  console.log('  屋上: ' + JSON.stringify(bldgRoof));
+  check('屋上再計算後もレイキャストが行われている', bldgRoof.raysCast > 50, JSON.stringify(bldgRoof));
+  check('屋上再計算はキャンセルされていない', bldgRoof.cancelled === false, JSON.stringify(bldgRoof));
+  check('屋上再計算後も .sun-day/.sun-bar/93セルのDOM構造が維持される',
+    bldgRoof.dom.days === 3 && bldgRoof.dom.cells === 93, JSON.stringify(bldgRoof.dom));
+  check('再計算完了後はstale表示が消える', bldgRoof.dom.stale === 0, JSON.stringify(bldgRoof.dom));
+  check('屋上の合計日照時間が1階以上（受け入れ基準: 屋上 >= 1階）',
+    bldgRoof.totalHours >= bldg1F.totalHours,
+    `roof=${bldgRoof.totalHours} 1F=${bldg1F.totalHours}`);
+  check('屋上と1階の差が0.5h以上（P0後の設計確定#10の確定閾値）',
+    bldgRoof.totalHours - bldg1F.totalHours >= 0.5,
+    `diff=${bldgRoof.totalHours - bldg1F.totalHours}`);
+  check('屋上のレイ原点は1階より高い', bldgRoof.originHeight > bldg1F.originHeight,
+    `roof=${bldgRoof.originHeight} 1F=${bldg1F.originHeight}`);
+
+  const bldgNoteText = await page.evaluate(() => document.getElementById('secSun').textContent);
+  check('屋上選択後の注記に「視点高さ」と「屋上」が出る',
+    bldgNoteText.includes('視点高さ') && bldgNoteText.includes('屋上'), bldgNoteText.slice(-220));
+
+  await page.locator('#diagnosisPanel').screenshot({ path: shotPath('r3-02-card-floor-select.png') });
+
+  // ==== 4. F3-1: セレクタ連打 → 最終選択のみ表示（stale経由）・キャンセルの観測 ====
+  console.log('\n--- F3-1: セレクタ連打（デバウンス・キャンセル） ---');
+  r3p2Logs.length = 0; // このセクション用にクリア
+
+  // roof 以外の階から2つ選ぶ（現在値は roof なので、まずそれ以外へ切り替えないと change が発火しない）
+  const nonRoof = floorOptions.filter((o) => o.value !== 'roof');
+  const keyA = nonRoof[0].value;
+  const keyB = nonRoof.length > 1 ? nonRoof[Math.floor(nonRoof.length / 2)].value : 'roof';
+  console.log(`  keyA=${keyA} keyB=${keyB}`);
+
+  // 1回目の変更 → デバウンスが明けて計算が「実際に始まる」のを待ってから、
+  // 完了前に2回目の変更を挟むことで、進行中の計算を本当にキャンセルさせる
+  // （デバウンスだけで弾かれる「未着手キャンセル」ではなく、estimateSunlight内のisCancelled
+  //   チェックで打ち切られる「進行中キャンセル」を再現する）。
+  await page.evaluate((k) => {
+    const sel = document.getElementById('sunFloorSelect');
+    sel.value = k;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }, keyA);
+  await page.waitForFunction(
+    () => !!document.querySelector('#secSun .sun-recalc-status'), null, { timeout: 3000 }
+  ).catch(() => {});
+  // SwiftShaderでの1回のフルスキャン（87本前後）は数秒かかる（実測: rAF間隔約200ms×15チャンク前後）。
+  // 600ms待てば計算開始直後で、完了前に確実に割り込める。
+  await page.waitForTimeout(600);
+
+  await page.evaluate((k) => {
+    const sel = document.getElementById('sunFloorSelect');
+    sel.value = k;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }, keyB);
+
+  await page.waitForFunction((k) => {
+    const sel = document.getElementById('sunFloorSelect');
+    return sel && sel.value === k && !document.querySelector('#secSun .sun-recalc-status');
+  }, keyB, { timeout: 60000, polling: 500 });
+
+  const finalState = await page.evaluate(() => {
+    const r = window.__nakano.diagnosis.getLastResult();
+    const sel = document.getElementById('sunFloorSelect');
+    return {
+      selectValue: sel?.value,
+      raysCast: r?.sunlight?.raysCast,
+      cancelled: r?.sunlight?.cancelled,
+      staleCount: document.querySelectorAll('#secSun .sun-day.stale').length,
+    };
+  });
+  console.log('  最終状態: ' + JSON.stringify(finalState));
+  console.log('  観測ログ: ' + JSON.stringify(r3p2Logs));
+
+  check('最終選択（2回目に選んだ階）の結果のみが表示される', finalState.selectValue === keyB, JSON.stringify(finalState));
+  check('最終表示にstale表示が残っていない', finalState.staleCount === 0, JSON.stringify(finalState));
+  check('最終結果はキャンセルされていない（成立したのは最後の選択のみ）',
+    finalState.cancelled === false, JSON.stringify(finalState));
+  check('最終結果は完走している（レイキャスト十分）', finalState.raysCast > 50, JSON.stringify(finalState));
+  check('1回目の選択（keyA）の再計算がキャンセルされたことが観測される（cancelled===trueの観測）',
+    r3p2Logs.some((l) => l.startsWith(CANCEL_LOG_PREFIX)), JSON.stringify(r3p2Logs));
+
+  const cancelledPayloads = r3p2Logs
+    .filter((l) => l.startsWith(CANCEL_LOG_PREFIX))
+    .map((l) => { try { return JSON.parse(l.slice(CANCEL_LOG_PREFIX.length).trim()); } catch (_) { return null; } })
+    .filter(Boolean);
+  check('キャンセルされた再計算のraysCastは完走時より少ない（raysCast減）',
+    cancelledPayloads.length > 0 && cancelledPayloads.every((c) => c.raysCast < finalState.raysCast),
+    JSON.stringify({ cancelledPayloads, finalRays: finalState.raysCast }));
+
+  // ==== 5. F3-1: 一般地点（住所検索）で階を選ぶと注記に視点高さが出る ====
+  console.log('\n--- F3-1: 一般地点の階数選択 ---');
+  await page.evaluate(() =>
+    window.__nakano.diagnosis.runDiagnosisAt(139.663, 35.688, { title: '南台五丁目付近(F3-1)', fly: true })
+  );
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 30000 });
+  await waitSection('secSun', 180000);
+
+  const groundOptions = await page.evaluate(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    return sel ? Array.from(sel.options).map((o) => o.value) : null;
+  });
+  const expectedGroundOptions = Array.from({ length: 15 }, (_, i) => 'f' + (i + 1));
+  console.log('  一般地点セレクタ: ' + JSON.stringify(groundOptions));
+  check('一般地点のセレクタは1階〜15階（屋上なし）',
+    JSON.stringify(groundOptions) === JSON.stringify(expectedGroundOptions), JSON.stringify(groundOptions));
+
+  await page.evaluate(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    sel.value = 'f3';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  // デバウンス直後は「.sun-recalc-status がまだ無い」状態と「計算完了後」の両方が
+  // "!recalc-status" を満たしてしまうので、先に「再計算が始まった（=出現した）」ことを
+  // 確認してから完了待ちに入る（section 3のroof切り替えと同じ二段待ち）。
+  await page.waitForFunction(
+    () => !!document.querySelector('#secSun .sun-recalc-status'), null, { timeout: 3000 }
+  ).catch(() => {});
+  await page.waitForFunction(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    return sel && sel.value === 'f3' && !document.querySelector('#secSun .sun-recalc-status');
+  }, null, { timeout: 60000, polling: 500 });
+
+  const groundAfter = await page.evaluate(() => {
+    const r = window.__nakano.diagnosis.getLastResult();
+    return {
+      text: document.getElementById('secSun').textContent,
+      originHeight: r?.sunlight?.originHeight,
+      baseHeight: r?.baseHeight?.height,
+      dom: {
+        days: document.querySelectorAll('#secSun .sun-day').length,
+        cells: document.querySelectorAll('#secSun .sun-bar i').length,
+      },
+    };
+  });
+  console.log('  3階選択後: ' + JSON.stringify({ ...groundAfter, text: groundAfter.text.slice(-220) }));
+  check('3階選択後の注記に「視点高さ」が出る', groundAfter.text.includes('視点高さ'), groundAfter.text.slice(-220));
+  // セレクタのoption文言にも「3階」は出るので、option一覧ではなく注記本文（末尾の「視点高さ...m（3階）。」）を見る
+  check('3階選択後の注記が「視点高さ ○○m（3階）」になっている',
+    /視点高さ\s*[\d.]+m（3階）/.test(groundAfter.text), groundAfter.text.slice(-220));
+  check('「簡易計算」を含む既存文が視点高さの注記より先に来る（既存文の順序を維持）',
+    groundAfter.text.indexOf('簡易計算') >= 0 &&
+    groundAfter.text.indexOf('簡易計算') < groundAfter.text.indexOf('視点高さ'),
+    groundAfter.text.slice(-260));
+  check('3階のレイ原点は 地面+1.2+3.0×2 と一致',
+    Math.abs(groundAfter.originHeight - (groundAfter.baseHeight + 1.2 + 3.0 * 2)) < 1e-6,
+    `${groundAfter.originHeight} vs base=${groundAfter.baseHeight}`);
+  check('3階再計算後も .sun-day/.sun-bar/93セルのDOM構造が維持される',
+    groundAfter.dom.days === 3 && groundAfter.dom.cells === 93, JSON.stringify(groundAfter.dom));
+
+  await page.locator('#secSun').screenshot({ path: shotPath('r3-03-sunsection-3f-ground.png') });
+
+  // ==== 6. JSエラー ====
   const fatal = t.errors.filter(
     (e) => e.startsWith('PAGEERROR') || /Failed to load module|SyntaxError|is not a function/.test(e)
   );
