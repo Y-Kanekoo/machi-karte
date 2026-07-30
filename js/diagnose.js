@@ -19,7 +19,8 @@ import { queryZoning } from './zoning.js';
 import {
   estimateSunlight,
   estimateBaseHeight,
-  prepareTiles,
+  preloadForSunlight,
+  boostTilesetCache,
   MIN_SUN_ELEVATION,
   DEFAULT_BASE_HEIGHT,
 } from './sunlight.js';
@@ -443,9 +444,25 @@ export function initDiagnosis(ctx) {
     const scale = `<div class="sun-scale"><span>${result.hourStart}時</span><span>12時</span><span>${result.hourEnd}時</span></div>`;
     const note = `${result.hourStart}:00〜${result.hourEnd}:00 JSTを20分刻みでサンプリング。`
       + `読み込み済みの建物のみを考慮した簡易計算です（地形・未読込の建物・樹木は考慮しません）。`
-      + `太陽高度${MIN_SUN_ELEVATION}度未満は日照に数えません。地面高さ ${baseInfo.height.toFixed(1)}m（${baseInfo.source}）。`;
+      + `太陽高度${MIN_SUN_ELEVATION}度未満は日照に数えません。地面高さ ${baseInfo.height.toFixed(1)}m（${baseInfo.source}）。`
+      + preloadNote(result.preload);
     const warn = result.error ? `<div class="diag-fail">${escapeHtml(result.error)}</div>` : '';
     return bars + scale + warn + `<div class="diag-note">${escapeHtml(note)}</div>`;
+  }
+
+  /**
+   * タイル先読みが既定（太陽経路ウォームアップ）以外になったときだけ注記を足す。
+   * 非公開APIが使えない環境でも日本語で状況が分かるようにする（R3 §6-6）。
+   */
+  function preloadNote(preload) {
+    if (!preload) return '';
+    if (preload.method === 'prepareTiles') {
+      return '周辺タイルの先読みは従来方式（カメラ移動）にフォールバックしました。';
+    }
+    if (preload.method === 'none') {
+      return '周辺タイルの先読みができなかったため、未読み込みの建物が考慮されていない可能性があります。';
+    }
+    return '';
   }
 
   // ---- 診断の実行 ----------------------------------------------------------
@@ -562,24 +579,39 @@ export function initDiagnosis(ctx) {
 
   async function runSunlight(lon, lat, picked, alive, fly) {
     const tileset = getCurrentBuildingTileset();
+    const isCancelled = () => !alive();
     fill('secSun', '<span class="diag-loading"><span class="spinner"></span>周辺の建物を読み込み中…</span>');
-    if (fly) {
-      await prepareTiles(viewer, tileset, lon, lat);
-    }
-    if (!alive()) return;
 
+    // 先読みのレイ原点に地面高さが要るので、先に地面高さを求める
     const baseInfo = await estimateBaseHeight(viewer, lon, lat, picked);
     if (!alive()) return;
 
-    fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
-    const result = await estimateSunlight(viewer, tileset, lon, lat, baseInfo.height, {
-      excludeEntities: pinEntity ? [pinEntity] : [],
-      onProgress: (f) => {
-        const el = $('sunPct');
-        if (el) el.textContent = Math.round(f * 100) + '%';
-      },
+    // R3: カメラを動かさない太陽経路ウォームアップ。
+    // 非対応環境では従来方式（カメラ移動）へフォールバックする
+    const preload = await preloadForSunlight(viewer, tileset, lon, lat, baseInfo.height, {
+      fly,
+      isCancelled,
     });
     if (!alive()) return;
+
+    fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
+    // 先読みしたタイルが計算中に追い出されないようキャッシュ上限を一時的に上げる
+    const restoreCache = boostTilesetCache(tileset);
+    let result;
+    try {
+      result = await estimateSunlight(viewer, tileset, lon, lat, baseInfo.height, {
+        excludeEntities: pinEntity ? [pinEntity] : [],
+        isCancelled,
+        onProgress: (f) => {
+          const el = $('sunPct');
+          if (el) el.textContent = Math.round(f * 100) + '%';
+        },
+      });
+    } finally {
+      restoreCache();
+    }
+    if (!alive() || result.cancelled) return;
+    result.preload = preload;
     lastResult.sunlight = result;
     lastResult.baseHeight = baseInfo;
     fill('secSun', renderSunlight(result, baseInfo));
