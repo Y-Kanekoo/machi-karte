@@ -109,6 +109,14 @@ try {
     preload?.warmUp?.rays >= 8 && preload?.warmUp?.rays <= 12, String(preload?.warmUp?.rays));
   check('ウォームアップがタイムアウトしていない', preload?.warmUp?.timedOut === false,
     JSON.stringify(preload?.warmUp));
+  // P1.1: 計画本数(rays)と実際に発射した本数(attempted)を別々に記録する
+  check('発射した本数が計画本数と一致する',
+    preload?.warmUp?.attempted === preload?.warmUp?.rays,
+    JSON.stringify({ attempted: preload?.warmUp?.attempted, rays: preload?.warmUp?.rays }));
+  check('ウォームアップがキャンセルされていない', preload?.warmUp?.cancelled === false,
+    JSON.stringify(preload?.warmUp));
+  check('先読みがキャンセル扱いになっていない', preload?.cancelled === false, JSON.stringify(preload));
+  check('先読みが成功扱いになっている', preload?.ok === true, JSON.stringify(preload));
   check('先読みのフォールバック注記が出ていない',
     !sunText.includes('フォールバック') && !sunText.includes('先読みができなかった'),
     sunText.slice(-160));
@@ -123,6 +131,8 @@ try {
       error: s?.error,
       raysCast: s?.raysCast,
       pickErrors: s?.pickErrors,
+      pickSupported: s?.pickSupported,
+      excludedFeatures: s?.excludedFeatures,
       cancelled: s?.cancelled,
       originHeight: s?.originHeight,
       msPerRayMean: s?.msPerRayMean,
@@ -139,6 +149,11 @@ try {
 
   check('日照が3日付分ある', sun.days?.length === 3, JSON.stringify(sun.days));
   check('レイキャストが50本より多い', sun.raysCast > 50, `rays=${sun.raysCast}`);
+  // P1.1: 同期 pickFromRay の機能検出（非対応環境では日本語の理由を出して計算しない）
+  check('同期pickFromRayが利用できると判定される', sun.pickSupported === true, String(sun.pickSupported));
+  check('pickエラーが多発していない', sun.pickErrors <= sun.raysCast * 0.5,
+    `errors=${sun.pickErrors} / rays=${sun.raysCast}`);
+  check('既定では自建物の除外をしない', sun.excludedFeatures === 0, String(sun.excludedFeatures));
   check('日照計算がエラーになっていない', !sun.error, String(sun.error));
   check('日照計算がキャンセルされていない', sun.cancelled === false, String(sun.cancelled));
   check('全日付で日照時間が0hより大きい',

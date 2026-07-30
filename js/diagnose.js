@@ -586,19 +586,21 @@ export function initDiagnosis(ctx) {
     const baseInfo = await estimateBaseHeight(viewer, lon, lat, picked);
     if (!alive()) return;
 
-    // R3: カメラを動かさない太陽経路ウォームアップ。
-    // 非対応環境では従来方式（カメラ移動）へフォールバックする
-    const preload = await preloadForSunlight(viewer, tileset, lon, lat, baseInfo.height, {
-      fly,
-      isCancelled,
-    });
-    if (!alive()) return;
-
-    fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
-    // 先読みしたタイルが計算中に追い出されないようキャッシュ上限を一時的に上げる
+    // 先読みで読み込んだタイルが計算中に追い出されないよう、
+    // 「先読み開始〜日照計算完了」を1つの区間としてキャッシュ上限を引き上げる（R3 P1.1）
     const restoreCache = boostTilesetCache(tileset);
+    let preload;
     let result;
     try {
+      // R3: カメラを動かさない太陽経路ウォームアップ。
+      // 非対応環境では従来方式（カメラ移動）へフォールバックする
+      preload = await preloadForSunlight(viewer, tileset, lon, lat, baseInfo.height, {
+        fly,
+        isCancelled,
+      });
+      if (!alive()) return;
+
+      fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
       result = await estimateSunlight(viewer, tileset, lon, lat, baseInfo.height, {
         excludeEntities: pinEntity ? [pinEntity] : [],
         isCancelled,
