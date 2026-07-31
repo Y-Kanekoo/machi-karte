@@ -159,9 +159,9 @@ v1.0（3Dビューア + 街カルテ地点診断）完成時点からの拡張�
 
 | 項目 | 内容 | 頻度 |
 |---|---|---|
-| GitHub Pages有効化 | **未完了**。Settings → Pages → Source=GitHub Actions → Re-run（手動1回） | 即時 |
-| CI | GitHub Actionsで`npm run test:unit`をpush毎に実行（e2eは外部データ依存が重いため手動/隔週。実行する場合はrelay-cacheの扱いに注意） | R1で導入 |
-| データ年度更新 | PLATEAUの年度更新でアセットURLが変わる。`npm run expectations`の定期実行で検知（R4の動的解決が入れば恒久解決） | 四半期 |
+| GitHub Pages有効化 | **完了**。Source=GitHub Actionsで公開運用中 | 完了 |
+| CI | push毎の単体テスト、週次の実タイル照合を維持。e2eは`HARNESS_DIRECT=1`で月次＋手動実行し、失敗時はissue起票 | 常時／週次／月次 |
+| データ年度更新 | `refresh-data.yml`で対応表再生成・11地点の期待値・3自治体の全URLを月次照合し、差分PRまたは失敗issueを自動作成。R4の動的解決と合わせて恒久運用化 | 月次 |
 | 依存更新 | CesiumJSバージョン（現1.130固定）・CDNライブラリの動作確認 | 半期 |
 | アクセシビリティ | カードのaria属性・コントラスト・キーボード操作 | R1に含める |
 | ドキュメント | スクリーンショット付きの使い方ページ（GitHub Pages内 `/docs` or README） | R2後 |

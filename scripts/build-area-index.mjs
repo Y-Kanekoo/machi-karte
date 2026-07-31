@@ -203,10 +203,18 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--out') {
-      options.out = argv[index + 1];
+      const value = argv[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error('--out には出力先を指定してください');
+      }
+      options.out = value;
       index += 1;
     } else if (arg === '--sanity-min') {
-      options.sanityMin = Number(argv[index + 1]);
+      const value = argv[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error('--sanity-min には自治体数の下限を指定してください');
+      }
+      options.sanityMin = Number(value);
       index += 1;
     } else {
       throw new Error(`未対応の引数です: ${arg}`);
