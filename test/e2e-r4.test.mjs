@@ -262,7 +262,7 @@ try {
     currentArea: document.getElementById('areaCurrentName')?.textContent,
     buildingShown: window.__nakano.loaded.bldgLod2?.show === true,
   }));
-  equal('渋谷区クエリはURLから除去される', initial.search, '');
+  check('渋谷区クエリはURLから除去される', !initial.search.includes('city='), initial.search);
   check(
     '渋谷区クエリはcity付きハッシュへ正規化される',
     initial.hash.startsWith('#v=1&city=13113'),
@@ -431,7 +431,11 @@ try {
     headerTitle: document.getElementById('areaTitle')?.getAttribute('aria-label'),
   }));
   equal('不正コードは中野区へフォールバック', invalid.city, '13114');
-  equal('不正コードのクエリはURLから除去される', invalid.search, '');
+  check(
+    '不正コードのクエリはURLから除去される',
+    !invalid.search.includes('city='),
+    invalid.search,
+  );
   equal('フォールバック後のhash', invalid.hash, '#v=1&city=13114');
   equal('フォールバック後のページタイトル', invalid.pageTitle, '3D街カルテ — 中野区');
   equal('フォールバック後のヘッダ表記', invalid.headerTitle, '3D街カルテ — 中野区');

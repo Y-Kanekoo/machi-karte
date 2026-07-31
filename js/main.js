@@ -2,7 +2,12 @@
 // データ: 国土交通省 Project PLATEAU 中野区 2025年度 (CC BY 4.0)
 // 配信: PLATEAU Streaming (assets.cms.plateau.reearth.io)
 
-import { HEIGHT_PROP_CANDIDATES, DEFAULT_CITY } from './config.js';
+import { HEIGHT_PROP_CANDIDATES, DEFAULT_CITY, QUALITY_PROFILES } from './config.js';
+import {
+  QUALITY_STORAGE_KEY,
+  reloadWithoutQualityOverride,
+  resolveQualityProfile,
+} from './pwa.js';
 import {
   parseCityCode,
   loadAreaIndex,
@@ -25,6 +30,10 @@ import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
 import { createShelterLayer } from './shelter.js';
 import { initShadeMap } from './shademap-ui.js';
+import { initBottomSheet } from './bottomsheet.js';
+
+const qualityProfileName = resolveQualityProfile();
+const qualityProfile = QUALITY_PROFILES[qualityProfileName];
 
 // ---- AreaConfig -------------------------------------------------------------
 
@@ -101,7 +110,11 @@ const tilesetUrls = {
   tranLod3: areaConfig.tilesets.tranLod3,
   wtrLod1: areaConfig.tilesets.wtrLod1,
 };
-const initialBuildingMode = areaConfig.tilesets.bldgLod2 ? 'lod2' : 'lod1';
+const fallbackBuildingMode = areaConfig.tilesets.bldgLod2 ? 'lod2' : 'lod1';
+const initialBuildingMode = qualityProfile.initialBuildingMode === 'lod1'
+  && areaConfig.tilesets.bldgLod1
+  ? 'lod1'
+  : fallbackBuildingMode;
 
 function unavailableText() {
   return '<span class="unavailable-text">このエリアでは提供されていません</span>';
@@ -285,6 +298,40 @@ function renderAreaChrome() {
 
 renderAreaChrome();
 
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function saveQualityPreference(profileName) {
+  try {
+    localStorage.setItem(QUALITY_STORAGE_KEY, profileName);
+    return true;
+  } catch (error) {
+    console.warn('表示品質の設定を保存できませんでした', error);
+    return false;
+  }
+}
+
+function initQualityControl() {
+  const selectedProfile = qualityProfileName === 'light' ? 'light' : 'high';
+  const warning = document.getElementById('qualityIosWarning');
+  const ios = isIosDevice();
+  const inputs = document.querySelectorAll('input[name="quality"]');
+
+  for (const input of inputs) {
+    input.checked = input.value === selectedProfile;
+    input.addEventListener('change', () => {
+      if (!input.checked || !saveQualityPreference(input.value)) return;
+      warning.classList.toggle('hidden', !ios || input.value !== 'high');
+      setTimeout(reloadWithoutQualityOverride, 120);
+    });
+  }
+  warning.classList.toggle('hidden', !ios || selectedProfile !== 'high');
+}
+
+initQualityControl();
+
 // ---- Viewer ----------------------------------------------------------------
 
 const gsiPhoto = new Cesium.UrlTemplateImageryProvider({
@@ -311,9 +358,20 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
   infoBox: false,
   shadows: false,
   terrainShadows: Cesium.ShadowMode.DISABLED,
+  ...(qualityProfile.requestRenderMode ? {
+    requestRenderMode: true,
+    ...(qualityProfile.maximumRenderTimeChange !== undefined
+      ? { maximumRenderTimeChange: qualityProfile.maximumRenderTimeChange }
+      : {}),
+  } : {}),
 });
+viewer.resolutionScale = qualityProfile.resolutionScale;
 viewer.scene.globe.depthTestAgainstTerrain = false;
 viewer.scene.skyAtmosphere.show = true;
+
+function requestRender() {
+  if (qualityProfile.requestRenderMode) viewer.scene.requestRender();
+}
 
 // JST正午を初期時刻に（影シミュレーション用）
 function setJstTime(hourDecimal) {
@@ -343,7 +401,12 @@ async function getTileset(key) {
   setStatus('データ読み込み中…');
   try {
     const tileset = await Cesium.Cesium3DTileset.fromUrl(url, {
-      maximumScreenSpaceError: 16,
+      maximumScreenSpaceError: qualityProfile.maximumScreenSpaceError,
+      cacheBytes: qualityProfile.cacheBytes,
+      dynamicScreenSpaceError: qualityProfile.dynamicScreenSpaceError,
+      ...(qualityProfile.maximumCacheOverflowBytes !== undefined
+        ? { maximumCacheOverflowBytes: qualityProfile.maximumCacheOverflowBytes }
+        : {}),
     });
     viewer.scene.primitives.add(tileset);
     loaded[key] = tileset;
@@ -402,6 +465,8 @@ async function showBuildings(mode) {
   }
   currentBldg = null;
   currentBldgKind = null;
+  // 旧タイルを消した時点で反映する。新タイルの取得完了を待つと軽量モードでは残像になる。
+  requestRender();
   if (mode === 'none') {
     diagnosis.onBuildingLayerChange();
     return;
@@ -412,10 +477,12 @@ async function showBuildings(mode) {
     if (requestGeneration === buildingLayerRequestGeneration) {
       diagnosis.onBuildingLayerChange();
     }
+    requestRender();
     return;
   }
   if (requestGeneration !== buildingLayerRequestGeneration) {
     if (ts !== currentBldg) ts.show = false;
+    requestRender();
     return;
   }
   ts.show = true;
@@ -423,6 +490,7 @@ async function showBuildings(mode) {
   currentBldgKind = mode;
   applyHeightColor();
   diagnosis.onBuildingLayerChange();
+  requestRender();
 }
 
 function applyHeightColor() {
@@ -437,6 +505,7 @@ function applyHeightColor() {
   } else {
     currentBldg.style = undefined;
   }
+  requestRender();
 }
 
 // ---- UI wiring ---------------------------------------------------------------
@@ -450,6 +519,7 @@ document.getElementById('shadows').addEventListener('change', (e) => {
   viewer.shadows = e.target.checked;
   viewer.scene.globe.enableLighting = e.target.checked;
   document.getElementById('timeControl').classList.toggle('hidden', !e.target.checked);
+  requestRender();
 });
 
 document.getElementById('timeSlider').addEventListener('input', (e) => {
@@ -458,6 +528,7 @@ document.getElementById('timeSlider').addEventListener('input', (e) => {
   const m = String(Math.round((t - h) * 60)).padStart(2, '0');
   document.getElementById('timeLabel').textContent = `${h}:${m}`;
   setJstTime(t);
+  requestRender();
 });
 
 const CHECK_LAYERS = {
@@ -475,6 +546,7 @@ for (const [id, key] of Object.entries(CHECK_LAYERS)) {
     } else if (loaded[key]) {
       loaded[key].show = false;
     }
+    requestRender();
   });
 }
 
@@ -490,6 +562,7 @@ document.querySelectorAll('input[name="imagery"]').forEach((el) => {
     if (baseImageryLayer) viewer.imageryLayers.remove(baseImageryLayer, true);
     baseImageryLayer = next;
     shadeMapController?.ensureTop();
+    requestRender();
   });
 });
 
@@ -553,6 +626,16 @@ function toast(msg, ms = 2000) {
 }
 if (areaFallbackMessage) toast(areaFallbackMessage, 4000);
 
+let resettingAfterContextLoss = false;
+viewer.scene.canvas.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  if (resettingAfterContextLoss) return;
+  resettingAfterContextLoss = true;
+  toast('メモリ不足のため表示をリセットします', 4000);
+  saveQualityPreference('light');
+  setTimeout(reloadWithoutQualityOverride, 500);
+});
+
 // ---- 街カルテ（地点診断） -------------------------------------------------------
 
 const diagnosis = initDiagnosis({
@@ -562,9 +645,15 @@ const diagnosis = initDiagnosis({
   buildingTableHtml,
   setStatus,
   toast,
+  requestRender,
   onDiagnosisStart: () => shadeMapController?.abortForDiagnosis(),
 });
-diagnosis.onClose(clearHighlight);
+const bottomSheet = initBottomSheet({ diagnosis });
+diagnosis.onClose(() => {
+  clearHighlight();
+  requestRender();
+});
+diagnosis.onResult(requestRender);
 
 // ---- R3: 日影マップ -----------------------------------------------------------
 
@@ -579,6 +668,9 @@ shadeMapController = initShadeMap({
     '日影マップを開始したため、日照計算を中断しました。'
   ),
 });
+for (const id of ['shadeRun', 'shadeAbort', 'shadeClear']) {
+  document.getElementById(id)?.addEventListener('click', requestRender);
+}
 
 // ---- R2: 避難所レイヤー ----------------------------------------------------------
 // Entityは専用の CustomDataSource に入るので、診断ピン（viewer.entities）とは独立。
@@ -601,11 +693,16 @@ shelterCheckbox.addEventListener('change', async () => {
   if (on) setStatus('避難所データを読み込み中…');
   const n = await shelterLayer.setVisible(on);
   if (on) setStatus(n ? '' : '避難所データを読み込めませんでした');
+  requestRender();
 });
 
 // ---- R1: 都市計画オーバーレイ / 地点比較 / 共有URL -----------------------------------
 
 const overlays = initZoningOverlay({ viewer, areaConfig });
+for (const key of ['use', 'fire', 'height']) {
+  document.getElementById(`ov-${key}`)?.addEventListener('change', requestRender);
+}
+document.getElementById('overlayAlpha')?.addEventListener('input', requestRender);
 
 // compare は「比較のリンクをコピー」でのみ share を使うので、実体は後から差し込む
 // （share は起動時復元で compare.restoreFromPoints を呼ぶため、相互に必要になる）
@@ -655,6 +752,7 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
     picked.color = Cesium.Color.YELLOW.withAlpha(0.8);
     highlighted = picked;
   }
+  requestRender();
 
   // 診断モードON、または建物クリック時に診断カードを開く
   if (diagnosis.isActive() || isBuilding) {
@@ -706,10 +804,25 @@ let restored = null;
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
   diagnosis, overlays, compare, share, toast, shelterLayer, areaConfig,
+  bottomSheet,
+  qualityProfileName, qualityProfile,
+  getBuildingState: () => ({ tileset: currentBldg, layerKind: currentBldgKind }),
   shadeMap: {
-    run: (opts) => shadeMapController.run(opts),
-    clear: () => shadeMapController.clear(),
-    abort: () => shadeMapController.abort(),
+    run: async (opts) => {
+      const result = await shadeMapController.run(opts);
+      requestRender();
+      return result;
+    },
+    clear: () => {
+      const result = shadeMapController.clear();
+      requestRender();
+      return result;
+    },
+    abort: () => {
+      const result = shadeMapController.abort();
+      requestRender();
+      return result;
+    },
     getState: () => shadeMapController.getState(),
     getCanvasState: () => shadeMapController.getCanvasState(),
   },

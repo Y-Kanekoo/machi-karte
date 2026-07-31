@@ -1,0 +1,21 @@
+{
+  "name": "3D街カルテ",
+  "short_name": "街カルテ",
+  "description": "PLATEAU 3D都市モデルで全国の街を眺め、住所や現在地の洪水・土砂災害・用途地域・日照をワンカードで診断するツール",
+  "id": "./",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "ja",
+  "dir": "ltr",
+  "theme_color": "#141a22",
+  "background_color": "#141a22",
+  "categories": ["utilities", "navigation"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

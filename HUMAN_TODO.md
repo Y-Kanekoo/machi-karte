@@ -1,1 +1,2 @@
 - [ ] R3実機チェックリスト（docs/CHECKLIST-R3.md）の実施 #p2 #release
+- [ ] R8a実機チェックリスト（docs/CHECKLIST-R8a.md）の実施 #p2 #release

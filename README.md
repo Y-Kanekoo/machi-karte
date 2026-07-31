@@ -1,4 +1,4 @@
-# 3D街カルテ — マルチエリア3D都市モデルビューア
+# machi-karte — 3D街カルテ（マルチエリア3D都市モデルビューア）
 
 国土交通省 [Project PLATEAU](https://www.mlit.go.jp/plateau/) の3D都市モデルをストリーミング配信で読み込み、CesiumJSで描画するWebアプリ「**3D街カルテ**」です。対応自治体をURLや画面上のセレクタで切り替えられ、ビルドや3Dデータのダウンロードは不要です。
 
@@ -8,7 +8,7 @@
 
 ## デモ
 
-GitHub Pages: https://y-kanekoo.github.io/nakano-3d/
+GitHub Pages: https://y-kanekoo.github.io/machi-karte/
 
 **初回のみ有効化が必要です**（GitHub Actionsのトークンでは自動有効化できないため）:
 
@@ -97,6 +97,28 @@ npm run area-index
 - **スポット移動** — 中野駅、サンプラザ跡・四季の森公園、中野ブロードウェイ、新井薬師、哲学堂公園
 - **背景地図切り替え** — 地理院の航空写真 / 淡色地図（都市計画レイヤーは背景を切り替えても残ります）
 
+## PWA（ホーム画面への追加）
+
+GitHub PagesのデモはPWAとしてホーム画面へ追加できます。初回は通信できる状態でページを開いてください。
+
+- **Android（Chrome）** — 右上のメニューから「ホーム画面に追加」または「アプリをインストール」を選び、画面の案内に従います。
+- **iOS（Safari）** — 共有ボタンを開き、「ホーム画面に追加」→「追加」を選びます。
+
+ホーム画面のアイコンから起動すると、ブラウザのアドレスバーがないスタンドアロン表示になります。オフラインで再読み込みしてもアプリシェル（画面枠とオフライン案内）は表示できますが、3D地図と街カルテの診断には通信が必要です。完全なオフライン利用には対応していません。
+
+左パネルの「表示品質」で次のモードを選べます。選択内容は端末に保存され、切り替え時にページを再読み込みします。
+
+- **軽量（推奨）** — モバイルの初期設定です。LOD1の箱型モデルと抑えたキャッシュ量で、メモリ使用量と描画負荷を軽減します。
+- **高画質** — LOD2の高精細モデルと高い描画解像度を使います。通信量とメモリ使用量が増えます。特にiOSではWebGLのメモリ制限により強制再読み込みされる場合があります。
+
+デバッグ時はURLクエリを利用できます。ほかのクエリと組み合わせる場合は、たとえば `?city=13113&quality=light&nosw=1` のように指定します。
+
+| パラメータ | 動作 |
+|---|---|
+| `?nosw=1` | このページ読み込み時のService Worker登録をスキップします。すでにページを制御しているService Workerを解除する場合は、Chrome DevToolsの Application → Service Workers で Unregister してください。 |
+| `?quality=light` | 保存済み設定や端末の自動判定より優先して軽量モードで起動します。 |
+| `?quality=high` | 保存済み設定や端末の自動判定より優先して高画質モードで起動します。 |
+
 ## ローカルでの実行
 
 静的サイトなので、そのままHTTPサーバで配信するだけです（アプリ本体にビルド・npm依存はありません）。
@@ -112,6 +134,7 @@ python3 -m http.server 8000
 |---|---|
 | `index.html` | UIとCesiumJS（CDN）の読み込み |
 | `js/main.js` | ビューア初期化、PLATEAUタイルセットの読み込み・スタイル・ピッキング |
+| `js/pwa.js` | Service Worker登録・更新通知と表示品質の自動判定 |
 | `js/config.js` | タイルセットURL・プリセット視点・外部データソースの定数 |
 | `js/area.js` | 自治体対応表の読込・動的設定・エリア選択肢の組み立て |
 | `js/util.js` | 汎用ユーティリティ |
@@ -124,10 +147,12 @@ python3 -m http.server 8000
 | `js/solar.js` | NOAA準拠の太陽位置計算（Cesium非依存の純粋関数） |
 | `js/sunlight.js` | レイキャストによる日照時間推定 |
 | `js/diagnose.js` | 診断オーケストレータ＋診断カードのDOM生成、検索UI・履歴・現在地診断 |
+| `js/bottomsheet.js` | モバイル診断カードの3段階ボトムシート制御 |
 | `js/share.js` | 共有URLのserialize/parse（純粋関数）と起動時の復元 |
 | `js/compare.js` | 地点比較の状態管理と比較モーダル |
 | `js/zoning-overlay.js` | MVTをcanvasにラスタライズするImageryProviderと凡例 |
 | `style.css` | UIスタイル |
+| `sw.js` | オフラインキャッシュとデータ別キャッシュ戦略 |
 | `data/area-index.json` | PLATEAU対応自治体448件のデータURL対応表 |
 | `data/spots.json` | 中野区・渋谷区・三島市のスポットプリセット |
 | `data/shelters.geojson` | 避難所・避難場所102件（中野区オープンデータ由来・同梱） |
@@ -144,7 +169,7 @@ python3 -m http.server 8000
 
 ## テスト
 
-テストのみnpm依存があります（アプリ本体は無依存のまま）。単体857項目 / スモーク17項目 / e2e 5ファイルです。
+テストのみnpm依存があります（アプリ本体は無依存のまま）。単体929項目 / スモーク17項目 / e2e 6ファイルです。
 
 ```bash
 npm install
@@ -189,11 +214,13 @@ npm run shelters
 | `test/area-index.test.mjs` | 対応表生成器の正規化と中野区設定の等価性 |
 | `test/area.test.mjs` | 自治体コード解決・AreaConfig・静的フォールバック |
 | `test/rc1.test.mjs` | 荒尾／益城・displayName・contentHash・city互換・矩形限定 |
+| `test/sw.test.mjs` | Service Workerのprecache・除外・データ別キャッシュ戦略 |
 | `test/e2e.test.mjs` | 街カルテの統合テスト（検索→診断→カード内容） |
 | `test/e2e-r1.test.mjs` | 共有URL・オーバーレイ（ピクセル検証）・比較・UX改善の統合テスト |
 | `test/e2e-r3.test.mjs` | 日照の視点高さ変更・再計算・キャンセルの統合テスト |
 | `test/e2e-r3-shade.test.mjs` | 日影マップの統合テスト |
 | `test/e2e-r4.test.mjs` | マルチエリア・欠損UI・city付き共有／履歴の統合テスト |
+| `test/e2e-r8a.test.mjs` | PWA・表示品質・モバイルボトムシートの統合テスト |
 | `test/data-expectations.mjs` | 実タイルをデコードして期待値を確定するスクリプト |
 
 ## 使用データ

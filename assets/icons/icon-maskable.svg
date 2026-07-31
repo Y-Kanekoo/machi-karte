@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" role="img" aria-label="3D街カルテのマスカブルアイコン">
+  <rect width="512" height="512" fill="#141a22"/>
+  <path d="M96 414V260h96v154H96Z" fill="#4575b4"/>
+  <path d="M208 414V168h96v246h-96Z" fill="#fee090"/>
+  <path d="M320 414V224h96v190h-96Z" fill="#d73027"/>
+  <path fill="#fff" fill-rule="evenodd" d="M256 72c-49 0-88 39-88 88 0 65 88 139 88 139s88-74 88-139c0-49-39-88-88-88Zm0 54a34 34 0 1 0 0 68 34 34 0 0 0 0-68Z"/>
+</svg>
