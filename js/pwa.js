@@ -1,8 +1,87 @@
-// PWA表示品質の自動判定。Service Worker登録はR8a-P1で追加する。
+// PWAのService Worker登録と表示品質の自動判定。
 
 export const QUALITY_STORAGE_KEY = 'quality';
 
 const SELECTABLE_QUALITY_PROFILES = new Set(['light', 'high']);
+
+function showUpdateToast(registration, worker) {
+  const toast = globalThis.document?.getElementById('toast');
+  if (!toast) return;
+
+  const message = document.createElement('span');
+  message.textContent = '新しいバージョンがあります';
+  const reloadButton = document.createElement('button');
+  reloadButton.type = 'button';
+  reloadButton.className = 'update-reload-button';
+  reloadButton.textContent = '再読み込み';
+  reloadButton.addEventListener('click', () => {
+    const waitingWorker = registration.waiting || worker;
+    if (!waitingWorker) {
+      globalThis.location.reload();
+      return;
+    }
+
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      globalThis.location.reload();
+    });
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+  });
+
+  toast.replaceChildren(message, reloadButton);
+  toast.classList.add('update-toast');
+  toast.classList.remove('hidden');
+}
+
+function watchForUpdate(registration) {
+  const watchedWorkers = new WeakSet();
+
+  function watchInstallingWorker() {
+    const worker = registration.installing;
+    if (!worker || watchedWorkers.has(worker)) return;
+    watchedWorkers.add(worker);
+
+    function notifyWhenInstalled() {
+      if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        showUpdateToast(registration, worker);
+      }
+    }
+
+    worker.addEventListener('statechange', notifyWhenInstalled);
+    notifyWhenInstalled();
+  }
+
+  registration.addEventListener('updatefound', watchInstallingWorker);
+  watchInstallingWorker();
+  if (registration.waiting && navigator.serviceWorker.controller) {
+    showUpdateToast(registration, registration.waiting);
+  }
+}
+
+/** nosw=1でないブラウザ環境ではService Workerを登録する。 */
+export async function registerServiceWorker() {
+  const query = new URLSearchParams(globalThis.location?.search || '');
+  if (
+    query.get('nosw') === '1'
+    || !globalThis.navigator
+    || !('serviceWorker' in globalThis.navigator)
+  ) return null;
+
+  try {
+    const registration = await navigator.serviceWorker.register('sw.js');
+    watchForUpdate(registration);
+    return registration;
+  } catch (error) {
+    console.warn('Service Workerを登録できませんでした', error);
+    return null;
+  }
+}
+
+if (typeof globalThis.window !== 'undefined') {
+  void registerServiceWorker();
+}
 
 /** ポインター・画面サイズまたは端末メモリからモバイル相当かを判定する。 */
 export function isMobileLike() {

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#141a22" />
+  <title>オフライン — 3D街カルテ</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #141a22;
+      color: #eef4fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 15%, rgba(69, 117, 180, 0.22), transparent 42%),
+        #141a22;
+    }
+    main {
+      width: min(100%, 420px);
+      text-align: center;
+    }
+    .icon {
+      width: 92px;
+      height: 92px;
+      margin-bottom: 18px;
+      filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.28));
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(25px, 7vw, 34px);
+      letter-spacing: 0.02em;
+    }
+    p {
+      margin: 0;
+      color: #c8d4df;
+      line-height: 1.75;
+    }
+    button {
+      margin: 28px 0;
+      border: 1px solid rgba(127, 196, 255, 0.6);
+      border-radius: 999px;
+      padding: 11px 24px;
+      background: #2676ad;
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:focus-visible {
+      outline: 3px solid #7fc4ff;
+      outline-offset: 3px;
+    }
+    .note {
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding-top: 20px;
+      font-size: 13px;
+      color: #9eacb9;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <svg class="icon" viewBox="0 0 96 96" role="img" aria-label="3D街カルテ">
+      <rect width="96" height="96" rx="22" fill="#1d2732" />
+      <path d="M16 67V45h17v22M39 67V29h18v38M63 67V38h17v29" fill="none" stroke="#7fc4ff" stroke-width="7" stroke-linejoin="round" />
+      <path d="M48 17c-9 0-16 7-16 16 0 12 16 27 16 27s16-15 16-27c0-9-7-16-16-16Z" fill="#d73027" stroke="#fff" stroke-width="3" />
+      <circle cx="48" cy="33" r="5" fill="#fff" />
+    </svg>
+    <h1>オフラインです</h1>
+    <p>3D地図と診断には通信が必要です。</p>
+    <button type="button" onclick="location.reload()">再読み込み</button>
+    <p class="note">公式ハザードマップは災害時に紙でも確認を。</p>
+  </main>
+</body>
+</html>

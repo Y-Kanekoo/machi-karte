@@ -28,6 +28,13 @@ export const HARNESS_DIRECT = process.env.HARNESS_DIRECT === '1';
 /** SKIP_NETWORK=1 で実タイル照合（外部データ取得）をスキップする。CIの単体テスト用 */
 export const SKIP_NETWORK = process.env.SKIP_NETWORK === '1';
 
+/** 既存e2eの全ページURLにService Worker無効化パラメータを付ける。 */
+function withoutServiceWorker(url) {
+  const target = new URL(url, BASE_URL);
+  target.searchParams.set('nosw', '1');
+  return target.href;
+}
+
 /** 中継対象ホスト（PLAN.md §8） */
 export const RELAY_HOSTS = [
   'cesium.com',
@@ -92,6 +99,7 @@ export async function launchViewer(opts = {}) {
     viewport: opts.viewport || { width: 1440, height: 900 },
     deviceScaleFactor: 1,
     ...(opts.contextOptions || {}),
+    serviceWorkers: 'block',
   });
   // クリップボード読み書きは e2e（headless）で明示的に許可しないと拒否される
   if (opts.permissions !== false) {
@@ -138,7 +146,7 @@ export async function launchViewer(opts = {}) {
   const page = watch(await context.newPage());
 
   if (opts.goto !== false) {
-    await page.goto(opts.url || BASE_URL, { waitUntil: 'load', timeout: 180000 });
+    await page.goto(withoutServiceWorker(opts.url || BASE_URL), { waitUntil: 'load', timeout: 180000 });
   }
 
   return {
@@ -150,7 +158,7 @@ export async function launchViewer(opts = {}) {
     /** 同じ中継設定のまま新しいタブを開く（共有URLの復元検証用） */
     newPage: async (url) => {
       const p = watch(await context.newPage());
-      if (url) await p.goto(url, { waitUntil: 'load', timeout: 180000 });
+      if (url) await p.goto(withoutServiceWorker(url), { waitUntil: 'load', timeout: 180000 });
       return p;
     },
     close: () => browser.close(),

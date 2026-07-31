@@ -8,6 +8,8 @@ import {
   equal,
   report,
 } from './harness.mjs';
+import { chromium } from 'playwright';
+import fs from 'node:fs';
 
 const MEBIBYTE = 1024 * 1024;
 
@@ -85,4 +87,58 @@ try {
   await defaultViewer.close();
 }
 
-report('R8a-P0 e2e');
+console.log('\n=== Service Worker登録 ===');
+let swBrowser;
+try {
+  const launchOptions = {
+    args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
+  };
+  const chromiumPath = process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium';
+  if (fs.existsSync(chromiumPath)) launchOptions.executablePath = chromiumPath;
+  swBrowser = await chromium.launch(launchOptions);
+} catch (error) {
+  console.warn(`  skip Service Worker対応ブラウザを起動できませんでした: ${error}`);
+}
+
+if (swBrowser) {
+  try {
+    const context = await swBrowser.newContext({ viewport: { width: 1280, height: 720 } });
+    const baseOrigin = new URL(BASE_URL).origin;
+    await context.route('**/*', (route) => {
+      const requestOrigin = new URL(route.request().url()).origin;
+      return requestOrigin === baseOrigin ? route.continue() : route.abort();
+    });
+    const page = await context.newPage();
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 180000 });
+    const supported = await page.evaluate(() => 'serviceWorker' in navigator);
+    if (!supported) {
+      console.warn('  skip ブラウザがService Workerに対応していません');
+    } else {
+      const swState = await page.evaluate(async () => {
+        try {
+          const registration = await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('登録待ちがタイムアウトしました')), 20000);
+            }),
+          ]);
+          return {
+            active: registration.active?.state === 'activated',
+            scriptURL: registration.active?.scriptURL || '',
+          };
+        } catch (error) {
+          return { active: false, scriptURL: '', error: String(error) };
+        }
+      });
+      check(
+        '素の起動でService Workerが登録・有効化される',
+        swState.active && swState.scriptURL.endsWith('/sw.js'),
+        swState.error || swState.scriptURL,
+      );
+    }
+  } finally {
+    await swBrowser.close();
+  }
+}
+
+report('R8a e2e');
