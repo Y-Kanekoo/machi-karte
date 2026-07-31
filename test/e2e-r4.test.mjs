@@ -215,4 +215,244 @@ try {
   await mishimaViewer.close();
 }
 
+// ============================================================================
+// 3. 渋谷区: 建物・実データ診断・共有URL復元
+// ============================================================================
+
+console.log('\n=== 渋谷区の建物・実データ診断・共有URL復元 ===');
+const shibuyaViewer = await launchViewer({
+  viewport: { width: 1440, height: 900 },
+  url: BASE_URL + '?city=13113',
+});
+try {
+  const { page } = shibuyaViewer;
+  await waitForApp(page, '13113');
+  await page.waitForFunction(
+    () => window.__nakano?.loaded?.bldgLod2?.tilesLoaded === true,
+    null,
+    { timeout: 180000, polling: 500 },
+  );
+
+  const initial = await page.evaluate(() => ({
+    search: location.search,
+    hash: location.hash,
+    pageTitle: document.title,
+    headerTitle: document.getElementById('areaTitle')?.getAttribute('aria-label'),
+    currentArea: document.getElementById('areaCurrentName')?.textContent,
+    buildingShown: window.__nakano.loaded.bldgLod2?.show === true,
+  }));
+  equal('渋谷区クエリはURLから除去される', initial.search, '');
+  check(
+    '渋谷区クエリはcity付きハッシュへ正規化される',
+    initial.hash.startsWith('#v=1&city=13113'),
+    initial.hash,
+  );
+  equal('渋谷区のページタイトル', initial.pageTitle, '3D街カルテ — 渋谷区');
+  equal('渋谷区のヘッダ表記', initial.headerTitle, '3D街カルテ — 渋谷区');
+  equal('エリア選択UIの現在地は渋谷区', initial.currentArea, '渋谷区');
+  check('渋谷区のLOD2建物が表示される', initial.buildingShown, JSON.stringify(initial));
+
+  const hachiko = await diagnoseAt(
+    page,
+    139.7006,
+    35.6595,
+    '渋谷駅ハチ公前付近',
+  );
+  equal('ハチ公前付近の洪水判定', hachiko.flood, '0.5〜3.0m');
+  equal('ハチ公前付近の用途地域', hachiko.use, '商業地域');
+  equal('ハチ公前付近の建蔽率', hachiko.coverage, 80);
+  equal('ハチ公前付近の容積率', hachiko.floorArea, 1000);
+
+  await page.evaluate(() => {
+    window.__nakano.viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(139.7006, 35.6595, 600),
+      orientation: {
+        heading: 0,
+        pitch: Cesium.Math.toRadians(-50),
+        roll: 0,
+      },
+    });
+  });
+  await page.click('#shareBtn');
+  const shareHash = await page.evaluate(() => location.hash);
+  check(
+    '渋谷区の共有URLはcityの後にspotを持つ',
+    /^#v=1&city=13113&spot=139\.7006,35\.6595(?:&|$)/.test(shareHash),
+    shareHash,
+  );
+  const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+  const shareUrl = String(clip).startsWith('http') ? String(clip) : BASE_URL + shareHash;
+
+  const restoredPage = await shibuyaViewer.newPage(shareUrl);
+  await waitForApp(restoredPage, '13113');
+  await restoredPage.waitForFunction(
+    () => window.__nakano?.getRestored?.() instanceof Promise,
+    null,
+    { timeout: 180000, polling: 500 },
+  );
+  await restoredPage.evaluate(() => window.__nakano.getRestored());
+  await restoredPage.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 120000 });
+  const restored = await restoredPage.evaluate(() => {
+    const carto = window.__nakano.viewer.camera.positionCartographic;
+    const result = window.__nakano.diagnosis.getLastResult();
+    return {
+      city: window.__nakano.areaConfig.code,
+      lon: result?.lon,
+      lat: result?.lat,
+      flood: result?.flood?.rank,
+      use: result?.zoning?.use?.name,
+      coverage: result?.zoning?.use?.coverage,
+      floorArea: result?.zoning?.use?.floorArea,
+      cameraLon: Cesium.Math.toDegrees(carto.longitude),
+      cameraLat: Cesium.Math.toDegrees(carto.latitude),
+    };
+  });
+  equal('共有URL復元後も渋谷区', restored.city, '13113');
+  near('共有URLからハチ公前の経度を復元', restored.lon, 139.7006, 1e-6);
+  near('共有URLからハチ公前の緯度を復元', restored.lat, 35.6595, 1e-6);
+  equal('共有URL復元後の洪水判定', restored.flood, '0.5〜3.0m');
+  equal('共有URL復元後の用途地域', restored.use, '商業地域');
+  equal('共有URL復元後の建蔽率', restored.coverage, 80);
+  equal('共有URL復元後の容積率', restored.floorArea, 1000);
+  near('共有URL復元後のカメラ経度', restored.cameraLon, 139.7006, 1e-4);
+  near('共有URL復元後のカメラ緯度', restored.cameraLat, 35.6595, 1e-4);
+  await restoredPage.close();
+
+  const fatal = shibuyaViewer.errors.filter(
+    (error) => error.startsWith('PAGEERROR')
+      || /Failed to load module|SyntaxError|is not a function/.test(error),
+  );
+  check('渋谷区の共有復元に致命的なJSエラーがない', fatal.length === 0, JSON.stringify(fatal));
+} finally {
+  await shibuyaViewer.close();
+}
+
+// ============================================================================
+// 4. エリアセレクタ: 中野区から渋谷区へreload切替
+// ============================================================================
+
+console.log('\n=== エリアセレクタのreload切替 ===');
+const selectorViewer = await launchViewer({ viewport: { width: 1440, height: 900 } });
+try {
+  const { page } = selectorViewer;
+  await waitForApp(page, '13114');
+  equal(
+    '都道府県セレクタは東京都を選択',
+    await page.inputValue('#areaPrefSelect'),
+    '東京都',
+  );
+  equal(
+    '自治体セレクタは中野区を選択',
+    await page.inputValue('#areaCitySelect'),
+    '13114',
+  );
+
+  await page.selectOption('#areaCitySelect', '13113');
+  await waitForApp(page, '13113');
+  await page.waitForFunction(
+    () => window.__nakano?.loaded?.bldgLod2?.tilesLoaded === true,
+    null,
+    { timeout: 180000, polling: 500 },
+  );
+  const switched = await page.evaluate(() => ({
+    hash: location.hash,
+    pageTitle: document.title,
+    headerTitle: document.getElementById('areaTitle')?.getAttribute('aria-label'),
+    currentArea: document.getElementById('areaCurrentName')?.textContent,
+    selectedCity: document.getElementById('areaCitySelect')?.value,
+    navigationType: performance.getEntriesByType('navigation')[0]?.type,
+    buildingShown: window.__nakano.loaded.bldgLod2?.show === true,
+  }));
+  equal('エリア切替後のhash', switched.hash, '#v=1&city=13113');
+  equal('エリア切替後のページタイトル', switched.pageTitle, '3D街カルテ — 渋谷区');
+  equal('エリア切替後のヘッダ表記', switched.headerTitle, '3D街カルテ — 渋谷区');
+  equal('エリア切替後の現在地表示', switched.currentArea, '渋谷区');
+  equal('エリア切替後の自治体選択値', switched.selectedCity, '13113');
+  equal('エリア切替はreloadで行われる', switched.navigationType, 'reload');
+  check('reload後に渋谷区の建物が表示される', switched.buildingShown, JSON.stringify(switched));
+} finally {
+  await selectorViewer.close();
+}
+
+// ============================================================================
+// 5. 不正な自治体コードのフォールバック
+// ============================================================================
+
+console.log('\n=== 不正な自治体コードのフォールバック ===');
+const invalidViewer = await launchViewer({
+  viewport: { width: 1440, height: 900 },
+  url: BASE_URL + '?city=99999',
+});
+try {
+  const { page } = invalidViewer;
+  const toastPromise = page
+    .waitForFunction(
+      () => {
+        const el = document.getElementById('toast');
+        return el && !el.classList.contains('hidden') ? el.textContent : null;
+      },
+      null,
+      { timeout: 10000, polling: 30 },
+    )
+    .then((handle) => handle.jsonValue());
+  await waitForApp(page, '13114');
+  const toastText = await toastPromise;
+  equal('不正コードのトースト', toastText, '未対応のエリア指定です');
+  const invalid = await page.evaluate(() => ({
+    search: location.search,
+    hash: location.hash,
+    city: window.__nakano.areaConfig.code,
+    pageTitle: document.title,
+    headerTitle: document.getElementById('areaTitle')?.getAttribute('aria-label'),
+  }));
+  equal('不正コードは中野区へフォールバック', invalid.city, '13114');
+  equal('不正コードのクエリはURLから除去される', invalid.search, '');
+  equal('フォールバック後のhash', invalid.hash, '#v=1&city=13114');
+  equal('フォールバック後のページタイトル', invalid.pageTitle, '3D街カルテ — 中野区');
+  equal('フォールバック後のヘッダ表記', invalid.headerTitle, '3D街カルテ — 中野区');
+} finally {
+  await invalidViewer.close();
+}
+
+// ============================================================================
+// 6. cityなしR1形式ハッシュの後方互換
+// ============================================================================
+
+console.log('\n=== cityなしR1形式ハッシュの後方互換 ===');
+const legacyHash = '#v=1&spot=139.673935,35.691502'
+  + '&addr=' + encodeURIComponent('東京都中野区弥生町二丁目')
+  + '&cam=139.674,35.6905,720,45,-55';
+const legacyViewer = await launchViewer({
+  viewport: { width: 1440, height: 900 },
+  url: BASE_URL + legacyHash,
+});
+try {
+  const { page } = legacyViewer;
+  await waitForApp(page, '13114');
+  await page.waitForFunction(
+    () => window.__nakano?.getRestored?.() instanceof Promise,
+    null,
+    { timeout: 180000, polling: 500 },
+  );
+  await page.evaluate(() => window.__nakano.getRestored());
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 120000 });
+  const legacy = await page.evaluate(() => {
+    const result = window.__nakano.diagnosis.getLastResult();
+    return {
+      city: window.__nakano.areaConfig.code,
+      hash: location.hash,
+      title: result?.title,
+      lon: result?.lon,
+      lat: result?.lat,
+    };
+  });
+  equal('city省略時は中野区として復元', legacy.city, '13114');
+  check('R1形式ハッシュへcityを暗黙追記しない', !legacy.hash.includes('city='), legacy.hash);
+  check('R1形式の住所を復元', legacy.title?.includes('弥生町二丁目'), legacy.title);
+  near('R1形式の経度を復元', legacy.lon, 139.673935, 1e-6);
+  near('R1形式の緯度を復元', legacy.lat, 35.691502, 1e-6);
+} finally {
+  await legacyViewer.close();
+}
+
 report('e2e-r4.test.mjs');

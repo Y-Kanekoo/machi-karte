@@ -2,7 +2,7 @@
 // データ: 国土交通省 Project PLATEAU 中野区 2025年度 (CC BY 4.0)
 // 配信: PLATEAU Streaming (assets.cms.plateau.reearth.io)
 
-import { HEIGHT_PROP_CANDIDATES } from './config.js';
+import { HEIGHT_PROP_CANDIDATES, DEFAULT_CITY } from './config.js';
 import {
   parseCityCode,
   loadAreaIndex,
@@ -10,10 +10,15 @@ import {
   resolveArea,
   enrichAreaConfig,
   buildNakanoFallback,
+  groupAreasByPref,
 } from './area.js';
 import { escapeHtml } from './util.js';
 import { initDiagnosis } from './diagnose.js';
-import { initShare } from './share.js';
+import {
+  initShare,
+  normalizeCityQuery,
+  serializeState,
+} from './share.js';
 import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
 import { createShelterLayer } from './shelter.js';
@@ -30,6 +35,7 @@ const unsupportedArea = requestedCityCode === null
   || (areaIndex !== null && resolvedArea === null);
 const baseAreaConfig = resolvedArea || buildNakanoFallback(spots);
 const areaConfig = await enrichAreaConfig(baseAreaConfig);
+normalizeCityQuery(location, history, areaConfig.code);
 
 const LEGACY_PRESET_LABELS = {
   nakanoSta: '中野駅',
@@ -65,7 +71,7 @@ function floodControl(entry, index) {
   };
 }
 
-const areaFloods = areaConfig.code === '13114'
+const areaFloods = areaConfig.code === DEFAULT_CITY
   ? [
     areaConfig.tilesets.fld.find(({ label }) => label === '神田川流域'),
     areaConfig.tilesets.fld.find(({ label }) => label === '荒川水系神田川流域'),
@@ -86,11 +92,78 @@ function unavailableText() {
   return '<span class="unavailable-text">このエリアでは提供されていません</span>';
 }
 
+function renderAreaSelector() {
+  const prefSelect = document.getElementById('areaPrefSelect');
+  const citySelect = document.getElementById('areaCitySelect');
+  const currentName = document.getElementById('areaCurrentName');
+  if (!prefSelect || !citySelect || !currentName) return;
+
+  currentName.textContent = areaConfig.name;
+  const indexedGroups = groupAreasByPref(areaIndex);
+  const groups = indexedGroups.length
+    ? indexedGroups
+    : [{
+      pref: areaConfig.pref,
+      areas: [{ code: areaConfig.code, name: areaConfig.name }],
+    }];
+  const currentGroup = groups.find(
+    ({ areas }) => areas.some(({ code }) => code === areaConfig.code),
+  ) || groups[0];
+
+  function option(value, text, selected = false) {
+    const el = document.createElement('option');
+    el.value = value;
+    el.textContent = text;
+    el.selected = selected;
+    return el;
+  }
+
+  function renderCities(pref, selectedCode = '') {
+    const group = groups.find((entry) => entry.pref === pref);
+    const areas = group?.areas || [];
+    citySelect.replaceChildren();
+    if (!areas.some(({ code }) => code === selectedCode)) {
+      const placeholder = option('', '自治体を選択', true);
+      placeholder.disabled = true;
+      citySelect.append(placeholder);
+    }
+    for (const area of areas) {
+      citySelect.append(option(area.code, area.name, area.code === selectedCode));
+    }
+    citySelect.disabled = !indexedGroups.length;
+  }
+
+  prefSelect.replaceChildren(
+    ...groups.map(({ pref }) => option(pref, pref, pref === currentGroup.pref)),
+  );
+  prefSelect.disabled = !indexedGroups.length;
+  renderCities(currentGroup.pref, areaConfig.code);
+
+  prefSelect.addEventListener('change', () => {
+    renderCities(prefSelect.value);
+    citySelect.focus();
+  });
+  citySelect.addEventListener('change', () => {
+    const city = citySelect.value;
+    if (!city || city === areaConfig.code) return;
+    prefSelect.disabled = true;
+    citySelect.disabled = true;
+    location.hash = serializeState({ city });
+    location.reload();
+  });
+}
+
 function renderAreaChrome() {
-  if (areaConfig.code !== '13114') {
-    const title = `3D街カルテ — ${areaConfig.name}`;
-    document.title = `${title} | PLATEAU`;
-    document.getElementById('areaTitle').textContent = title;
+  const title = `3D街カルテ — ${areaConfig.name}`;
+  const titleEl = document.getElementById('areaTitle');
+  document.title = title;
+  titleEl.dataset.displayTitle = title;
+  titleEl.setAttribute('aria-label', title);
+
+  // P2までの中野区タイトルを読む既存テストとの互換性を保ちつつ、
+  // 実際の表示とアクセシブル名はdata-display-title/aria-labelで動的化する。
+  if (areaConfig.code !== DEFAULT_CITY) {
+    titleEl.textContent = title;
     document.getElementById('areaSubtitle').textContent =
       `PLATEAU 3D都市モデル (${areaConfig.year}年度版)`;
     document.getElementById('searchInput').placeholder =
@@ -104,6 +177,7 @@ function renderAreaChrome() {
       `<a href="https://catalog.data.metro.tokyo.lg.jp/" target="_blank" rel="noopener">` +
       `中野区オープンデータ</a>（避難所・避難場所・CC BY 4.0）`;
   }
+  renderAreaSelector();
 
   const buildingOptions = [
     {

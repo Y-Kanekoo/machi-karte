@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>中野区 3Dビューア・街カルテ | PLATEAU</title>
+  <title>3D街カルテ — 中野区</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.130/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="style.css" rel="stylesheet" />
@@ -25,7 +25,26 @@
   </div>
 
   <div id="controlPanel">
-    <h1 id="areaTitle">中野区 3Dビューア</h1>
+    <div id="areaSelector" class="area-selector">
+      <div class="area-selector-heading">
+        エリア: <strong id="areaCurrentName">中野区</strong>
+        <span aria-hidden="true">▼</span>
+      </div>
+      <div class="area-selector-fields">
+        <label for="areaPrefSelect">都道府県
+          <select id="areaPrefSelect" aria-label="都道府県を選択">
+            <option value="東京都">東京都</option>
+          </select>
+        </label>
+        <label for="areaCitySelect">自治体
+          <select id="areaCitySelect" aria-label="自治体を選択">
+            <option value="13114">中野区</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <h1 id="areaTitle" data-display-title="3D街カルテ — 中野区"
+        aria-label="3D街カルテ — 中野区">中野区 3Dビューア</h1>
     <p class="subtitle" id="areaSubtitle">PLATEAU 3D都市モデル (2025年度版)</p>
 
     <section>

@@ -6,7 +6,14 @@
 // 依存方向: compare.js → diagnose.js の公開API（runDiagnosisAt / getLastResult）。
 // diagnose.js からは compare.js を参照しない。
 
-import { COMPARE_MAX, COMPARE_STORAGE_KEY, COMPARE_DEDUPE_METERS, FLOOD_COLORS } from './config.js';
+import {
+  COMPARE_MAX,
+  COMPARE_STORAGE_KEY,
+  COMPARE_DEDUPE_METERS,
+  FLOOD_COLORS,
+  DEFAULT_CITY,
+} from './config.js';
+import { serializeState, isValidCityCode } from './share.js';
 import { escapeHtml } from './util.js';
 import { distanceMeters as haversineMeters } from './tilemath.js';
 
@@ -17,18 +24,20 @@ import { distanceMeters as haversineMeters } from './tilemath.js';
  * 未取得の項目は null のままにして、表示側で「未計算」を出す。
  *
  * @param {object} r lastResult
- * @returns {{lon:number, lat:number, title:string|null, flood:string|null,
+ * @param {string} city 自治体コード
+ * @returns {{city:string, lon:number, lat:number, title:string|null, flood:string|null,
  *   landslide:Array<{label:string, rank:string}>|null, landslideWorst:string|null,
  *   use:string|null, coverage:number|null, floorArea:number|null,
  *   fire:string|null, heightDistrict:string|null,
  *   sun:Array<{label:string, hours:number}>|null, buildingHeight:number|null, at:number}|null}
  */
-export function snapshotFromResult(r) {
+export function snapshotFromResult(r, city = DEFAULT_CITY) {
   if (!r || !Number.isFinite(r.lon) || !Number.isFinite(r.lat)) return null;
   const land = Array.isArray(r.landslide)
     ? r.landslide.map((x) => ({ label: x.label, rank: x.rank }))
     : null;
   return {
+    city: isValidCityCode(city) ? city : DEFAULT_CITY,
     lon: r.lon,
     lat: r.lat,
     title: r.title || null,
@@ -117,7 +126,14 @@ function readStore() {
   try {
     const raw = sessionStorage.getItem(COMPARE_STORAGE_KEY);
     const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter((s) => s && Number.isFinite(s.lon)) : [];
+    return Array.isArray(arr)
+      ? arr
+        .filter((s) => s && Number.isFinite(s.lon))
+        .map((s) => ({
+          ...s,
+          city: isValidCityCode(s.city) ? s.city : DEFAULT_CITY,
+        }))
+      : [];
   } catch (e) {
     console.warn('compare: read failed', e);
     return [];
@@ -138,7 +154,13 @@ function writeStore(list) {
  * @param {{diagnosis:object, viewer:object, toast:(m:string)=>void, share?:object}} ctx
  */
 export function initCompare(ctx) {
-  const { diagnosis, viewer, toast, share = null } = ctx;
+  const {
+    diagnosis,
+    viewer,
+    toast,
+    share = null,
+    areaConfig = null,
+  } = ctx;
 
   const addBtn = document.getElementById('compareAddBtn');
   const bar = document.getElementById('compareBar');
@@ -171,12 +193,17 @@ export function initCompare(ctx) {
   }
 
   function add() {
-    const snap = snapshotFromResult(diagnosis.getLastResult());
+    const snap = snapshotFromResult(
+      diagnosis.getLastResult(),
+      areaConfig?.code || DEFAULT_CITY,
+    );
     if (!snap) {
       toast('先に地点を診断してください');
       return null;
     }
-    const dup = items.find((s) => distanceMeters(s, snap) < COMPARE_DEDUPE_METERS);
+    const dup = items.find(
+      (s) => s.city === snap.city && distanceMeters(s, snap) < COMPARE_DEDUPE_METERS,
+    );
     if (dup) {
       toast('同じ地点はすでに追加されています');
       return null;
@@ -259,6 +286,16 @@ export function initCompare(ctx) {
     const s = items[i];
     if (!s) return;
     closeModal();
+    const city = isValidCityCode(s.city) ? s.city : DEFAULT_CITY;
+    if (city !== (areaConfig?.code || DEFAULT_CITY)) {
+      location.hash = serializeState({
+        city,
+        spot: { lon: s.lon, lat: s.lat },
+        addr: s.title,
+      });
+      location.reload();
+      return;
+    }
     await diagnosis.runDiagnosisAt(s.lon, s.lat, { title: s.title, fly: true });
   }
 
@@ -318,7 +355,10 @@ export function initCompare(ctx) {
     persist();
     for (const p of (points || []).slice(0, COMPARE_MAX)) {
       await diagnosis.runDiagnosisAt(p.lon, p.lat, { fly: false, skipSunlight: true });
-      const snap = snapshotFromResult(diagnosis.getLastResult());
+      const snap = snapshotFromResult(
+        diagnosis.getLastResult(),
+        areaConfig?.code || DEFAULT_CITY,
+      );
       if (snap) items.push(snap);
     }
     persist();

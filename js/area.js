@@ -70,6 +70,27 @@ export async function loadSpots() {
   }
 }
 
+/**
+ * 自治体対応表を都道府県ごとの選択肢へ整形する。
+ * 自治体コード順に並べることで、都道府県と自治体の行政コード順を保つ。
+ */
+export function groupAreasByPref(index) {
+  const groups = new Map();
+  const entries = Object.entries(index?.areas || {})
+    .filter(([code, area]) =>
+      CITY_CODE_PATTERN.test(code)
+      && typeof area?.pref === 'string'
+      && typeof area?.name === 'string')
+    .sort(([codeA], [codeB]) => codeA.localeCompare(codeB));
+
+  for (const [code, area] of entries) {
+    if (!groups.has(area.pref)) groups.set(area.pref, []);
+    groups.get(area.pref).push({ code, name: area.name });
+  }
+
+  return Array.from(groups, ([pref, areas]) => ({ pref, areas }));
+}
+
 function restoreUrl(prefix, value) {
   if (typeof value !== 'string' || value.length === 0) return null;
   if (/^https?:\/\//.test(value)) return value;
