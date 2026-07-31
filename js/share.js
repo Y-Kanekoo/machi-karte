@@ -2,8 +2,9 @@
 //
 // URLハッシュに診断状態を保存する。形式は URLSearchParams 互換:
 //   #v=1&city={自治体コード}&spot={lon},{lat}&addr={住所}&cam={lon},{lat},{height},{heading},{pitch}&ov={use,fire,height}
-//   #v=1&city={現在の自治体コード}&compare={自治体コード},{lon},{lat};...
-// 旧形式の compare={lon},{lat};... は中野区（13114）として復元する。
+//   #v=1&city={現在の自治体コード}&compare={lon},{lat};...                  （全地点が中野区）
+//   #v=1&city={現在の自治体コード}&compare={自治体コード},{lon},{lat};...   （他エリアを含む）
+// cityなしの比較地点は中野区（13114）として復元する。
 //
 // serializeState / parseHash は DOM・Cesium 非依存の純粋関数（Node単体テスト対象）。
 
@@ -98,14 +99,21 @@ export function serializeState(state) {
   }
 
   if (Array.isArray(s.compare)) {
-    const pts = s.compare
+    const points = s.compare
       .filter((p) => p && isValidLonLat(Number(p.lon), Number(p.lat)))
       .slice(0, COMPARE_MAX)
       .map((p) => {
-        const pair = `${round6(Number(p.lon))},${round6(Number(p.lat))}`;
-        return isValidCityCode(p.city) ? `${p.city},${pair}` : pair;
+        const city = isValidCityCode(p.city) ? p.city : DEFAULT_CITY;
+        return {
+          city,
+          pair: `${round6(Number(p.lon))},${round6(Number(p.lat))}`,
+        };
       });
-    if (pts.length) parts.push(`compare=${pts.join(';')}`);
+    if (points.length) {
+      const legacyFormat = points.every((p) => p.city === DEFAULT_CITY);
+      const pts = points.map((p) => legacyFormat ? p.pair : `${p.city},${p.pair}`);
+      parts.push(`compare=${pts.join(';')}`);
+    }
   }
 
   return parts.join('&');
