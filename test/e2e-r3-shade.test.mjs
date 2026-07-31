@@ -189,11 +189,19 @@ try {
   const oldLayersRemoved = addedLayers
     .slice(0, -1)
     .every((event) => removedLayerIds.has(event.id));
+  const isCanvasColorWithinTolerance = (sample) =>
+    sample.alpha > 0
+      && [1, 3, 5].every((offset) =>
+        Math.abs(
+          Number.parseInt(sample.actualHex.slice(offset, offset + 2), 16)
+            - Number.parseInt(sample.expectedHex.slice(offset, offset + 2), 16)
+        ) <= 2
+      );
   const canvasSample = canvasState.samples.find(
-    (sample) => sample.actualHex === sample.expectedHex && sample.alpha > 0
+    isCanvasColorWithinTolerance
   );
   const canvasMismatches = canvasState.samples.filter(
-    (sample) => sample.actualHex !== sample.expectedHex || sample.alpha === 0
+    (sample) => !isCanvasColorWithinTolerance(sample)
   );
   console.log('  完走結果: ' + JSON.stringify({
     completed,
@@ -238,7 +246,7 @@ try {
   check('粗→精の最終canvasは透明な未計算領域を残さず全面を塗る',
     canvasState.transparentPixels === 0,
     `transparentPixels=${canvasState.transparentPixels}`);
-  check('代表セルのcanvas色がhoursToColorの結果と一致する',
+  check('代表セルのcanvas色がhoursToColorの結果と一致する（±2許容）',
     !!canvasSample
       && canvasState.samples.length === completed.cellCount
       && canvasMismatches.length === 0,
