@@ -1,0 +1,96 @@
+{
+  "13114": {
+    "nakanoSta": {
+      "label": "中野駅",
+      "lon": 139.6659,
+      "lat": 35.701,
+      "height": 500,
+      "heading": 0,
+      "pitch": -40
+    },
+    "sunplaza": {
+      "label": "サンプラザ跡・四季の森",
+      "lon": 139.6645,
+      "lat": 35.704,
+      "height": 450,
+      "heading": 30,
+      "pitch": -35
+    },
+    "broadway": {
+      "label": "中野ブロードウェイ",
+      "lon": 139.6656,
+      "lat": 35.7085,
+      "height": 400,
+      "heading": 180,
+      "pitch": -40
+    },
+    "araiyakushi": {
+      "label": "新井薬師",
+      "lon": 139.6674,
+      "lat": 35.7125,
+      "height": 450,
+      "heading": 0,
+      "pitch": -40
+    },
+    "tetsugakudo": {
+      "label": "哲学堂公園",
+      "lon": 139.679,
+      "lat": 35.7195,
+      "height": 500,
+      "heading": 220,
+      "pitch": -35
+    },
+    "overview": {
+      "label": "全体俯瞰",
+      "lon": 139.664,
+      "lat": 35.69,
+      "height": 4500,
+      "heading": 0,
+      "pitch": -55
+    }
+  },
+  "13113": {
+    "dogenzaka": {
+      "label": "道玄坂二丁目",
+      "lon": 139.698318,
+      "lat": 35.659397,
+      "height": 450,
+      "heading": 25,
+      "pitch": -40
+    },
+    "hachiko": {
+      "label": "渋谷駅ハチ公前",
+      "lon": 139.7006,
+      "lat": 35.6595,
+      "height": 420,
+      "heading": 20,
+      "pitch": -40
+    },
+    "shoto": {
+      "label": "松濤一丁目",
+      "lon": 139.6926,
+      "lat": 35.6595,
+      "height": 450,
+      "heading": 340,
+      "pitch": -40
+    }
+  },
+  "22206": {
+    "ichibancho": {
+      "label": "一番町（三島駅南）",
+      "lon": 138.912567,
+      "lat": 35.124771,
+      "height": 500,
+      "heading": 80,
+      "pitch": -40
+    },
+    "daibagawa": {
+      "label": "大場川沿い",
+      "lon": 138.9291,
+      "lat": 35.0946,
+      "height": 450,
+      "heading": 20,
+      "pitch": -40
+    }
+  }
+}

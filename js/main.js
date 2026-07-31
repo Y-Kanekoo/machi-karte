@@ -2,14 +2,288 @@
 // データ: 国土交通省 Project PLATEAU 中野区 2025年度 (CC BY 4.0)
 // 配信: PLATEAU Streaming (assets.cms.plateau.reearth.io)
 
-import { TILESETS, PRESETS, HEIGHT_PROP_CANDIDATES } from './config.js';
+import { HEIGHT_PROP_CANDIDATES, DEFAULT_CITY } from './config.js';
+import {
+  parseCityCode,
+  loadAreaIndex,
+  loadSpots,
+  resolveArea,
+  enrichAreaConfig,
+  buildNakanoFallback,
+  groupAreasByPref,
+  resolveServiceRect,
+} from './area.js';
 import { escapeHtml } from './util.js';
 import { initDiagnosis } from './diagnose.js';
-import { initShare } from './share.js';
+import {
+  initShare,
+  normalizeCityQuery,
+  normalizeCityHash,
+  serializeState,
+} from './share.js';
 import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
 import { createShelterLayer } from './shelter.js';
 import { initShadeMap } from './shademap-ui.js';
+
+// ---- AreaConfig -------------------------------------------------------------
+
+const initialHash = location.hash;
+const requestedCityCode = parseCityCode(location);
+const [areaIndex, spots] = await Promise.all([loadAreaIndex(), loadSpots()]);
+const resolvedArea = requestedCityCode
+  ? resolveArea(areaIndex, requestedCityCode, spots)
+  : null;
+const baseAreaConfig = resolvedArea || buildNakanoFallback(spots);
+const areaConfig = await enrichAreaConfig(baseAreaConfig);
+const areaMismatch = requestedCityCode !== areaConfig.code;
+const areaFallbackMessage = !areaMismatch
+  ? null
+  : requestedCityCode === null
+    ? 'エリア指定が正しくないため中野区を表示しています'
+    : areaIndex === null
+      ? 'エリア情報を取得できなかったため中野区を表示しています'
+      : '未対応のエリア指定のため中野区を表示しています';
+normalizeCityQuery(location, history, areaConfig.code);
+if (areaMismatch) {
+  normalizeCityHash(location, history, areaConfig.code, { preserveState: false });
+}
+
+const areaDisplayName = areaConfig.displayName || areaConfig.name;
+const overlayRectKnown = !!resolveServiceRect(areaConfig);
+
+const LEGACY_PRESET_LABELS = {
+  nakanoSta: '中野駅',
+  sunplaza: 'サンプラザ跡・四季の森',
+  broadway: '中野ブロードウェイ',
+  araiyakushi: '新井薬師',
+  tetsugakudo: '哲学堂公園',
+  overview: '全体俯瞰',
+};
+
+function floodControl(entry, index) {
+  if (entry.label === '神田川流域') {
+    return {
+      ...entry,
+      id: 'fldKanda',
+      key: 'fldKandaL2',
+      text: '洪水浸水想定（神田川流域・L2）',
+    };
+  }
+  if (entry.label === '荒川水系神田川流域') {
+    return {
+      ...entry,
+      id: 'fldArakawa',
+      key: 'fldArakawaL2',
+      text: '洪水浸水想定（荒川水系 神田川等・L2）',
+    };
+  }
+  return {
+    ...entry,
+    id: `fld-${index}`,
+    key: `fld${index}`,
+    text: `洪水浸水想定（${entry.label}・L2）`,
+  };
+}
+
+const areaFloods = areaConfig.code === DEFAULT_CITY
+  ? [
+    areaConfig.tilesets.fld.find(({ label }) => label === '神田川流域'),
+    areaConfig.tilesets.fld.find(({ label }) => label === '荒川水系神田川流域'),
+  ].filter(Boolean)
+  : areaConfig.tilesets.fld;
+const floodControls = areaFloods.filter((entry) => entry?.url).map(floodControl);
+const tilesetUrls = {
+  bldgLod1: areaConfig.tilesets.bldgLod1,
+  bldgLod2: areaConfig.tilesets.bldgLod2,
+  bldgLod2NoTex: areaConfig.tilesets.bldgLod2NoTex,
+  ...Object.fromEntries(floodControls.map(({ key, url }) => [key, url])),
+  tranLod3: areaConfig.tilesets.tranLod3,
+  wtrLod1: areaConfig.tilesets.wtrLod1,
+};
+const initialBuildingMode = areaConfig.tilesets.bldgLod2 ? 'lod2' : 'lod1';
+
+function unavailableText() {
+  return '<span class="unavailable-text">このエリアでは提供されていません</span>';
+}
+
+function renderAreaSelector() {
+  const prefSelect = document.getElementById('areaPrefSelect');
+  const citySelect = document.getElementById('areaCitySelect');
+  const currentName = document.getElementById('areaCurrentName');
+  if (!prefSelect || !citySelect || !currentName) return;
+
+  currentName.textContent = areaDisplayName;
+  const indexedGroups = groupAreasByPref(areaIndex);
+  const groups = indexedGroups.length
+    ? indexedGroups
+    : [{
+      pref: areaConfig.pref,
+      areas: [{ code: areaConfig.code, name: areaDisplayName }],
+    }];
+  const currentGroup = groups.find(
+    ({ areas }) => areas.some(({ code }) => code === areaConfig.code),
+  ) || groups[0];
+
+  function option(value, text, selected = false) {
+    const el = document.createElement('option');
+    el.value = value;
+    el.textContent = text;
+    el.selected = selected;
+    return el;
+  }
+
+  function renderCities(pref, selectedCode = '') {
+    const group = groups.find((entry) => entry.pref === pref);
+    const areas = group?.areas || [];
+    citySelect.replaceChildren();
+    if (!areas.some(({ code }) => code === selectedCode)) {
+      const placeholder = option('', '自治体を選択', true);
+      placeholder.disabled = true;
+      citySelect.append(placeholder);
+    }
+    for (const area of areas) {
+      citySelect.append(option(area.code, area.name, area.code === selectedCode));
+    }
+    citySelect.disabled = !indexedGroups.length;
+  }
+
+  prefSelect.replaceChildren(
+    ...groups.map(({ pref }) => option(pref, pref, pref === currentGroup.pref)),
+  );
+  prefSelect.disabled = !indexedGroups.length;
+  renderCities(currentGroup.pref, areaConfig.code);
+
+  prefSelect.addEventListener('change', () => {
+    renderCities(prefSelect.value);
+    citySelect.focus();
+  });
+  citySelect.addEventListener('change', () => {
+    const city = citySelect.value;
+    if (!city || city === areaConfig.code) return;
+    prefSelect.disabled = true;
+    citySelect.disabled = true;
+    location.hash = serializeState({ city });
+    location.reload();
+  });
+}
+
+function renderAreaChrome() {
+  const title = `3D街カルテ — ${areaDisplayName}`;
+  const titleEl = document.getElementById('areaTitle');
+  document.title = title;
+  titleEl.dataset.displayTitle = title;
+  titleEl.setAttribute('aria-label', title);
+
+  // P2までの中野区タイトルを読む既存テストとの互換性を保ちつつ、
+  // 実際の表示とアクセシブル名はdata-display-title/aria-labelで動的化する。
+  if (areaConfig.code !== DEFAULT_CITY) {
+    titleEl.textContent = title;
+    document.getElementById('areaSubtitle').textContent =
+      `PLATEAU 3D都市モデル (${areaConfig.year}年度版)`;
+    document.getElementById('searchInput').placeholder =
+      `住所で診断（例: ${areaDisplayName}○○）`;
+    document.getElementById('attribution').innerHTML =
+      `出典: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">` +
+      `国土交通省 Project PLATEAU</a>（${escapeHtml(areaDisplayName)} 3D都市モデル ` +
+      `${escapeHtml(areaConfig.year)}年度・CC BY 4.0）／` +
+      `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">` +
+      `地理院タイル</a>`;
+  }
+  renderAreaSelector();
+
+  const buildingOptions = [
+    {
+      value: 'lod2',
+      text: 'LOD2（テクスチャ付き・高精細）',
+      available: !!areaConfig.tilesets.bldgLod2,
+    },
+    {
+      value: 'lod2notex',
+      text: 'LOD2（テクスチャなし）',
+      available: !!areaConfig.tilesets.bldgLod2NoTex,
+    },
+    {
+      value: 'lod1',
+      text: 'LOD1（箱型・軽量）',
+      available: !!areaConfig.tilesets.bldgLod1,
+    },
+    { value: 'none', text: '非表示', available: true },
+  ];
+  document.getElementById('buildingLayers').innerHTML = buildingOptions
+    .map(({ value, text, available }) =>
+      `<label${available ? '' : ' class="layer-unavailable"'}>` +
+      `<input type="radio" name="bldg" value="${value}"` +
+      `${value === initialBuildingMode ? ' checked' : ''}${available ? '' : ' disabled'}> ` +
+      `${text}${available ? '' : unavailableText()}</label>`)
+    .join('');
+
+  const zoningLabels = {
+    use: '用途地域',
+    fire: '防火・準防火地域',
+    height: '高度地区',
+  };
+  document.getElementById('zoningLayers').innerHTML = Object.entries(zoningLabels)
+    .map(([key, text]) => {
+      const dataAvailable = !!areaConfig.zoning[key];
+      const available = dataAvailable && overlayRectKnown;
+      const reason = dataAvailable && !overlayRectKnown
+        ? '<span class="unavailable-text">範囲不明のため地図表示を利用できません</span>'
+        : unavailableText();
+      return `<label${available ? '' : ' class="layer-unavailable"'}>` +
+        `<input type="checkbox" id="ov-${key}"${available ? '' : ' disabled'}> ${text}` +
+        `${available ? '' : reason}</label>`;
+    })
+    .join('');
+
+  document.getElementById('floodLayers').innerHTML = floodControls.length
+    ? floodControls
+      .map(({ id, text }) =>
+        `<label><input type="checkbox" id="${escapeHtml(id)}"> ${escapeHtml(text)}</label>`)
+      .join('')
+    : `<label class="layer-unavailable"><input type="checkbox" id="fldUnavailable" disabled> ` +
+      `洪水浸水想定${unavailableText()}</label>`;
+
+  const transportOptions = [
+    {
+      id: 'tran',
+      text: '道路（LOD3）',
+      available: !!areaConfig.tilesets.tranLod3,
+    },
+    {
+      id: 'wtr',
+      text: '水部（LOD1）',
+      available: !!areaConfig.tilesets.wtrLod1,
+    },
+  ];
+  document.getElementById('transportLayers').innerHTML = transportOptions
+    .map(({ id, text, available }) =>
+      `<label${available ? '' : ' class="layer-unavailable"'}>` +
+      `<input type="checkbox" id="${id}"${available ? '' : ' disabled'}> ${text}` +
+      `${available ? '' : unavailableText()}</label>`)
+    .join('');
+
+  const shelterCheckbox = document.getElementById('shelterLayer');
+  const shelterLabel = shelterCheckbox?.closest('label');
+  const sheltersAvailable = areaConfig.disaster?.shelters === true;
+  if (shelterCheckbox && shelterLabel && !sheltersAvailable) {
+    shelterCheckbox.checked = false;
+    shelterCheckbox.disabled = true;
+    shelterLabel.classList.add('layer-unavailable');
+    if (!shelterLabel.querySelector('.unavailable-text')) {
+      shelterLabel.insertAdjacentHTML('beforeend', unavailableText());
+    }
+  }
+
+  document.getElementById('presetButtons').innerHTML = Object.entries(areaConfig.presets || {})
+    .map(([key, preset]) =>
+      `<button data-preset="${escapeHtml(key)}">${escapeHtml(
+        preset.label || LEGACY_PRESET_LABELS[key] || key,
+      )}</button>`)
+    .join('');
+}
+
+renderAreaChrome();
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -64,9 +338,11 @@ function setStatus(msg) {
 
 async function getTileset(key) {
   if (loaded[key]) return loaded[key];
+  const url = tilesetUrls[key];
+  if (!url) return null;
   setStatus('データ読み込み中…');
   try {
-    const tileset = await Cesium.Cesium3DTileset.fromUrl(TILESETS[key], {
+    const tileset = await Cesium.Cesium3DTileset.fromUrl(url, {
       maximumScreenSpaceError: 16,
     });
     viewer.scene.primitives.add(tileset);
@@ -185,13 +461,14 @@ document.getElementById('timeSlider').addEventListener('input', (e) => {
 });
 
 const CHECK_LAYERS = {
-  fldKanda: 'fldKandaL2',
-  fldArakawa: 'fldArakawaL2',
+  ...Object.fromEntries(floodControls.map(({ id, key }) => [id, key])),
   tran: 'tranLod3',
   wtr: 'wtrLod1',
 };
 for (const [id, key] of Object.entries(CHECK_LAYERS)) {
-  document.getElementById(id).addEventListener('change', async (e) => {
+  const checkbox = document.getElementById(id);
+  if (!checkbox || checkbox.disabled) continue;
+  checkbox.addEventListener('change', async (e) => {
     if (e.target.checked) {
       const ts = await getTileset(key);
       if (ts) ts.show = true;
@@ -227,8 +504,11 @@ function flyTo(p, duration = 2.0) {
     duration,
   });
 }
-document.querySelectorAll('.presets button').forEach((btn) => {
-  btn.addEventListener('click', () => flyTo(PRESETS[btn.dataset.preset]));
+document.querySelectorAll('#presetButtons button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const preset = areaConfig.presets?.[btn.dataset.preset];
+    if (preset) flyTo(preset);
+  });
 });
 
 // ---- Feature picking ---------------------------------------------------------
@@ -271,11 +551,13 @@ function toast(msg, ms = 2000) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.add('hidden'), ms);
 }
+if (areaFallbackMessage) toast(areaFallbackMessage, 4000);
 
 // ---- 街カルテ（地点診断） -------------------------------------------------------
 
 const diagnosis = initDiagnosis({
   viewer,
+  areaConfig,
   getCurrentBuildingTileset: () => currentBldg,
   buildingTableHtml,
   setStatus,
@@ -288,6 +570,7 @@ diagnosis.onClose(clearHighlight);
 
 shadeMapController = initShadeMap({
   viewer,
+  areaConfig,
   getBuildingState: () => ({
     tileset: currentBldg,
     layerKind: currentBldgKind,
@@ -306,6 +589,12 @@ const shelterCheckbox = document.getElementById('shelterLayer');
 const shelterLegend = document.getElementById('shelterLegend');
 
 shelterCheckbox.addEventListener('change', async () => {
+  if (areaConfig.disaster?.shelters !== true) {
+    shelterCheckbox.checked = false;
+    shelterLegend.classList.add('hidden');
+    diagnosis.updateShelterButton();
+    return;
+  }
   const on = shelterCheckbox.checked;
   shelterLegend.classList.toggle('hidden', !on);
   diagnosis.updateShelterButton();
@@ -316,7 +605,7 @@ shelterCheckbox.addEventListener('change', async () => {
 
 // ---- R1: 都市計画オーバーレイ / 地点比較 / 共有URL -----------------------------------
 
-const overlays = initZoningOverlay({ viewer });
+const overlays = initZoningOverlay({ viewer, areaConfig });
 
 // compare は「比較のリンクをコピー」でのみ share を使うので、実体は後から差し込む
 // （share は起動時復元で compare.restoreFromPoints を呼ぶため、相互に必要になる）
@@ -324,10 +613,18 @@ const shareRef = {};
 const compare = initCompare({
   diagnosis,
   viewer,
+  areaConfig,
   toast,
   share: { shareCompare: (pts) => shareRef.api.shareCompare(pts) },
 });
-const share = initShare({ viewer, diagnosis, overlays, compare, toast });
+const share = initShare({
+  viewer,
+  diagnosis,
+  overlays,
+  compare,
+  toast,
+  areaConfig,
+});
 shareRef.api = share;
 
 /** クリック位置の経緯度を求める（建物表面 → 地表の順にフォールバック） */
@@ -385,23 +682,30 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
 let restored = null;
 
 (async () => {
-  flyTo(PRESETS.overview, 0);
-  await showBuildings('lod2');
+  if (areaConfig.presets?.overview) flyTo(areaConfig.presets.overview, 0);
+  await showBuildings(initialBuildingMode);
   // 共有URLがあればそちらを優先する（既定の中野駅プリセットへは飛ばさない）
   const hasHash = !!location.hash && location.hash.length > 1;
-  if (!hasHash) flyTo(PRESETS.nakanoSta, 3.0);
-  restored = share.restoreFromHash().catch((e) => {
+  const initialPreset = areaConfig.presets?.nakanoSta
+    || Object.values(areaConfig.presets || {})[0]
+    || null;
+  if (!hasHash && initialPreset) {
+    flyTo(initialPreset, 3.0);
+  }
+  restored = share.restoreFromHash(areaMismatch ? initialHash : location.hash).catch((e) => {
     console.warn('share: restore failed', e);
     return null;
   });
   const state = await restored;
-  if (!state && hasHash) flyTo(PRESETS.nakanoSta, 3.0);
+  if (!state && hasHash && initialPreset) {
+    flyTo(initialPreset, 3.0);
+  }
 })();
 
 // テスト用フック（e2eから内部状態を参照するため）
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
-  diagnosis, overlays, compare, share, toast, shelterLayer,
+  diagnosis, overlays, compare, share, toast, shelterLayer, areaConfig,
   shadeMap: {
     run: (opts) => shadeMapController.run(opts),
     clear: () => shadeMapController.clear(),

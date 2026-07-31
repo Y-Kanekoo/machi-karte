@@ -1,5 +1,8 @@
 // 定数定義（タイルセットURL・プリセット視点・外部データソース）
 
+export const DEFAULT_CITY = '13114';
+export const AREA_INDEX_URL = 'data/area-index.json';
+
 export const TILESETS = {
   bldgLod1:
     'https://assets.cms.plateau.reearth.io/assets/00/0bafbd-0652-4f11-ab1f-ca88d81a98a7/13114_nakano-ku_pref_2025_citygml_1_op_bldg_3dtiles_13114_nakano-ku_lod1/tileset.json',

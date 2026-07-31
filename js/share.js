@@ -1,18 +1,32 @@
 // 共有URL（診断パーマリンク）
 //
 // URLハッシュに診断状態を保存する。形式は URLSearchParams 互換:
-//   #v=1&spot={lon},{lat}&addr={住所}&cam={lon},{lat},{height},{heading},{pitch}&ov={use,fire,height}
-//   #v=1&compare={lon},{lat};{lon},{lat}
+//   #v=1&city={自治体コード}&spot={lon},{lat}&addr={住所}&cam={lon},{lat},{height},{heading},{pitch}&ov={use,fire,height}
+//   #v=1&city={現在の自治体コード}&compare={lon},{lat};...                  （全地点が中野区）
+//   #v=1&city={現在の自治体コード}&compare={自治体コード},{lon},{lat};...   （他エリアを含む）
+// cityなしの比較地点は中野区（13114）として復元する。
 //
 // serializeState / parseHash は DOM・Cesium 非依存の純粋関数（Node単体テスト対象）。
 
-import { OVERLAY_KEYS, COMPARE_MAX, JP_BOUNDS } from './config.js';
+import {
+  OVERLAY_KEYS,
+  COMPARE_MAX,
+  JP_BOUNDS,
+  DEFAULT_CITY,
+} from './config.js';
 
 /** ハッシュのスキーマバージョン。互換性のない変更時にインクリメントする */
 export const SCHEMA_VERSION = 1;
 
 /** 住所文字列の最大長（URL肥大とDoS的な入力を防ぐ） */
 export const ADDR_MAX_LENGTH = 120;
+
+const CITY_CODE_PATTERN = /^\d{5}$/;
+
+/** 自治体コードとして受け付ける形式か */
+export function isValidCityCode(city) {
+  return typeof city === 'string' && CITY_CODE_PATTERN.test(city);
+}
 
 /** 日本国内の緯度経度か（NaN・範囲外の値をURLから受け取らないためのガード） */
 export function isValidLonLat(lon, lat) {
@@ -44,17 +58,22 @@ function clamp(v, min, max) {
  * 状態オブジェクトをハッシュ文字列（先頭の `#` を含まない）へ直列化する。
  *
  * @param {{
+ *   city?: string|null,
  *   spot?: {lon:number, lat:number}|null,
  *   addr?: string|null,
  *   cam?: {lon:number, lat:number, height:number, heading:number, pitch:number}|null,
  *   overlays?: string[]|null,
- *   compare?: Array<{lon:number, lat:number}>|null,
+ *   compare?: Array<{city?:string, lon:number, lat:number}>|null,
  * }} state
  * @returns {string} 例 `v=1&spot=139.665900,35.705600`
  */
 export function serializeState(state) {
   const s = state || {};
   const parts = [`v=${SCHEMA_VERSION}`];
+
+  if (isValidCityCode(s.city)) {
+    parts.push(`city=${s.city}`);
+  }
 
   if (s.spot && isValidLonLat(Number(s.spot.lon), Number(s.spot.lat))) {
     parts.push(`spot=${round6(Number(s.spot.lon))},${round6(Number(s.spot.lat))}`);
@@ -80,11 +99,21 @@ export function serializeState(state) {
   }
 
   if (Array.isArray(s.compare)) {
-    const pts = s.compare
+    const points = s.compare
       .filter((p) => p && isValidLonLat(Number(p.lon), Number(p.lat)))
       .slice(0, COMPARE_MAX)
-      .map((p) => `${round6(Number(p.lon))},${round6(Number(p.lat))}`);
-    if (pts.length) parts.push(`compare=${pts.join(';')}`);
+      .map((p) => {
+        const city = isValidCityCode(p.city) ? p.city : DEFAULT_CITY;
+        return {
+          city,
+          pair: `${round6(Number(p.lon))},${round6(Number(p.lat))}`,
+        };
+      });
+    if (points.length) {
+      const legacyFormat = points.every((p) => p.city === DEFAULT_CITY);
+      const pts = points.map((p) => legacyFormat ? p.pair : `${p.city},${p.pair}`);
+      parts.push(`compare=${pts.join(';')}`);
+    }
   }
 
   return parts.join('&');
@@ -98,12 +127,23 @@ function parsePair(text) {
   return isValidLonLat(lon, lat) ? { lon, lat } : null;
 }
 
+function parseComparePoint(text) {
+  const parts = String(text).split(',');
+  if (parts.length === 2) {
+    const point = parsePair(text);
+    return point ? { city: DEFAULT_CITY, ...point } : null;
+  }
+  if (parts.length !== 3 || !isValidCityCode(parts[0])) return null;
+  const point = parsePair(parts.slice(1).join(','));
+  return point ? { city: parts[0], ...point } : null;
+}
+
 /**
  * ハッシュ文字列を状態オブジェクトへ復元する。
  * 解析できない・意味のある状態を含まない場合は null（呼び出し側は黙って無視する）。
  *
  * @param {string} hash `#v=1&spot=...` でも `v=1&spot=...` でもよい
- * @returns {{spot, addr, cam, overlays, compare}|null}
+ * @returns {{city, spot, addr, cam, overlays, compare}|null}
  */
 export function parseHash(hash) {
   if (typeof hash !== 'string') return null;
@@ -120,7 +160,15 @@ export function parseHash(hash) {
   // 未知のスキーマバージョンは無視する（将来の形式を古いコードが誤読しないため）
   if (q.get('v') !== String(SCHEMA_VERSION)) return null;
 
-  const out = { spot: null, addr: null, cam: null, overlays: [], compare: null };
+  const requestedCity = q.get('city');
+  const out = {
+    city: isValidCityCode(requestedCity) ? requestedCity : DEFAULT_CITY,
+    spot: null,
+    addr: null,
+    cam: null,
+    overlays: [],
+    compare: null,
+  };
 
   if (q.has('spot')) out.spot = parsePair(q.get('spot'));
 
@@ -145,7 +193,7 @@ export function parseHash(hash) {
   if (q.has('compare')) {
     const pts = String(q.get('compare'))
       .split(';')
-      .map(parsePair)
+      .map(parseComparePoint)
       .filter(Boolean)
       .slice(0, COMPARE_MAX);
     if (pts.length) out.compare = pts;
@@ -154,6 +202,46 @@ export function parseHash(hash) {
   // spot / cam / compare のいずれも読めなければ復元する意味がない
   if (!out.spot && !out.cam && !out.compare) return null;
   return out;
+}
+
+/**
+ * `?city=` を現在エリアの `#v=1&city=...` に正規化する。
+ * 既存の共有状態があれば保持し、city以外のクエリパラメータは残す。
+ */
+export function normalizeCityQuery(locationLike, historyLike, city) {
+  const query = new URLSearchParams(String(locationLike?.search || ''));
+  if (!query.has('city')) return false;
+
+  query.delete('city');
+  const state = parseHash(String(locationLike?.hash || '')) || {};
+  const hashBody = serializeState({
+    ...state,
+    city: isValidCityCode(city) ? city : DEFAULT_CITY,
+  });
+  const rest = query.toString();
+  const path = `${String(locationLike?.pathname || '')}${rest ? `?${rest}` : ''}#${hashBody}`;
+  historyLike.replaceState(null, '', path);
+  return true;
+}
+
+/**
+ * ハッシュ内のcityを実際に表示している自治体コードへ置き換える。
+ * 対応表取得失敗や未対応コードのフォールバック後に、画面とURLを一致させるために使う。
+ */
+export function normalizeCityHash(
+  locationLike,
+  historyLike,
+  city,
+  { preserveState = true } = {},
+) {
+  const normalizedCity = isValidCityCode(city) ? city : DEFAULT_CITY;
+  const state = preserveState
+    ? (parseHash(String(locationLike?.hash || '')) || {})
+    : {};
+  const hashBody = serializeState({ ...state, city: normalizedCity });
+  const path = `${String(locationLike?.pathname || '')}${String(locationLike?.search || '')}#${hashBody}`;
+  historyLike.replaceState(null, '', path);
+  return hashBody;
 }
 
 // ---- 以下はブラウザ用（DOM/Cesium 依存） -------------------------------------
@@ -170,7 +258,14 @@ export function parseHash(hash) {
  * }} ctx
  */
 export function initShare(ctx) {
-  const { viewer, diagnosis, overlays = null, compare = null, toast } = ctx;
+  const {
+    viewer,
+    diagnosis,
+    overlays = null,
+    compare = null,
+    toast,
+    areaConfig = null,
+  } = ctx;
   const btn = document.getElementById('shareBtn');
 
   /** 現在のカメラを serialize 用の形に落とす */
@@ -195,6 +290,7 @@ export function initShare(ctx) {
   function buildHash() {
     const r = diagnosis.getLastResult();
     return serializeState({
+      city: areaConfig?.code || DEFAULT_CITY,
       spot: r ? { lon: r.lon, lat: r.lat } : null,
       addr: r?.title || null,
       cam: currentCamera(),
@@ -239,7 +335,11 @@ export function initShare(ctx) {
 
   /** 比較状態を共有するときのハッシュ（compare.js から呼ぶ） */
   function shareCompare(points) {
-    const url = applyHash(serializeState({ compare: points, cam: currentCamera() }));
+    const url = applyHash(serializeState({
+      city: areaConfig?.code || DEFAULT_CITY,
+      compare: points,
+      cam: currentCamera(),
+    }));
     return url;
   }
 
@@ -250,6 +350,12 @@ export function initShare(ctx) {
   async function restoreFromHash(hash = location.hash) {
     const state = parseHash(hash);
     if (!state) return null;
+    if (state.city !== (areaConfig?.code || DEFAULT_CITY)) {
+      console.warn(
+        `share: city mismatch (${state.city} !== ${areaConfig?.code || DEFAULT_CITY})`,
+      );
+      return null;
+    }
 
     if (state.cam) {
       try {
@@ -278,7 +384,7 @@ export function initShare(ctx) {
       // 住所は diagnose 側の renderPlace で escapeHtml を通してから DOM に入る
       await diagnosis.runDiagnosisAt(state.spot.lon, state.spot.lat, {
         title: state.addr || null,
-        fly: false,
+        fly: !state.cam,
       });
     }
     return state;
