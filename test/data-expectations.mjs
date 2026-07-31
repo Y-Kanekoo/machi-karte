@@ -44,6 +44,46 @@ const R2_POINTS = [
   { name: '沼袋',               lon: 139.662,   lat: 35.720 },
 ];
 
+// R4（マルチエリア）で追加した地点。docs/plans/R4.md §1.5 と対応。
+// 2026-07-31 実測期待値（用途地域MVTは全地点 layer=UseDistrict / extent=65536）:
+//   渋谷区道玄坂二丁目       洪水=区域外    rgba=[0,0,0,0]         用途地域=商業地域 80%/800%
+//   渋谷駅ハチ公前付近       洪水=0.5〜3.0m rgba=[255,216,192,255] 用途地域=商業地域 80%/1000%
+//   渋谷区松濤一丁目         洪水=0.5m未満  rgba=[247,245,169,255] 用途地域=第2種中高層住居専用地域 60%/200%
+//   三島市一番町（三島駅南） 洪水=区域外    rgba=[0,0,0,0]         用途地域=近隣商業地域 80%/200%
+//   三島市大場川沿い         洪水=0.5〜3.0m rgba=[255,216,192,255] 用途地域=第2種中高層住居専用地域 60%/200%
+const R4_POINTS = [
+  {
+    name: '渋谷区道玄坂二丁目',
+    lon: 139.698318,
+    lat: 35.659397,
+    useUrl: 'https://assets.cms.plateau.reearth.io/assets/8c/e32d25-4532-43b4-9523-029812474e78/13113_shibuya-ku_pref_2025_citygml_1_op_urf_UseDistrict_mvt_lod1/{z}/{x}/{y}.mvt',
+  },
+  {
+    name: '渋谷駅ハチ公前付近',
+    lon: 139.7006,
+    lat: 35.6595,
+    useUrl: 'https://assets.cms.plateau.reearth.io/assets/8c/e32d25-4532-43b4-9523-029812474e78/13113_shibuya-ku_pref_2025_citygml_1_op_urf_UseDistrict_mvt_lod1/{z}/{x}/{y}.mvt',
+  },
+  {
+    name: '渋谷区松濤一丁目',
+    lon: 139.6926,
+    lat: 35.6595,
+    useUrl: 'https://assets.cms.plateau.reearth.io/assets/8c/e32d25-4532-43b4-9523-029812474e78/13113_shibuya-ku_pref_2025_citygml_1_op_urf_UseDistrict_mvt_lod1/{z}/{x}/{y}.mvt',
+  },
+  {
+    name: '三島市一番町（三島駅南）',
+    lon: 138.912567,
+    lat: 35.124771,
+    useUrl: 'https://assets.cms.plateau.reearth.io/assets/3d/7a1e6b-83b9-459b-9b88-7d0d9fb664a8/22206_mishima-shi_city_2023_citygml_2_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt',
+  },
+  {
+    name: '三島市大場川沿い',
+    lon: 138.9291,
+    lat: 35.0946,
+    useUrl: 'https://assets.cms.plateau.reearth.io/assets/3d/7a1e6b-83b9-459b-9b88-7d0d9fb664a8/22206_mishima-shi_city_2023_citygml_2_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt',
+  },
+];
+
 function rgba(png, px, py) {
   const i = (png.width * py + px) * 4;
   return [png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]];
@@ -88,6 +128,22 @@ for (const p of POINTS) {
     `  ${p.name.padEnd(16)} tile=${t.x}/${t.y} px=(${t.px},${t.py}) rgba=[${c}] → ${cls.rank} (距離 ${cls.distance.toFixed(1)})`
   );
   floodResults[p.name] = { rank: cls.rank, rgba: c };
+}
+
+console.log('\n--- R4検証地点（渋谷区・三島市） ---');
+for (const p of R4_POINTS) {
+  const t = lonLatToPixel(p.lon, p.lat, HAZARD_TILES.floodL2.z);
+  const url = tileUrl(HAZARD_TILES.floodL2.url, t.z, t.x, t.y);
+  const { status, png } = await loadPng(url);
+  if (!png) {
+    console.log(`  ${p.name.padEnd(20)} HTTP ${status} タイルなし → 区域外`);
+    continue;
+  }
+  const c = rgba(png, t.px, t.py);
+  const cls = classifyFloodColor(c);
+  console.log(
+    `  ${p.name.padEnd(20)} tile=${t.x}/${t.y} px=(${t.px},${t.py}) rgba=[${c}] → ${cls.rank} (距離 ${cls.distance.toFixed(1)})`
+  );
 }
 
 // タイル内に実際に含まれる色の分布（凡例表の検証用）
@@ -250,6 +306,29 @@ async function queryMvt(cfg, lon, lat) {
     }
   }
   return out;
+}
+
+console.log('\n--- R4検証地点の用途地域（渋谷区・三島市） ---');
+for (const p of R4_POINTS) {
+  const r = await queryMvt({ url: p.useUrl, z: 16 }, p.lon, p.lat);
+  if (r.status !== 200) {
+    console.log(`  ${p.name.padEnd(20)} HTTP ${r.status}`);
+    continue;
+  }
+  if (!r.hits.length) {
+    console.log(
+      `  ${p.name.padEnd(20)} 該当なし (layers=${r.layerNames} extent=${r.extent} features=${r.nFeatures})`
+    );
+    continue;
+  }
+  for (const h of r.hits) {
+    const props = h.props;
+    console.log(
+      `  ${p.name.padEnd(20)} [${h.layer}] extent=${r.extent} ` +
+      `${props.urf_function} 建蔽率=${props.urf_buildingCoverageRate}% ` +
+      `容積率=${props.urf_floorAreaRate}%`
+    );
+  }
 }
 
 for (const key of ['use', 'fire', 'height']) {
