@@ -3,7 +3,7 @@
 // 配信: PLATEAU Streaming (assets.cms.plateau.reearth.io)
 
 import { HEIGHT_PROP_CANDIDATES, DEFAULT_CITY, QUALITY_PROFILES } from './config.js';
-import { resolveQualityProfile } from './pwa.js';
+import { QUALITY_STORAGE_KEY, resolveQualityProfile } from './pwa.js';
 import {
   parseCityCode,
   loadAreaIndex,
@@ -26,6 +26,7 @@ import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
 import { createShelterLayer } from './shelter.js';
 import { initShadeMap } from './shademap-ui.js';
+import { initBottomSheet } from './bottomsheet.js';
 
 const qualityProfileName = resolveQualityProfile();
 const qualityProfile = QUALITY_PROFILES[qualityProfileName];
@@ -292,6 +293,40 @@ function renderAreaChrome() {
 }
 
 renderAreaChrome();
+
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function saveQualityPreference(profileName) {
+  try {
+    localStorage.setItem(QUALITY_STORAGE_KEY, profileName);
+    return true;
+  } catch (error) {
+    console.warn('表示品質の設定を保存できませんでした', error);
+    return false;
+  }
+}
+
+function initQualityControl() {
+  const selectedProfile = qualityProfileName === 'light' ? 'light' : 'high';
+  const warning = document.getElementById('qualityIosWarning');
+  const ios = isIosDevice();
+  const inputs = document.querySelectorAll('input[name="quality"]');
+
+  for (const input of inputs) {
+    input.checked = input.value === selectedProfile;
+    input.addEventListener('change', () => {
+      if (!input.checked || !saveQualityPreference(input.value)) return;
+      warning.classList.toggle('hidden', !ios || input.value !== 'high');
+      setTimeout(() => location.reload(), 120);
+    });
+  }
+  warning.classList.toggle('hidden', !ios || selectedProfile !== 'high');
+}
+
+initQualityControl();
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -586,6 +621,16 @@ function toast(msg, ms = 2000) {
 }
 if (areaFallbackMessage) toast(areaFallbackMessage, 4000);
 
+let resettingAfterContextLoss = false;
+viewer.scene.canvas.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  if (resettingAfterContextLoss) return;
+  resettingAfterContextLoss = true;
+  toast('メモリ不足のため表示をリセットします', 4000);
+  saveQualityPreference('light');
+  setTimeout(() => location.reload(), 500);
+});
+
 // ---- 街カルテ（地点診断） -------------------------------------------------------
 
 const diagnosis = initDiagnosis({
@@ -597,6 +642,7 @@ const diagnosis = initDiagnosis({
   toast,
   onDiagnosisStart: () => shadeMapController?.abortForDiagnosis(),
 });
+const bottomSheet = initBottomSheet({ diagnosis });
 diagnosis.onClose(() => {
   clearHighlight();
   requestRender();
@@ -751,6 +797,7 @@ let restored = null;
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
   diagnosis, overlays, compare, share, toast, shelterLayer, areaConfig,
+  bottomSheet,
   qualityProfileName, qualityProfile,
   getBuildingState: () => ({ tileset: currentBldg, layerKind: currentBldgKind }),
   shadeMap: {

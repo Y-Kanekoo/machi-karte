@@ -7,6 +7,7 @@ import {
   check,
   equal,
   report,
+  shotPath,
 } from './harness.mjs';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
@@ -85,6 +86,105 @@ try {
   equal('manifestのdisplay', manifest.body?.display, 'standalone');
 } finally {
   await defaultViewer.close();
+}
+
+console.log('\n=== モバイルUI ===');
+const mobileViewer = await launchViewer({
+  viewport: { width: 390, height: 844 },
+  contextOptions: { hasTouch: true, isMobile: true },
+});
+try {
+  const { page } = mobileViewer;
+  await page.waitForFunction(() => !!window.__nakano?.bottomSheet);
+  await page.evaluate(() => {
+    void window.__nakano.diagnosis.runDiagnosisAt(139.6686, 35.7056, {
+      title: '中野駅',
+      fly: false,
+      skipSunlight: true,
+    });
+  });
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)');
+  await page.waitForFunction(
+    () => document.getElementById('diagnosisPanel')?.dataset.sheetState === 'half',
+  );
+
+  const initialSheet = await page.evaluate(() => ({
+    state: window.__nakano.bottomSheet.getState(),
+    bodyOpen: document.body.classList.contains('sheet-open'),
+    role: document.getElementById('diagnosisPanel')?.getAttribute('role'),
+    label: document.getElementById('diagnosisPanel')?.getAttribute('aria-label'),
+    handleRole: document.querySelector('.sheet-handle')?.getAttribute('role'),
+  }));
+  equal('モバイル診断シートの初期状態はhalf', initialSheet.state, 'half');
+  check('診断シート表示中はbodyにsheet-openが付く', initialSheet.bodyOpen);
+  equal('診断シートはdialogロールを持つ', initialSheet.role, 'dialog');
+  equal('診断シートにアクセシブル名がある', initialSheet.label, '街カルテ 診断結果');
+  equal('シートハンドルはbuttonロールを持つ', initialSheet.handleRole, 'button');
+
+  await page.locator('.sheet-handle').dispatchEvent('keydown', { key: 'ArrowDown' });
+  equal(
+    'ハンドル操作でpeekへ遷移する',
+    await page.locator('#diagnosisPanel').getAttribute('data-sheet-state'),
+    'peek',
+  );
+  await page.locator('.sheet-handle').dispatchEvent('keydown', { key: 'ArrowUp' });
+  equal(
+    'ハンドル操作でhalfへ戻る',
+    await page.locator('#diagnosisPanel').getAttribute('data-sheet-state'),
+    'half',
+  );
+  await page.locator('.sheet-handle').dispatchEvent('keydown', { key: 'ArrowUp' });
+  const fullSheet = await page.evaluate(() => {
+    const body = document.getElementById('diagBody');
+    return {
+      state: document.getElementById('diagnosisPanel')?.dataset.sheetState,
+      overflowY: getComputedStyle(body).overflowY,
+    };
+  });
+  equal('ハンドル操作でfullへ遷移する', fullSheet.state, 'full');
+  equal('full状態ではシート内スクロールが有効', fullSheet.overflowY, 'auto');
+
+  await page.locator('.sheet-handle').dispatchEvent('keydown', { key: 'ArrowDown' });
+  const halfSheet = await page.evaluate(() => {
+    const body = document.getElementById('diagBody');
+    return {
+      state: document.getElementById('diagnosisPanel')?.dataset.sheetState,
+      overflowY: getComputedStyle(body).overflowY,
+    };
+  });
+  equal('fullからhalfへ遷移する', halfSheet.state, 'half');
+  equal('half状態ではシート内スクロールが無効', halfSheet.overflowY, 'hidden');
+  await page.screenshot({ path: shotPath('r8a-p2-bottomsheet-half.png') });
+
+  const qualityUi = await page.evaluate(() => ({
+    text: document.getElementById('qualityControl')?.textContent.replace(/\s+/g, ' ').trim(),
+    lightChecked: document.getElementById('qualityLight')?.checked,
+    highChecked: document.getElementById('qualityHigh')?.checked,
+  }));
+  check(
+    '表示品質ラジオに軽量と高画質が表示される',
+    qualityUi.text.includes('表示品質:')
+      && qualityUi.text.includes('軽量（推奨）')
+      && qualityUi.text.includes('高画質'),
+    qualityUi.text,
+  );
+  check('モバイル初期値は軽量ラジオ', qualityUi.lightChecked && !qualityUi.highChecked);
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 180000 }),
+    page.evaluate(() => {
+      const high = document.getElementById('qualityHigh');
+      high.checked = true;
+      high.dispatchEvent(new Event('change', { bubbles: true }));
+    }),
+  ]);
+  equal(
+    '高画質選択をlocalStorageへ保存する',
+    await page.evaluate(() => localStorage.getItem('quality')),
+    'high',
+  );
+} finally {
+  await mobileViewer.close();
 }
 
 console.log('\n=== Service Worker登録 ===');

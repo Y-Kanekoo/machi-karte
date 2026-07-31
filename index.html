@@ -70,6 +70,14 @@
         <input type="range" id="timeSlider" min="6" max="18" step="0.25" value="12">
         <span id="timeLabel">12:00</span>
       </div>
+      <fieldset id="qualityControl" class="quality-control">
+        <legend>表示品質:</legend>
+        <div class="quality-options">
+          <label><input type="radio" id="qualityLight" name="quality" value="light"> 軽量（推奨）</label>
+          <label><input type="radio" id="qualityHigh" name="quality" value="high"> 高画質</label>
+        </div>
+        <p id="qualityIosWarning" class="quality-warning hidden">メモリ制限により強制再読み込みされる場合があります</p>
+      </fieldset>
     </section>
 
     <section id="shadeMapSection">
@@ -166,7 +174,8 @@
     <button id="compareClearBtn" type="button" aria-label="比較をすべて消去">消去</button>
   </div>
 
-  <div id="diagnosisPanel" class="hidden" aria-live="polite">
+  <div id="diagnosisPanel" class="hidden" role="dialog" aria-label="街カルテ 診断結果" aria-live="polite">
+    <button class="sheet-handle" type="button" role="button" aria-label="シートを開閉"></button>
     <div class="info-header">
       <h2>街カルテ</h2>
       <div class="card-actions">

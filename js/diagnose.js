@@ -812,6 +812,7 @@ export function initDiagnosis(ctx) {
     sunlightRecalcProgress = null;
 
     panel.classList.remove('hidden');
+    document.body.classList.add('sheet-open');
     showSearchMsg(''); // 前の診断で出したメッセージを残さない
     clearFloodDepth();  // 前の地点の水面を残さない（日照のレイキャストにも影響させない）
     sectionShell();
@@ -1003,6 +1004,7 @@ export function initDiagnosis(ctx) {
     sunCtx = null;
     sunlightRecalcProgress = null;
     panel.classList.add('hidden');
+    document.body.classList.remove('sheet-open');
     clearPin();
     clearFloodDepth();
     for (const h of closeHandlers) h();

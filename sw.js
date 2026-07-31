@@ -1,4 +1,4 @@
-const VERSION = 'v1';
+const VERSION = 'v2';
 
 const CACHE_NAMES = {
   shell: `shell-${VERSION}`,
@@ -13,6 +13,7 @@ const PRECACHE_URLS = [
   './index.html',
   './style.css',
   './js/area.js',
+  './js/bottomsheet.js',
   './js/compare.js',
   './js/config.js',
   './js/diagnose.js',
