@@ -53,6 +53,7 @@ export function initShadeMap(deps) {
   let runQueue = Promise.resolve();
   let overlayQueue = Promise.resolve();
   let lastOverlayAt = 0;
+  let lastOverlayQueuedAt = 0;
   let lastQueuedOverlay = null;
   let state = {
     running: false,
@@ -95,25 +96,40 @@ export function initShadeMap(deps) {
     context.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   }
 
+  function canvasBoundaries(count) {
+    return Array.from(
+      { length: count + 1 },
+      (_, index) => Math.round(index * CANVAS_SIZE / count)
+    );
+  }
+
   function maximumHours(result) {
     return result.slotCount > 0 ? result.slotCount / 3 : 10;
   }
 
   /**
-   * 指定セルをブロック塗りする。boundsOuterが全セルの外周と一致するため、
-   * (column,row)を等分割するだけで半セルずれなく矩形へ対応する。
+   * 指定セルをレベルのピッチ相当のブロックで塗る。細レベルは同じ領域を
+   * clear後に上塗りするため、未計算領域には直前レベルの粗ブロックが残る。
+   * 共有境界を使い、隣接ブロックの1px重複を避ける。
    */
-  function drawCells(result, cells) {
+  function drawCells(result, cells, levelPitchM = null) {
     const count = Math.round(result.grid.sizeM / result.grid.pitchM) + 1;
+    const boundaries = canvasBoundaries(count);
     const maxHours = maximumHours(result);
     context.save();
     context.globalAlpha = OVERLAY_ALPHA;
     for (const cell of cells) {
-      const x0 = Math.floor(cell.column * CANVAS_SIZE / count);
-      const x1 = Math.ceil((cell.column + 1) * CANVAS_SIZE / count);
-      const canvasRow = count - 1 - cell.row;
-      const y0 = Math.floor(canvasRow * CANVAS_SIZE / count);
-      const y1 = Math.ceil((canvasRow + 1) * CANVAS_SIZE / count);
+      const blockPitchM = Number(levelPitchM ?? cell.level ?? result.grid.pitchM);
+      const factor = Math.max(1, Math.round(blockPitchM / result.grid.pitchM));
+      const columnStart = Math.max(0, Math.round(cell.column - factor / 2));
+      const columnEnd = Math.min(count, Math.round(cell.column + factor / 2));
+      const rowStart = Math.max(0, Math.round(cell.row - factor / 2));
+      const rowEnd = Math.min(count, Math.round(cell.row + factor / 2));
+      const x0 = boundaries[columnStart];
+      const x1 = boundaries[columnEnd];
+      const y0 = boundaries[count - rowEnd];
+      const y1 = boundaries[count - rowStart];
+      context.clearRect(x0, y0, x1 - x0, y1 - y0);
       context.fillStyle = hoursToColor(result.cells[cell.index], maxHours);
       context.fillRect(x0, y0, x1 - x0, y1 - y0);
     }
@@ -129,6 +145,21 @@ export function initShadeMap(deps) {
       result,
       result.grid.cells.filter((cell) => cell.index < computedCount)
     );
+  }
+
+  function isTokenCurrent(token) {
+    return !!token && token.id === generation && !token.cancelled;
+  }
+
+  function hasOverlay() {
+    return !!overlayLayer && viewer.imageryLayers.contains(overlayLayer);
+  }
+
+  function removePendingLayer(layer) {
+    pendingLayers.delete(layer);
+    if (viewer.imageryLayers.contains(layer)) {
+      viewer.imageryLayers.remove(layer, true);
+    }
   }
 
   function waitForPostRender() {
@@ -150,10 +181,11 @@ export function initShadeMap(deps) {
 
   /**
    * canvasのスナップショットを新規レイヤーとして追加し、1描画後に旧レイヤーを外す。
-   * queuedIdが現行世代でない場合は、再実行・クリア後の古い描画なので反映しない。
+   * tokenが現行要求でない場合は、再実行・クリア・中断後の古い描画なので反映しない。
    */
-  async function replaceOverlay(dataUrl, boundsOuter, queuedId) {
-    if (queuedId !== generation) return;
+  async function replaceOverlay(dataUrl, boundsOuter, token) {
+    // add前の検査。キャッシュヒット中の手動中断もここで止める。
+    if (!isTokenCurrent(token)) return false;
     const rectangle = Cesium.Rectangle.fromDegrees(
       boundsOuter.west,
       boundsOuter.south,
@@ -171,10 +203,15 @@ export function initShadeMap(deps) {
     viewer.imageryLayers.raiseToTop(nextLayer);
     await waitForPostRender();
 
-    if (queuedId !== generation) {
-      pendingLayers.delete(nextLayer);
-      viewer.imageryLayers.remove(nextLayer, true);
-      return;
+    // postRender後の検査。待機中にclear・診断・レイヤー切替された場合はpendingを除く。
+    if (!isTokenCurrent(token)) {
+      removePendingLayer(nextLayer);
+      return false;
+    }
+    // 状態確定直前にも検査し、旧要求がoverlayLayerを上書きしないようにする。
+    if (!isTokenCurrent(token)) {
+      removePendingLayer(nextLayer);
+      return false;
     }
 
     const previous = overlayLayer;
@@ -186,20 +223,25 @@ export function initShadeMap(deps) {
     viewer.imageryLayers.raiseToTop(nextLayer);
     state.layerPresent = true;
     lastOverlayAt = performance.now();
+    return true;
   }
 
-  function queueOverlay(result, queuedId, force = false) {
-    if (queuedId !== generation) return overlayQueue;
-    if (!force && performance.now() - lastOverlayAt < FINE_REPLACE_INTERVAL_MS) {
+  function queueOverlay(result, token, force = false) {
+    if (!isTokenCurrent(token)) return overlayQueue;
+    const queuedAt = performance.now();
+    const previousReplacementAt = Math.max(lastOverlayAt, lastOverlayQueuedAt);
+    if (!force && queuedAt - previousReplacementAt < FINE_REPLACE_INTERVAL_MS) {
       return overlayQueue;
     }
     const dataUrl = canvas.toDataURL('image/png');
-    lastQueuedOverlay = `${queuedId}:${result.computedCount}`;
+    lastQueuedOverlay = `${token.id}:${result.computedCount}`;
+    lastOverlayQueuedAt = queuedAt;
     overlayQueue = overlayQueue
-      .catch(() => {})
-      .then(() => replaceOverlay(dataUrl, result.grid.boundsOuter, queuedId))
+      .catch(() => false)
+      .then(() => replaceOverlay(dataUrl, result.grid.boundsOuter, token))
       .catch((error) => {
         console.error('日影マップのオーバーレイ描画に失敗しました', error);
+        return false;
       });
     return overlayQueue;
   }
@@ -214,6 +256,9 @@ export function initShadeMap(deps) {
     }
     pendingLayers.clear();
     state.layerPresent = false;
+    lastOverlayAt = 0;
+    lastOverlayQueuedAt = 0;
+    lastQueuedOverlay = null;
   }
 
   function pickMapCenter() {
@@ -252,6 +297,46 @@ export function initShadeMap(deps) {
     };
   }
 
+  function finishInterrupted(token, sourceResult, options = {}) {
+    const forceZero = options.forceZero === true;
+    const computedCount = forceZero
+      ? 0
+      : Number.isInteger(sourceResult.computedCount) ? sourceResult.computedCount : 0;
+    const raysCompleted = forceZero ? 0 : Number(sourceResult.raysCompleted) || 0;
+    const totalRays = Number(sourceResult.totalRays) || 0;
+    const fraction = totalRays > 0 ? raysCompleted / totalRays : 0;
+    const percent = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
+    const result = {
+      ...sourceResult,
+      completed: false,
+      computedCount,
+      raysCompleted,
+      cacheHit: options.cacheHit === true,
+      cancelReason: token.reason || sourceResult.cancelReason || '中断',
+    };
+
+    if (token.id !== generation) {
+      if (activeToken === token) activeToken = null;
+      return result;
+    }
+    if (computedCount === 0) {
+      removeOverlay();
+      clearCanvas();
+    }
+    state = {
+      ...state,
+      running: false,
+      progress: fraction,
+      status: `中断（${percent}%まで計算済み）`,
+      cacheHit: false,
+      result,
+      layerPresent: hasOverlay(),
+    };
+    if (activeToken === token) activeToken = null;
+    updateUi();
+    return result;
+  }
+
   async function executeRun(token, options) {
     const runId = token.id;
     if (runId !== generation) {
@@ -260,17 +345,7 @@ export function initShadeMap(deps) {
     }
     if (token.cancelled) {
       const result = cancelledBeforeStart(token.reason);
-      state = {
-        ...state,
-        running: false,
-        progress: 0,
-        status: '中断（0%まで計算済み）',
-        cacheHit: false,
-        result,
-      };
-      if (activeToken === token) activeToken = null;
-      updateUi();
-      return result;
+      return finishInterrupted(token, result, { forceZero: true });
     }
 
     const building = getBuildingState();
@@ -279,6 +354,8 @@ export function initShadeMap(deps) {
         ...cancelledBeforeStart(null),
         error: '建物モデルを表示してください',
       };
+      removeOverlay();
+      clearCanvas();
       state = {
         ...state,
         running: false,
@@ -299,6 +376,8 @@ export function initShadeMap(deps) {
         ...cancelledBeforeStart(null),
         error: '画面中心の位置を取得できませんでした',
       };
+      removeOverlay();
+      clearCanvas();
       state = {
         ...state,
         running: false,
@@ -345,15 +424,24 @@ export function initShadeMap(deps) {
     const cached = cache.get(key);
     if (cached) {
       drawAll(cached);
-      await queueOverlay(cached, runId, true);
+      await queueOverlay(cached, token, true);
+      const result = { ...cached, cacheHit: true };
+      if (!isTokenCurrent(token)) {
+        return finishInterrupted(token, result, {
+          forceZero: true,
+          cacheHit: true,
+        });
+      }
       const time = new Date(cached.calculatedAt).toLocaleTimeString('ja-JP', {
         hour: '2-digit',
         minute: '2-digit',
       });
-      const result = { ...cached, cacheHit: true };
-      if (token.id !== generation) {
-        if (activeToken === token) activeToken = null;
-        return result;
+      // 状態確定直前にも世代とキャンセルを確認する。
+      if (!isTokenCurrent(token)) {
+        return finishInterrupted(token, result, {
+          forceZero: true,
+          cacheHit: true,
+        });
       }
       state = {
         ...state,
@@ -362,7 +450,7 @@ export function initShadeMap(deps) {
         status: '計算完了',
         cacheHit: true,
         result,
-        layerPresent: !!overlayLayer,
+        layerPresent: hasOverlay(),
       };
       cacheNotice.textContent = `キャッシュから表示（${time}）`;
       if (activeToken === token) activeToken = null;
@@ -375,6 +463,7 @@ export function initShadeMap(deps) {
       viewer,
       tileset: building.tileset,
     });
+    let fineDrawnCount = 0;
     let result;
     try {
       result = await engine.run({
@@ -387,20 +476,43 @@ export function initShadeMap(deps) {
         isCancelled: () =>
           token.cancelled || token.id !== generation
           || getBuildingState().tileset !== building.tileset,
-        onProgress: (fraction) => {
-          if (token.id === generation) setProgress(fraction);
+        onProgress: (fraction, partial) => {
+          if (!isTokenCurrent(token)) return;
+          setProgress(fraction);
+          if (!partial?.grid || !Number.isInteger(partial.computedCount)) return;
+          const finalLevel = partial.grid.levels.at(-1);
+          if (!finalLevel) return;
+          const finalLevelStart = finalLevel.cumulativeCount - finalLevel.count;
+          if (
+            partial.computedCount < finalLevelStart
+            || partial.computedCount <= fineDrawnCount
+          ) {
+            return;
+          }
+          const completedFineCells = partial.grid.cells.filter(
+            (cell) =>
+              cell.index >= fineDrawnCount
+              && cell.index < partial.computedCount
+          );
+          drawCells(partial, completedFineCells, finalLevel.pitchM);
+          fineDrawnCount = partial.computedCount;
+          state.result = partial;
+          queueOverlay(partial, token);
         },
         onLevelComplete: (level, partial) => {
-          if (token.id !== generation) return;
+          if (!isTokenCurrent(token)) return;
           const currentLevel = partial.grid.levels.find((item) => item.level === level);
           if (!currentLevel) return;
-          const completedCells = currentLevel.newCells.filter(
+          const completedCells = partial.grid.cells.filter(
             (cell) => cell.index < partial.computedCount
           );
-          drawCells(partial, completedCells);
+          drawCells(partial, completedCells, currentLevel.pitchM);
+          if (level === partial.grid.pitchM) {
+            fineDrawnCount = partial.computedCount;
+          }
           state.result = partial;
           // 最終ピッチは完了直後の最終描画で必ず反映するため、ここでは2秒制限を適用する。
-          queueOverlay(partial, runId, level !== partial.grid.pitchM);
+          queueOverlay(partial, token, level !== partial.grid.pitchM);
         },
       });
     } catch (error) {
@@ -420,7 +532,7 @@ export function initShadeMap(deps) {
       cancelReason,
     };
 
-    if (token.id === generation && result.grid && result.computedCount > 0) {
+    if (isTokenCurrent(token) && result.grid && result.computedCount > 0) {
       drawAll({
         ...result,
         grid: result.grid,
@@ -430,16 +542,20 @@ export function initShadeMap(deps) {
       if (lastQueuedOverlay === finalOverlay) {
         await overlayQueue.catch(() => {});
       } else {
-        await queueOverlay(result, runId, true);
+        await queueOverlay(result, token, true);
       }
     } else {
+      if (token.id === generation && result.computedCount === 0) {
+        removeOverlay();
+        clearCanvas();
+      }
       await overlayQueue.catch(() => {});
     }
 
-    // 再実行・建物レイヤー切替・クリア後に完了した旧世代はUIへ反映しない。
-    if (token.id !== generation) {
-      if (activeToken === token) activeToken = null;
-      return finalResult;
+    // 再実行・建物レイヤー切替・クリア後の旧世代、または描画待ち中に
+    // 中断された現行世代は完了状態へ進めない。
+    if (!isTokenCurrent(token)) {
+      return finishInterrupted(token, finalResult);
     }
 
     if (result.completed) {
@@ -452,7 +568,7 @@ export function initShadeMap(deps) {
         status: '計算完了',
         cacheHit: false,
         result: finalResult,
-        layerPresent: !!overlayLayer,
+        layerPresent: hasOverlay(),
       };
     } else {
       const fraction = result.totalRays > 0
@@ -466,7 +582,7 @@ export function initShadeMap(deps) {
         status: result.error || `中断（${percent}%まで計算済み）`,
         cacheHit: false,
         result: finalResult,
-        layerPresent: !!overlayLayer,
+        layerPresent: hasOverlay(),
       };
     }
     if (activeToken === token) activeToken = null;
@@ -541,7 +657,56 @@ export function initShadeMap(deps) {
     return {
       ...state,
       cacheSize: cache.size,
-      layerPresent: !!overlayLayer && viewer.imageryLayers.contains(overlayLayer),
+      layerPresent: hasOverlay(),
+    };
+  }
+
+  /** e2eで描画色とhoursToColorの対応を検証するためのcanvasスナップショット。 */
+  function getCanvasState() {
+    const result = state.result;
+    if (!result?.grid) {
+      return {
+        width: CANVAS_SIZE,
+        height: CANVAS_SIZE,
+        legendHex: SHADE_LEGEND.map((item) => item.hex),
+        transparentPixels: CANVAS_SIZE * CANVAS_SIZE,
+        samples: [],
+      };
+    }
+    const count = Math.round(result.grid.sizeM / result.grid.pitchM) + 1;
+    const boundaries = canvasBoundaries(count);
+    const computedCount = Number.isInteger(result.computedCount)
+      ? result.computedCount
+      : result.grid.cells.length;
+    const samples = result.grid.cells
+      .filter((cell) => cell.index < computedCount)
+      .map((cell) => {
+        const x = Math.floor((boundaries[cell.column] + boundaries[cell.column + 1]) / 2);
+        const canvasRow = count - 1 - cell.row;
+        const y = Math.floor((boundaries[canvasRow] + boundaries[canvasRow + 1]) / 2);
+        const pixel = [...context.getImageData(x, y, 1, 1).data];
+        const actualHex = '#' + pixel.slice(0, 3)
+          .map((channel) => channel.toString(16).padStart(2, '0'))
+          .join('');
+        return {
+          index: cell.index,
+          hours: result.cells[cell.index],
+          expectedHex: hoursToColor(result.cells[cell.index], maximumHours(result)),
+          actualHex,
+          alpha: pixel[3],
+        };
+      });
+    const image = context.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE).data;
+    let transparentPixels = 0;
+    for (let index = 3; index < image.length; index += 4) {
+      if (image[index] === 0) transparentPixels++;
+    }
+    return {
+      width: CANVAS_SIZE,
+      height: CANVAS_SIZE,
+      legendHex: SHADE_LEGEND.map((item) => item.hex),
+      transparentPixels,
+      samples,
     };
   }
 
@@ -559,6 +724,7 @@ export function initShadeMap(deps) {
     clear,
     abort,
     getState,
+    getCanvasState,
     abortForDiagnosis,
     onBuildingLayerChange,
     ensureTop,

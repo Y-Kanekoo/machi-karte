@@ -346,7 +346,7 @@ export class ShadeMapCache {
  * @returns {{run:(options:{
  *   center:{lon:number,lat:number}, sizeM?:number, pitchM?:number,
  *   date?:'winter'|'spring'|'equinox'|'summer', year?:number, frameBudgetMs?:number,
- *   onProgress?:((fraction:number)=>void)|null,
+ *   onProgress?:((fraction:number, partial?:object)=>void)|null,
  *   onLevelComplete?:((level:number, partial:object)=>void)|null,
  *   isCancelled?:(()=>boolean)|null
  * })=>Promise<{
@@ -429,13 +429,15 @@ export function createShadeMapEngine(deps = {}) {
       slotCount,
     });
 
-    const emitProgress = (fraction) => {
+    const emitProgress = (fraction, partial = undefined) => {
       const next = Math.min(1, Math.max(0, fraction));
       if (!(next > lastProgress)) return;
       lastProgress = next;
       if (typeof onProgress !== 'function') return;
       try {
-        onProgress(next);
+        // 第1引数の進捗率は従来どおり。第2引数はUIが精細パス途中を描けるよう
+        // 後方互換で追加した、その時点の確定済みセル数を含む部分結果。
+        onProgress(next, partial);
       } catch (error) {
         console.warn('日影マップの進捗コールバックで例外が発生しました', error);
       }
@@ -552,7 +554,10 @@ export function createShadeMapEngine(deps = {}) {
             doneRays++;
 
             if (measuredAt - frameStarted > frameBudget) {
-              emitProgress(totalRays > 0 ? doneRays / totalRays : computedCount / grid.cells.length);
+              emitProgress(
+                totalRays > 0 ? doneRays / totalRays : computedCount / grid.cells.length,
+                result(false, slotCount)
+              );
               const frame = await nextFrame(raf, cancelledNow);
               if (frame.cancelled || cancelledNow()) return result(false, slotCount);
               frameStarted = now();
@@ -570,7 +575,7 @@ export function createShadeMapEngine(deps = {}) {
         }
       }
 
-      emitProgress(1);
+      emitProgress(1, result(false, slotCount));
       return result(true, slotCount);
     } finally {
       releaseCache();

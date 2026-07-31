@@ -116,8 +116,10 @@ const BLDG_KEYS = { lod1: 'bldgLod1', lod2: 'bldgLod2', lod2notex: 'bldgLod2NoTe
 let currentBldg = null;
 let currentBldgKind = null;
 let shadeMapController = null;
+let buildingLayerRequestGeneration = 0;
 
 async function showBuildings(mode) {
+  const requestGeneration = ++buildingLayerRequestGeneration;
   shadeMapController?.onBuildingLayerChange();
   for (const k of Object.values(BLDG_KEYS)) {
     if (loaded[k]) loaded[k].show = false;
@@ -128,6 +130,10 @@ async function showBuildings(mode) {
   const key = BLDG_KEYS[mode];
   const ts = await getTileset(key);
   if (!ts) return;
+  if (requestGeneration !== buildingLayerRequestGeneration) {
+    if (ts !== currentBldg) ts.show = false;
+    return;
+  }
   ts.show = true;
   currentBldg = ts;
   currentBldgKind = mode;
@@ -409,6 +415,7 @@ window.__nakano = {
     clear: () => shadeMapController.clear(),
     abort: () => shadeMapController.abort(),
     getState: () => shadeMapController.getState(),
+    getCanvasState: () => shadeMapController.getCanvasState(),
   },
   getRestored: () => restored,
 };
