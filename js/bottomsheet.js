@@ -8,6 +8,7 @@ const HALF_RATIO = 0.5;
 const VELOCITY_THRESHOLD = 0.45;
 const CLOSE_DRAG_DISTANCE = 24;
 const MAX_CLOSE_OVERSHOOT = 96;
+const COMPARE_BAR_OFFSET_PROPERTY = '--compare-bar-offset';
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -17,6 +18,7 @@ function clamp(value, min, max) {
 export function initBottomSheet({ diagnosis }) {
   const panel = document.getElementById('diagnosisPanel');
   const handle = panel?.querySelector('.sheet-handle');
+  const compareBar = document.getElementById('compareBar');
   const mobileQuery = globalThis.matchMedia?.(MOBILE_QUERY);
   if (!panel || !handle || !mobileQuery) return null;
 
@@ -30,9 +32,31 @@ export function initBottomSheet({ diagnosis }) {
   let velocity = 0;
   let moved = false;
   let wasOpen = document.body.classList.contains('sheet-open');
+  let compareBarMeasureFrame = null;
 
   function viewportHeight() {
     return globalThis.visualViewport?.height || globalThis.innerHeight;
+  }
+
+  function measureCompareBarOffset() {
+    compareBarMeasureFrame = null;
+    let offset = 0;
+    if (compareBar && !compareBar.classList.contains('hidden')) {
+      const rect = compareBar.getBoundingClientRect();
+      const style = globalThis.getComputedStyle(compareBar);
+      const marginTop = Number.parseFloat(style.marginTop) || 0;
+      // offsetHeightでborderを含む実高さを取り、rect.bottomとの差分から
+      // CSSのbottomと下側marginを含む画面下端までの余白も実測する。
+      const bottomClearance = Math.max(0, globalThis.innerHeight - rect.bottom);
+      const measuredHeight = Math.max(compareBar.offsetHeight, rect.height);
+      offset = Math.ceil(bottomClearance + measuredHeight + marginTop);
+    }
+    document.documentElement.style.setProperty(COMPARE_BAR_OFFSET_PROPERTY, `${offset}px`);
+  }
+
+  function scheduleCompareBarMeasurement() {
+    if (compareBarMeasureFrame !== null) return;
+    compareBarMeasureFrame = requestAnimationFrame(measureCompareBarOffset);
   }
 
   function offsets() {
@@ -161,7 +185,22 @@ export function initBottomSheet({ diagnosis }) {
 
   const observer = new MutationObserver(syncOpenState);
   observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  if (compareBar) {
+    const compareBarObserver = new MutationObserver(scheduleCompareBarMeasurement);
+    compareBarObserver.observe(compareBar, {
+      attributes: true,
+      attributeFilter: ['class'],
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+    if (typeof ResizeObserver === 'function') {
+      const compareBarResizeObserver = new ResizeObserver(scheduleCompareBarMeasurement);
+      compareBarResizeObserver.observe(compareBar);
+    }
+  }
   const syncSize = () => {
+    scheduleCompareBarMeasurement();
     if (mobileQuery.matches && document.body.classList.contains('sheet-open')) setState(state);
   };
   mobileQuery.addEventListener?.('change', syncSize);
@@ -169,6 +208,7 @@ export function initBottomSheet({ diagnosis }) {
   globalThis.addEventListener('resize', syncSize);
 
   panel.dataset.sheetState = state;
+  measureCompareBarOffset();
   return {
     setState,
     getState: () => state,

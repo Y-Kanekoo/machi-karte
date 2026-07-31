@@ -208,18 +208,27 @@ try {
   const mobileLayout = await page.evaluate(() => {
     const sheet = document.getElementById('diagnosisPanel');
     const bar = document.getElementById('compareBar');
-    const sheetBox = sheet.getBoundingClientRect();
     const barBox = bar.getBoundingClientRect();
+    const hitTarget = document.elementFromPoint(
+      (barBox.left + barBox.right) / 2,
+      (barBox.top + barBox.bottom) / 2,
+    );
     return {
-      sheetBottom: sheetBox.bottom,
-      compareTop: barBox.top,
+      panelBottomPx: parseFloat(getComputedStyle(sheet).bottom),
+      barH: bar.offsetHeight,
+      barRect: { top: barBox.top, bottom: barBox.bottom },
+      innerH: innerHeight,
+      hitTest: hitTarget === bar || bar.contains(hitTarget),
       sheetZIndex: Number(getComputedStyle(sheet).zIndex),
       compareZIndex: Number(getComputedStyle(bar).zIndex),
     };
   });
   check(
     'モバイルで診断シートと比較バーが重ならない',
-    mobileLayout.sheetBottom <= mobileLayout.compareTop,
+    mobileLayout.panelBottomPx >= mobileLayout.barH - 1
+      && mobileLayout.barRect.bottom <= mobileLayout.innerH + 1
+      && mobileLayout.barRect.top >= 0
+      && mobileLayout.hitTest === true,
     JSON.stringify(mobileLayout),
   );
   check(

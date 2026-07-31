@@ -1279,17 +1279,12 @@ body.diag-mode #cesiumContainer canvas {
 /* ---- R8a-P2: モバイル診断ボトムシート -------------------------------------- */
 
 @media (max-width: 767px) {
-  :root {
-    --mobile-compare-sheet-offset: 68px;
-  }
-
   #diagnosisPanel {
     --sheet-translate-y: calc(100% - 50vh);
-    --sheet-bottom-offset: 0px;
     position: fixed;
     top: auto;
     right: 0;
-    bottom: var(--sheet-bottom-offset);
+    bottom: var(--compare-bar-offset, 0px);
     left: 0;
     display: flex;
     flex-direction: column;
@@ -1305,11 +1300,6 @@ body.diag-mode #cesiumContainer canvas {
     touch-action: pan-y;
     box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.3);
     z-index: 12;
-  }
-
-  /* 比較バー（z-index: 13）の上までシート下端を移し、双方を操作可能に保つ。 */
-  #compareBar:not(.hidden) ~ #diagnosisPanel {
-    --sheet-bottom-offset: var(--mobile-compare-sheet-offset);
   }
 
   #diagnosisPanel.sheet-dragging {
