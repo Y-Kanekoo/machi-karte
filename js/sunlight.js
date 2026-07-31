@@ -59,9 +59,10 @@ export const ROOF_CLEARANCE = 0.3;
 /**
  * 建物の包絡（_zmax − _zmin）として妥当とみなす最小の高さ（m）。
  * これ未満は縮退した（不正な）包絡とみなし、階数の内挿をやめて一般地点仕様へ落とす。
- * 1.0m 以上あれば上限クランプ `zmax − ROOF_CLEARANCE` が必ず zmin を上回る。
+ * 1.5m 以上なら1階の既定値 `zmin + EYE_HEIGHT` が
+ * 上限クランプ `zmax − ROOF_CLEARANCE` 以下になり、一般地点の初期計算と厳密に一致する。
  */
-export const BUILDING_MIN_SPAN = 1.0;
+export const BUILDING_MIN_SPAN = 1.5;
 /** 地上階数プロパティの実名（P0実測。`地上階数` は実データに存在しない） */
 export const STOREYS_PROPERTY = 'bldg:storeysAboveGround';
 
@@ -176,7 +177,7 @@ function parseStoreys(value) {
  *       h(k) = min(zmin + 1.2 + perFloor×(k−1), zmax − 0.3)   （k = 1..F）
  *       h(屋上) = zmax + 1.2
  *       並びは「屋上 → F階 → … → 1階」（UIのセレクタ順）
- *   - 建物だが zmin/zmax が欠損、または包絡が縮退（zmax − zmin < 1.0m）:
+ *   - 建物だが zmin/zmax が欠損、または包絡が縮退（zmax − zmin < 1.5m）:
  *     一般地点仕様へフォールバック（base を使う。fallback:true）
  *
  * 数値は `parseNumber` で厳格に解釈する（`null`・空文字は 0 ではなく「欠損」）。
@@ -192,7 +193,7 @@ function parseStoreys(value) {
 export function floorHeights(kind, params = {}) {
   const zmin = parseNumber(params.zmin);
   const zmax = parseNumber(params.zmax);
-  // 縮退した包絡（高さ1m未満）は内挿しても意味がないので一般地点仕様へ落とす
+  // 縮退した包絡（高さ1.5m未満）は内挿しても意味がないので一般地点仕様へ落とす
   const hasEnvelope =
     kind === 'building' && zmin !== null && zmax !== null && zmax - zmin >= BUILDING_MIN_SPAN;
 
@@ -243,7 +244,7 @@ export function floorHeights(kind, params = {}) {
     isRoof: true,
   }];
   for (let k = floorCount; k >= 1; k--) {
-    // 上限は屋上面の直下（ROOF_CLEARANCE）。包絡は1.0m以上あるので zmin を下回ることはない
+    // 上限は屋上面の直下（ROOF_CLEARANCE）。包絡は1.5m以上あるので1階既定値もクランプされない
     const h = Math.min(zmin + EYE_HEIGHT + perFloor * (k - 1), zmax - ROOF_CLEARANCE);
     floors.push({ key: 'f' + k, label: `${k}階`, floor: k, height: h, isRoof: false });
   }

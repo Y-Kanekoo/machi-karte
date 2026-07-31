@@ -2,7 +2,7 @@
 // 実行: node test/sunfloor.test.mjs （ブラウザ不要。Cesium/DOM非依存であることの担保も兼ねる）
 //
 // P1.1（レビュー指摘の修正）で追加した境界も対象:
-//   入力の厳格パース（null/空文字を0にしない）・縮退建物（包絡<1.0m）のフォールバック・
+//   入力の厳格パース（null/空文字を0にしない）・縮退建物（包絡<1.5m）のフォールバック・
 //   推定階数の60階クランプ・floorHeightsForFeature（getPropertyスタブ）・
 //   boostTilesetCache の参照カウント
 //
@@ -129,11 +129,12 @@ equal('F=1でも屋上+1階の2択', tiny.floors.length, 2);
 near('F=1の1階 = zmin + 1.2（クランプ前）', byKey(tiny, 'f1').height, 1.2, 1e-9);
 near('F=1の屋上 = zmax + 1.2', byKey(tiny, 'roof').height, 4.7, 1e-9);
 
-// 1m の建物: round(0.25)=0 → max(1, 0) = 1 階。zmin+1.2 > zmax−0.3 なのでクランプが効く
-const flat = floorHeights('building', { zmin: 10, zmax: 11 });
-equal('1mの建物でもF=1（0階にはならない）', flat.floorCount, 1);
-near('zmax−0.3 にクランプされる', byKey(flat, 'f1').height, 10.7, 1e-9);
-check('クランプ後も屋上より低い', byKey(flat, 'f1').height < byKey(flat, 'roof').height);
+// 1.5m の建物: 1階既定値 zmin+1.2 とクランプ上限 zmax−0.3 が厳密に一致する
+const flat = floorHeights('building', { zmin: 10, zmax: 11.5 });
+equal('1.5mの建物でもF=1（0階にはならない）', flat.floorCount, 1);
+near('1階は zmin+1.2 の既定値と一致する', byKey(flat, 'f1').height, 11.2, 1e-9);
+near('1階は zmax−0.3 の上限とも一致する', byKey(flat, 'f1').height, 11.2, 1e-9);
+check('1階は屋上より低い', byKey(flat, 'f1').height < byKey(flat, 'roof').height);
 
 // 2m（<3m）の建物: 2/4.0 = 0.5 → round → 1 階。クランプは効かない
 const low = floorHeights('building', { zmin: 10, zmax: 12 });
@@ -197,7 +198,7 @@ console.log('  ウォームアップ方向: ' + JSON.stringify(
 // 「属性が無い」ことと「値が0である」ことを区別できない。
 // 例えば zmin=null の建物は「0m〜60mの60m級ビル」として内挿されてしまう。
 
-equal('縮退とみなす最小の包絡は1.0m', BUILDING_MIN_SPAN, 1.0);
+equal('縮退とみなす最小の包絡は1.5m', BUILDING_MIN_SPAN, 1.5);
 equal('階数プロパティの上限は60', BUILDING_FLOOR_MAX, 60);
 
 for (const [label, bad] of [['null', null], ['undefined', undefined], ['空文字', ''],
@@ -230,11 +231,11 @@ equal('maxFloorsが空文字なら既定の15階',
 equal('maxFloorsは60階でクランプする',
   floorHeights('ground', { base: 10, maxFloors: 1000 }).floors.length, BUILDING_FLOOR_MAX);
 
-// ---- R3 P1.1: 縮退建物（zmax − zmin < 1.0m）は一般地点仕様へフォールバック -----------------
+// ---- R3 P2.1: 縮退建物（zmax − zmin < 1.5m）は一般地点仕様へフォールバック -----------------
 
 for (const [label, zmin, zmax] of [
   ['0.1m', 50, 50.1],
-  ['0.99m', 10, 10.99],
+  ['1.49m', 10, 11.49],
   ['0m（同値）', 20, 20],
   ['負（zmax<zmin）', 20, 19],
 ]) {
@@ -245,15 +246,14 @@ for (const [label, zmin, zmax] of [
   near(`包絡${label}の1階 = zmin + 1.2`, byKey(r, 'f1').height, zmin + EYE_HEIGHT, 1e-9);
 }
 
-// 境界のちょうど1.0mは建物として扱う（クランプ zmax−0.3 が zmin を上回る下限）
-const span1 = floorHeights('building', { zmin: 10, zmax: 11 });
-equal('包絡ちょうど1.0mは建物として扱う', span1.kind, 'building');
-check('包絡1.0mでも各階は zmin 以上（下限ガード無しで成立）',
-  span1.floors.filter((f) => !f.isRoof).every((f) => f.height >= 10),
-  JSON.stringify(span1.floors.map((f) => f.height)));
+// 境界のちょうど1.5mは建物として扱い、1階は初期計算の zmin+1.2 と厳密に一致する
+const span1_5 = floorHeights('building', { zmin: 10, zmax: 11.5 });
+equal('包絡ちょうど1.5mは建物として扱う', span1_5.kind, 'building');
+near('包絡1.5mの1階は zmin+1.2 と一致する',
+  byKey(span1_5, 'f1').height, 11.2, 1e-9);
 
 // 建物として成立する範囲では、どの階も zmin 以上 zmax−0.3 以下に収まる
-for (const [zmin, zmax, storeys] of [[0, 1, undefined], [37.36, 137.95, 22], [10, 12, 30], [5, 6.2, 3]]) {
+for (const [zmin, zmax, storeys] of [[0, 1.5, undefined], [37.36, 137.95, 22], [10, 12, 30], [5, 6.5, 3]]) {
   const r = floorHeights('building', { zmin, zmax, storeys });
   const inner = r.floors.filter((f) => !f.isRoof);
   check(`包絡${zmax - zmin}mの各階が zmin 以上 zmax−0.3 以下`,

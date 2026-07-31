@@ -12,12 +12,9 @@
 //   page.click が30秒タイムアウトする事象があるため、DOM直叩きと window.__nakano フックで操作する。
 //   建物クリック相当は viewer.scene.pick でフィーチャを拾い、diagnosis.diagnose({picked}) に渡す
 //   （P1実装記録の方法。window.__nakano.viewer / window.__nakano.diagnosis は main.js が既に公開済み
-//   なので、このテストのために main.js へ新規フックを追加する必要はなかった）。
+//   なので、日照の観測値は diagnosis.getSunlightTestState() から読み取る）。
 
 import { launchViewer, waitForViewerReady, check, report, shotPath } from './harness.mjs';
-
-/** js/diagnose.js の recalcSunlight が古い再計算をキャンセルしたときに出す観測用ログ */
-const CANCEL_LOG_PREFIX = '[R3-P2] sun-recalc-cancelled';
 
 /** 従来 prepareTiles のテレポート先（この姿勢が観測されたら回帰） */
 const TELEPORT_HEIGHT = 400;
@@ -28,13 +25,6 @@ const FLYTO_PITCH_DEG = -50;
 
 const t = await launchViewer({ viewport: { width: 1440, height: 900 } });
 const { page } = t;
-
-/** [R3-P2] プレフィックスのconsole.logを集める（キャンセル発生の観測用。P0実装記録と同じ手法） */
-const r3p2Logs = [];
-page.on('console', (m) => {
-  const txt = m.text();
-  if (txt.startsWith('[R3-P2]')) r3p2Logs.push(txt);
-});
 
 /** 指定セクションの取得中スピナーが消えるのを待ってテキストを返す */
 async function waitSection(id, timeout = 180000) {
@@ -234,6 +224,9 @@ try {
     pickInfo.found, JSON.stringify(pickInfo));
   if (!pickInfo.found) throw new Error('建物フィーチャが見つからず F3-1 のテストを継続できない');
 
+  const buildingInitialCount = await page.evaluate(
+    () => window.__nakano.diagnosis.getSunlightTestState().runCount
+  );
   await page.evaluate(({ lon, lat }) => {
     window.__nakano.diagnosis
       .diagnose({ lon, lat, title: null, picked: window.__r3p2Feature, fly: false })
@@ -263,11 +256,15 @@ try {
       totalHours: r?.sunlight?.days?.reduce((a, d) => a + d.hours, 0),
       originHeight: r?.sunlight?.originHeight,
       cancelled: r?.sunlight?.cancelled,
+      runCount: window.__nakano.diagnosis.getSunlightTestState().runCount,
     };
   });
   console.log('  1階（既定）: ' + JSON.stringify(bldg1F));
   check('建物クリックの既定表示でも日照が計算されている（初期表示では再計算しない）',
     bldg1F.raysCast > 50, JSON.stringify(bldg1F));
+  check('建物クリックの初期診断では日照計算を1回だけ実行する',
+    bldg1F.runCount - buildingInitialCount === 1,
+    `before=${buildingInitialCount} after=${bldg1F.runCount}`);
 
   // 屋上へ切り替え → 400msデバウンス後に再計算される
   await page.evaluate(() => {
@@ -332,13 +329,15 @@ try {
 
   // ==== 4. F3-1: セレクタ連打 → 最終選択のみ表示（stale経由）・キャンセルの観測 ====
   console.log('\n--- F3-1: セレクタ連打（デバウンス・キャンセル） ---');
-  r3p2Logs.length = 0; // このセクション用にクリア
 
   // roof 以外の階から2つ選ぶ（現在値は roof なので、まずそれ以外へ切り替えないと change が発火しない）
   const nonRoof = floorOptions.filter((o) => o.value !== 'roof');
   const keyA = nonRoof[0].value;
   const keyB = nonRoof.length > 1 ? nonRoof[Math.floor(nonRoof.length / 2)].value : 'roof';
   console.log(`  keyA=${keyA} keyB=${keyB}`);
+  const cancelBefore = await page.evaluate(
+    () => window.__nakano.diagnosis.getSunlightTestState()
+  );
 
   // 1回目の変更 → デバウンスが明けて計算が「実際に始まる」のを待ってから、
   // 完了前に2回目の変更を挟むことで、進行中の計算を本当にキャンセルさせる
@@ -350,11 +349,21 @@ try {
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   }, keyA);
   await page.waitForFunction(
-    () => !!document.querySelector('#secSun .sun-recalc-status'), null, { timeout: 3000 }
-  ).catch(() => {});
-  // SwiftShaderでの1回のフルスキャン（87本前後）は数秒かかる（実測: rAF間隔約200ms×15チャンク前後）。
-  // 600ms待てば計算開始直後で、完了前に確実に割り込める。
-  await page.waitForTimeout(600);
+    () => {
+      const state = window.__nakano.diagnosis.getSunlightTestState();
+      return state.selectedKey === document.getElementById('sunFloorSelect')?.value
+        && state.recalculationProgress > 0
+        && state.recalculationProgress < 1;
+    },
+    null,
+    { timeout: 10000, polling: 50 }
+  );
+  const movingState = await page.evaluate(
+    () => window.__nakano.diagnosis.getSunlightTestState()
+  );
+  check('1回目の再計算で進捗が動き始めてから2回目を選択する',
+    movingState.recalculationProgress > 0 && movingState.recalculationProgress < 1,
+    JSON.stringify(movingState));
 
   await page.evaluate((k) => {
     const sel = document.getElementById('sunFloorSelect');
@@ -373,28 +382,35 @@ try {
     return {
       selectValue: sel?.value,
       raysCast: r?.sunlight?.raysCast,
+      originHeight: r?.sunlight?.originHeight,
       cancelled: r?.sunlight?.cancelled,
       staleCount: document.querySelectorAll('#secSun .sun-day.stale').length,
+      testState: window.__nakano.diagnosis.getSunlightTestState(),
     };
   });
   console.log('  最終状態: ' + JSON.stringify(finalState));
-  console.log('  観測ログ: ' + JSON.stringify(r3p2Logs));
 
   check('最終選択（2回目に選んだ階）の結果のみが表示される', finalState.selectValue === keyB, JSON.stringify(finalState));
   check('最終表示にstale表示が残っていない', finalState.staleCount === 0, JSON.stringify(finalState));
   check('最終結果はキャンセルされていない（成立したのは最後の選択のみ）',
     finalState.cancelled === false, JSON.stringify(finalState));
   check('最終結果は完走している（レイキャスト十分）', finalState.raysCast > 50, JSON.stringify(finalState));
-  check('1回目の選択（keyA）の再計算がキャンセルされたことが観測される（cancelled===trueの観測）',
-    r3p2Logs.some((l) => l.startsWith(CANCEL_LOG_PREFIX)), JSON.stringify(r3p2Logs));
-
-  const cancelledPayloads = r3p2Logs
-    .filter((l) => l.startsWith(CANCEL_LOG_PREFIX))
-    .map((l) => { try { return JSON.parse(l.slice(CANCEL_LOG_PREFIX.length).trim()); } catch (_) { return null; } })
-    .filter(Boolean);
+  check('1回目の選択（keyA）の再計算がキャンセルされたことをテストフックで観測できる',
+    finalState.testState.cancelledRunCount === cancelBefore.cancelledRunCount + 1,
+    JSON.stringify({ before: cancelBefore, after: finalState.testState }));
   check('キャンセルされた再計算のraysCastは完走時より少ない（raysCast減）',
-    cancelledPayloads.length > 0 && cancelledPayloads.every((c) => c.raysCast < finalState.raysCast),
-    JSON.stringify({ cancelledPayloads, finalRays: finalState.raysCast }));
+    finalState.testState.lastCancelledRaysCast < finalState.raysCast,
+    JSON.stringify({ cancelledRays: finalState.testState.lastCancelledRaysCast, finalRays: finalState.raysCast }));
+  check('連打では1回目と最終選択の2回だけ日照計算を開始する',
+    finalState.testState.runCount === cancelBefore.runCount + 2,
+    JSON.stringify({ before: cancelBefore, after: finalState.testState }));
+  check('最終結果のoriginHeightが最終選択階の期待高さと一致する',
+    Math.abs(finalState.originHeight - finalState.testState.expectedOriginHeight) < 1e-6,
+    JSON.stringify({
+      selectedKey: keyB,
+      originHeight: finalState.originHeight,
+      expectedOriginHeight: finalState.testState.expectedOriginHeight,
+    }));
 
   // ==== 5. F3-1: 一般地点（住所検索）で階を選ぶと注記に視点高さが出る ====
   console.log('\n--- F3-1: 一般地点の階数選択 ---');
@@ -458,7 +474,115 @@ try {
 
   await page.locator('#secSun').screenshot({ path: shotPath('r3-03-sunsection-3f-ground.png') });
 
-  // ==== 6. JSエラー ====
+  // ==== 6. F3-1: 再計算中に新規診断を開始しても新しい診断だけが表示される ====
+  console.log('\n--- F3-1: 再計算中の新規診断 ---');
+  const rediagnoseBefore = await page.evaluate(
+    () => window.__nakano.diagnosis.getSunlightTestState()
+  );
+  await page.evaluate(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    sel.value = 'f5';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForFunction(
+    () => {
+      const p = window.__nakano.diagnosis.getSunlightTestState().recalculationProgress;
+      return p > 0 && p < 1;
+    },
+    null,
+    { timeout: 10000, polling: 50 }
+  );
+  await page.evaluate(() => {
+    window.__nakano.diagnosis.diagnose({
+      lon: 139.671,
+      lat: 35.705,
+      title: '再計算中に開始した新規診断',
+      picked: null,
+      fly: false,
+    }).catch((e) => console.warn('rediagnose failed', e));
+  });
+  await waitSection('secSun', 180000);
+
+  const rediagnosed = await page.evaluate(() => {
+    const r = window.__nakano.diagnosis.getLastResult();
+    return {
+      title: r?.title,
+      lon: r?.lon,
+      lat: r?.lat,
+      originHeight: r?.sunlight?.originHeight,
+      baseHeight: r?.baseHeight?.height,
+      cancelled: r?.sunlight?.cancelled,
+      placeText: document.getElementById('secPlace')?.textContent,
+      selectValue: document.getElementById('sunFloorSelect')?.value,
+      staleCount: document.querySelectorAll('#secSun .sun-day.stale').length,
+      status: !!document.querySelector('#secSun .sun-recalc-status'),
+      days: document.querySelectorAll('#secSun .sun-day').length,
+      cells: document.querySelectorAll('#secSun .sun-bar i').length,
+      testState: window.__nakano.diagnosis.getSunlightTestState(),
+    };
+  });
+  console.log('  新規診断: ' + JSON.stringify(rediagnosed));
+  check('再計算中に開始した新規診断の地点名と座標が最終結果になる',
+    rediagnosed.title === '再計算中に開始した新規診断'
+      && Math.abs(rediagnosed.lon - 139.671) < 1e-9
+      && Math.abs(rediagnosed.lat - 35.705) < 1e-9,
+    JSON.stringify(rediagnosed));
+  check('新規診断の地点名がカードに表示される',
+    rediagnosed.placeText?.includes('再計算中に開始した新規診断'), String(rediagnosed.placeText));
+  check('新規診断は既定の1階を選択し、地面+1.2mで完走する',
+    rediagnosed.selectValue === 'f1'
+      && rediagnosed.cancelled === false
+      && Math.abs(rediagnosed.originHeight - (rediagnosed.baseHeight + 1.2)) < 1e-6,
+    JSON.stringify(rediagnosed));
+  check('新規診断のタイムラインだけが非staleの93セルで表示される',
+    rediagnosed.days === 3 && rediagnosed.cells === 93
+      && rediagnosed.staleCount === 0 && rediagnosed.status === false,
+    JSON.stringify(rediagnosed));
+  check('新規診断の開始で実行中だった再計算がキャンセルされる',
+    rediagnosed.testState.cancelledRunCount === rediagnoseBefore.cancelledRunCount + 1,
+    JSON.stringify({ before: rediagnoseBefore, after: rediagnosed.testState }));
+
+  // ==== 7. F3-1: 再計算中にカードを閉じても例外を出さない ====
+  console.log('\n--- F3-1: 再計算中のカード閉鎖 ---');
+  const closeBefore = await page.evaluate(
+    () => window.__nakano.diagnosis.getSunlightTestState()
+  );
+  const errorsBeforeClose = t.errors.length;
+  await page.evaluate(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    sel.value = 'f3';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForFunction(
+    () => {
+      const p = window.__nakano.diagnosis.getSunlightTestState().recalculationProgress;
+      return p > 0 && p < 1;
+    },
+    null,
+    { timeout: 10000, polling: 50 }
+  );
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+  await page.waitForFunction(
+    (before) => window.__nakano.diagnosis.getSunlightTestState().cancelledRunCount > before,
+    closeBefore.cancelledRunCount,
+    { timeout: 10000, polling: 50 }
+  );
+  const closeState = await page.evaluate(() => ({
+    hidden: document.getElementById('diagnosisPanel').classList.contains('hidden'),
+    testState: window.__nakano.diagnosis.getSunlightTestState(),
+  }));
+  const closeErrors = t.errors.slice(errorsBeforeClose).filter(
+    (e) => e.startsWith('PAGEERROR') || /Unhandled|unhandled|rejection/i.test(e)
+  );
+  console.log('  閉鎖後: ' + JSON.stringify({ ...closeState, closeErrors }));
+  check('再計算中に閉じると診断カードが閉じる', closeState.hidden, JSON.stringify(closeState));
+  check('カード閉鎖で実行中の日照再計算がキャンセルされる',
+    closeState.testState.cancelledRunCount === closeBefore.cancelledRunCount + 1,
+    JSON.stringify({ before: closeBefore, after: closeState.testState }));
+  check('再計算中のカード閉鎖で未処理Promise拒否やページ例外が出ない',
+    closeErrors.length === 0, JSON.stringify(closeErrors));
+
+  // ==== 8. JSエラー ====
   const fatal = t.errors.filter(
     (e) => e.startsWith('PAGEERROR') || /Failed to load module|SyntaxError|is not a function/.test(e)
   );
