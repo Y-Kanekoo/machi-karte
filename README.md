@@ -1,4 +1,4 @@
-# 3D街カルテ — マルチエリア3D都市モデルビューア
+# machi-karte — 3D街カルテ（マルチエリア3D都市モデルビューア）
 
 国土交通省 [Project PLATEAU](https://www.mlit.go.jp/plateau/) の3D都市モデルをストリーミング配信で読み込み、CesiumJSで描画するWebアプリ「**3D街カルテ**」です。対応自治体をURLや画面上のセレクタで切り替えられ、ビルドや3Dデータのダウンロードは不要です。
 
@@ -8,7 +8,7 @@
 
 ## デモ
 
-GitHub Pages: https://y-kanekoo.github.io/nakano-3d/
+GitHub Pages: https://y-kanekoo.github.io/machi-karte/
 
 **初回のみ有効化が必要です**（GitHub Actionsのトークンでは自動有効化できないため）:
 
