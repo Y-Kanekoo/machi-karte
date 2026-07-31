@@ -7,8 +7,6 @@
 // 非公開API（pickFromRay / pickFromRayMostDetailed）は機能検出と try/catch で包み、
 // 利用できない場合も計算全体を例外終了させない。
 //
-// TODO(autonomous): P5で日照計算と日影マップのウォームアップ時刻定数を共有する。
-
 import { jstDate, sampleDay, solarKeyDates, sunPosition } from './solar.js';
 import { MIN_PLAUSIBLE_BASE_HEIGHT, resolveBaseHeight } from './floodviz.js';
 import {
@@ -16,7 +14,12 @@ import {
   DEFAULT_BASE_HEIGHT,
   estimateBaseHeight,
   EYE_HEIGHT,
+  HOUR_END,
+  HOUR_START,
   MIN_SUN_ELEVATION,
+  SAMPLE_STEP_MIN,
+  WARM_UP_CONCURRENCY,
+  WARM_UP_TIMEOUT_MS,
 } from './sunlight.js';
 
 const RAD = Math.PI / 180;
@@ -24,13 +27,9 @@ const METERS_PER_DEGREE = 111320;
 const CENTER_SNAP_M = 10;
 const DEFAULT_FRAME_BUDGET_MS = 8;
 const SAMPLE_BATCH_SIZE = 64;
-const SAMPLE_STEP_MIN = 20;
-const HOUR_START = 7;
-const HOUR_END = 17;
-const WARM_UP_TIMEOUT_MS = 15000;
 const HEIGHT_SAMPLE_TIMEOUT_MS = 15000;
+/** 日影マップでは多原点になるため、朝・南中・夕へ意図的に間引いた専用時刻を使う。 */
 const SHADE_WARM_UP_HOURS_JST = [8, 12, 16];
-const SHADE_WARM_UP_CONCURRENCY = 4;
 const STANDARD_LEVEL_PITCHES_M = [40, 20, 10];
 
 /** 中野駅。日影マップ中心の10mスナップに使う固定原点 */
@@ -647,11 +646,11 @@ async function warmUpMultipleOrigins(scene, grid, height, date, year, isCancelle
     }
 
     const deadline = defaultNow() + WARM_UP_TIMEOUT_MS;
-    for (let start = 0; start < raySpecs.length; start += SHADE_WARM_UP_CONCURRENCY) {
+    for (let start = 0; start < raySpecs.length; start += WARM_UP_CONCURRENCY) {
       if (isCancelled()) return;
       const remaining = deadline - defaultNow();
       if (remaining <= 0) return;
-      const batch = raySpecs.slice(start, start + SHADE_WARM_UP_CONCURRENCY).map((spec) => {
+      const batch = raySpecs.slice(start, start + WARM_UP_CONCURRENCY).map((spec) => {
         try {
           const ray = new Cesium.Ray(
             spec.origin,

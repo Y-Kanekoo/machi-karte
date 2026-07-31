@@ -254,7 +254,9 @@ try {
     return {
       raysCast: r?.sunlight?.raysCast,
       totalHours: r?.sunlight?.days?.reduce((a, d) => a + d.hours, 0),
+      hours: r?.sunlight?.days?.map((d) => d.hours),
       originHeight: r?.sunlight?.originHeight,
+      excludedFeatures: r?.sunlight?.excludedFeatures,
       cancelled: r?.sunlight?.cancelled,
       runCount: window.__nakano.diagnosis.getSunlightTestState().runCount,
     };
@@ -265,6 +267,8 @@ try {
   check('建物クリックの初期診断では日照計算を1回だけ実行する',
     bldg1F.runCount - buildingInitialCount === 1,
     `before=${buildingInitialCount} after=${bldg1F.runCount}`);
+  check('建物クリックの初回日照計算で自建物フィーチャを1件除外する',
+    bldg1F.excludedFeatures === 1, JSON.stringify(bldg1F));
 
   // 屋上へ切り替え → 400msデバウンス後に再計算される
   await page.evaluate(() => {
@@ -326,6 +330,34 @@ try {
     bldgNoteText.includes('視点高さ') && bldgNoteText.includes('屋上'), bldgNoteText.slice(-220));
 
   await page.locator('#diagnosisPanel').screenshot({ path: shotPath('r3-02-card-floor-select.png') });
+
+  await page.evaluate(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    sel.value = 'f1';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForFunction(
+    () => !!document.querySelector('#secSun .sun-recalc-status'), null, { timeout: 3000 }
+  ).catch(() => {});
+  await page.waitForFunction(() => {
+    const sel = document.getElementById('sunFloorSelect');
+    return sel && sel.value === 'f1' && !document.querySelector('#secSun .sun-recalc-status');
+  }, null, { timeout: 60000, polling: 500 });
+  const bldg1FSelectedAgain = await page.evaluate(() => {
+    const sunlight = window.__nakano.diagnosis.getLastResult()?.sunlight;
+    return {
+      hours: sunlight?.days?.map((day) => day.hours),
+      excludedFeatures: sunlight?.excludedFeatures,
+      selectedKey: window.__nakano.diagnosis.getSunlightTestState().selectedKey,
+    };
+  });
+  check('1階→別階→1階と選び直しても各日付のhoursが初回結果と一致する',
+    JSON.stringify(bldg1FSelectedAgain.hours) === JSON.stringify(bldg1F.hours),
+    JSON.stringify({ initial: bldg1F.hours, selectedAgain: bldg1FSelectedAgain.hours }));
+  check('選び直した1階でも自建物フィーチャの除外件数が1件のまま',
+    bldg1FSelectedAgain.selectedKey === 'f1'
+      && bldg1FSelectedAgain.excludedFeatures === 1,
+    JSON.stringify(bldg1FSelectedAgain));
 
   // ==== 4. F3-1: セレクタ連打 → 最終選択のみ表示（stale経由）・キャンセルの観測 ====
   console.log('\n--- F3-1: セレクタ連打（デバウンス・キャンセル） ---');

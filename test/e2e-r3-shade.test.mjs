@@ -656,6 +656,154 @@ try {
     JSON.stringify(diagnosisAborted));
   await page.evaluate(() => window.__nakano.diagnosis.close());
 
+  // ==== 7.1. 階変更→日影中断・建物レイヤー切替で診断文脈を無効化 ====
+  console.log('\n--- R3-RC1: 階変更と建物レイヤー切替 ---');
+  const floorDiagnosisBefore = await page.evaluate(
+    () => window.__nakano.diagnosis.getSunlightTestState().runCount
+  );
+  await page.evaluate(() => {
+    window.__nakano.diagnosis.diagnose({
+      lon: 139.6659,
+      lat: 35.7010,
+      title: '階変更で日影を中断する診断',
+      picked: null,
+      fly: false,
+    }).catch((error) => console.warn('階変更排他テストの診断に失敗しました', error));
+  });
+  await page.waitForFunction(
+    (before) => {
+      const state = window.__nakano.diagnosis.getSunlightTestState();
+      return state.runCount > before
+        && !!window.__nakano.diagnosis.getLastResult()?.sunlight
+        && !!document.getElementById('sunFloorSelect')
+        && !document.querySelector('#secSun .spinner');
+    },
+    floorDiagnosisBefore,
+    { timeout: 180000, polling: 100 }
+  );
+
+  await startRun('__shadeFloorChangeAbort', {
+    sizeM: 100,
+    pitchM: 10,
+    date: 'spring',
+    year: 2038,
+    frameBudgetMs: 40,
+  });
+  await page.waitForFunction(
+    () => {
+      const state = window.__nakano.shadeMap.getState();
+      return state.running && state.progress > 0.005;
+    },
+    null,
+    { timeout: 180000, polling: 50 }
+  );
+  await page.evaluate(() => {
+    const select = document.getElementById('sunFloorSelect');
+    select.value = 'f2';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const floorChangeAborted = await resultOf('__shadeFloorChangeAbort');
+  await page.waitForFunction(
+    () => {
+      const select = document.getElementById('sunFloorSelect');
+      return select?.value === 'f2'
+        && !document.querySelector('#secSun .sun-recalc-status');
+    },
+    null,
+    { timeout: 60000, polling: 100 }
+  );
+  check('日影計算中に階セレクタを変更すると日影マップが自動中断される',
+    floorChangeAborted.completed === false
+      && floorChangeAborted.cancelReason === '診断開始',
+    JSON.stringify(floorChangeAborted));
+
+  await page.evaluate(() => {
+    window.__shadeDiagnosisLayerSwitch = window.__nakano.showBuildings('lod2notex');
+  });
+  await page.evaluate(() => window.__shadeDiagnosisLayerSwitch);
+  const invalidatedDiagnosis = await page.evaluate(() => ({
+    disabled: document.getElementById('sunFloorSelect')?.disabled,
+    note: document.querySelector('#secSun .sun-layer-change-note')?.textContent || '',
+    selectedKey: window.__nakano.diagnosis.getSunlightTestState().selectedKey,
+  }));
+  check('診断表示中の建物レイヤー切替で階セレクタが無効になる',
+    invalidatedDiagnosis.disabled === true, JSON.stringify(invalidatedDiagnosis));
+  check('建物レイヤー切替後の日照注記に再診断の案内が出る',
+    invalidatedDiagnosis.note.includes('建物レイヤーが切り替わったため、再診断してください')
+      && invalidatedDiagnosis.selectedKey === null,
+    JSON.stringify(invalidatedDiagnosis));
+  await page.evaluate(() => window.__nakano.showBuildings('lod2'));
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+
+  // ==== 7.2. 日影開始→診断日照キャンセル・キャッシュブースト復元 ====
+  console.log('\n--- R3-RC1: 日影開始で診断日照をキャンセル ---');
+  const sunlightBeforeShade = await page.evaluate(
+    () => window.__nakano.diagnosis.getSunlightTestState()
+  );
+  await page.evaluate(() => {
+    window.__nakano.diagnosis.diagnose({
+      lon: 139.668,
+      lat: 35.703,
+      title: '日影開始で中断される診断日照',
+      picked: null,
+      fly: false,
+    }).catch((error) => console.warn('診断日照排他テストの開始に失敗しました', error));
+  });
+  await page.waitForFunction(
+    (before) => {
+      const state = window.__nakano.diagnosis.getSunlightTestState();
+      return state.runCount > before
+        && !!document.getElementById('sunPct')
+        && !window.__nakano.diagnosis.getLastResult()?.sunlight;
+    },
+    sunlightBeforeShade.runCount,
+    { timeout: 180000, polling: 20 }
+  );
+  await startRun('__shadeCancelsSunlight', {
+    sizeM: 100,
+    pitchM: 10,
+    date: 'summer',
+    year: 2039,
+    frameBudgetMs: 40,
+  });
+  await page.waitForFunction(
+    (before) =>
+      window.__nakano.diagnosis.getSunlightTestState().cancelledRunCount > before,
+    sunlightBeforeShade.cancelledRunCount,
+    { timeout: 30000, polling: 20 }
+  );
+  await page.waitForFunction(
+    () => window.__nakano.shadeMap.getState().running,
+    null,
+    { timeout: 180000, polling: 50 }
+  );
+  await page.evaluate(() => window.__nakano.shadeMap.abort());
+  const shadeAfterSunlight = await resultOf('__shadeCancelsSunlight');
+  const sunlightAfterShade = await page.evaluate(async () => {
+    const sunlightModule = await import('./js/sunlight.js');
+    return {
+      testState: window.__nakano.diagnosis.getSunlightTestState(),
+      note: document.getElementById('secSun')?.textContent || '',
+      spinner: !!document.querySelector('#secSun .spinner'),
+      stale: document.querySelectorAll('#secSun .sun-day.stale').length,
+      cacheBoostDepth: sunlightModule.tilesetCacheBoostDepth(),
+    };
+  });
+  check('診断日照計算中に日影マップを開始すると診断側がキャンセルされる',
+    sunlightAfterShade.testState.cancelledRunCount
+      === sunlightBeforeShade.cancelledRunCount + 1,
+    JSON.stringify({ before: sunlightBeforeShade, after: sunlightAfterShade }));
+  check('診断日照のキャンセル後は中断理由を表示し、スピナーやstale表示を残さない',
+    sunlightAfterShade.note.includes('日影マップを開始したため、日照計算を中断しました')
+      && !sunlightAfterShade.spinner
+      && sunlightAfterShade.stale === 0,
+    JSON.stringify(sunlightAfterShade));
+  check('双方の計算終了後にタイルキャッシュのブースト深度が0へ戻る',
+    shadeAfterSunlight.completed === false
+      && sunlightAfterShade.cacheBoostDepth === 0,
+    JSON.stringify({ shadeAfterSunlight, sunlightAfterShade }));
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+
   // ==== 8. モバイル幅390pxでのレイアウト ====
   console.log('\n--- F3-2: モバイルレイアウト ---');
   await page.setViewportSize({ width: 390, height: 844 });

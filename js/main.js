@@ -126,10 +126,18 @@ async function showBuildings(mode) {
   }
   currentBldg = null;
   currentBldgKind = null;
-  if (mode === 'none') return;
+  if (mode === 'none') {
+    diagnosis.onBuildingLayerChange();
+    return;
+  }
   const key = BLDG_KEYS[mode];
   const ts = await getTileset(key);
-  if (!ts) return;
+  if (!ts) {
+    if (requestGeneration === buildingLayerRequestGeneration) {
+      diagnosis.onBuildingLayerChange();
+    }
+    return;
+  }
   if (requestGeneration !== buildingLayerRequestGeneration) {
     if (ts !== currentBldg) ts.show = false;
     return;
@@ -138,6 +146,7 @@ async function showBuildings(mode) {
   currentBldg = ts;
   currentBldgKind = mode;
   applyHeightColor();
+  diagnosis.onBuildingLayerChange();
 }
 
 function applyHeightColor() {
@@ -271,6 +280,7 @@ const diagnosis = initDiagnosis({
   buildingTableHtml,
   setStatus,
   toast,
+  onDiagnosisStart: () => shadeMapController?.abortForDiagnosis(),
 });
 diagnosis.onClose(clearHighlight);
 
@@ -282,28 +292,10 @@ shadeMapController = initShadeMap({
     tileset: currentBldg,
     layerKind: currentBldgKind,
   }),
+  cancelDiagnosisSunlight: () => diagnosis.cancelSunlight(
+    '日影マップを開始したため、日照計算を中断しました。'
+  ),
 });
-
-// 公開経路は診断開始前に即時中断する。検索ボタン等、diagnose.js内部から直接始まる
-// 経路は下のMutationObserverでsectionShellの作り直しを検知して補完する。
-for (const method of ['diagnose', 'runDiagnosisAt', 'searchAndDiagnose', 'diagnoseCurrentLocation']) {
-  const original = diagnosis[method].bind(diagnosis);
-  diagnosis[method] = (...args) => {
-    shadeMapController.abortForDiagnosis();
-    return original(...args);
-  };
-}
-const diagBody = document.getElementById('diagBody');
-const diagnosisStartObserver = new MutationObserver((records) => {
-  const started = records.some((record) =>
-    record.target === diagBody
-    && [...record.addedNodes].some((node) =>
-      node.nodeType === Node.ELEMENT_NODE && node.matches?.('.diag-sec[data-sec="place"]')
-    )
-  );
-  if (started) shadeMapController.abortForDiagnosis();
-});
-diagnosisStartObserver.observe(diagBody, { childList: true });
 
 // ---- R2: 避難所レイヤー ----------------------------------------------------------
 // Entityは専用の CustomDataSource に入るので、診断ピン（viewer.entities）とは独立。

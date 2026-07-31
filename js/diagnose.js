@@ -87,7 +87,13 @@ function measuredHeightOf(picked) {
 }
 
 export function initDiagnosis(ctx) {
-  const { viewer, getCurrentBuildingTileset, buildingTableHtml, setStatus } = ctx;
+  const {
+    viewer,
+    getCurrentBuildingTileset,
+    buildingTableHtml,
+    setStatus,
+    onDiagnosisStart = null,
+  } = ctx;
 
   const panel = document.getElementById('diagnosisPanel');
   const body = document.getElementById('diagBody');
@@ -115,6 +121,16 @@ export function initDiagnosis(ctx) {
   let sunlightCancelledRunCount = 0;
   let lastCancelledRaysCast = null;
   let sunlightRecalcProgress = null;
+
+  /** 診断開始・日照再計算開始を同じフックで通知し、日影マップとの排他に使う。 */
+  function notifyDiagnosisStart() {
+    if (typeof onDiagnosisStart !== 'function') return;
+    try {
+      onDiagnosisStart();
+    } catch (e) {
+      console.warn('診断開始フックの実行に失敗しました', e);
+    }
+  }
 
   // ---- ピン --------------------------------------------------------------
 
@@ -534,6 +550,71 @@ export function initDiagnosis(ctx) {
     fill('secSun', selectHtml + status + bars + scale);
   }
 
+  /**
+   * 公開APIから呼べる日照計算のキャンセル。
+   * 初回計算はrunSunlightが捕捉したsunRunToken、再計算はisCurrentRequestを通じて中断する。
+   * 再計算中なら前回の完走結果へ戻し、初回計算中なら中断理由を表示してスピナーを残さない。
+   */
+  function cancelSunlight(message = '日照計算を中断しました。') {
+    const secSun = $('secSun');
+    const wasRunning = !!sunDebounceTimer
+      || !!secSun?.querySelector('.spinner')
+      || !!secSun?.querySelector('.sun-recalc-status');
+
+    sunRunToken++;
+    if (sunDebounceTimer) {
+      clearTimeout(sunDebounceTimer);
+      sunDebounceTimer = null;
+    }
+    sunlightRecalcProgress = null;
+    if (!wasRunning) return false;
+
+    if (sunCtx?.lastResult && sunCtx.alive()) {
+      sunCtx.selectedKey = sunCtx.lastResultKey;
+      fill('secSun', renderSunlight(
+        sunCtx.lastResult,
+        sunCtx.baseInfo,
+        sunCtx.floorCtx,
+        sunCtx.lastResultKey,
+        { recalcError: message }
+      ));
+    } else if (!panel.classList.contains('hidden')) {
+      fill('secSun', `<div class="diag-note sun-cancel-note">${escapeHtml(message)}</div>`);
+    }
+    return true;
+  }
+
+  /**
+   * 建物レイヤー切替時は旧tileset・旧pickedを含む日照文脈を破棄する。
+   * 既存結果は参照用に残すが、階セレクタから再計算できないよう無効化する。
+   */
+  function onBuildingLayerChange() {
+    const message = '建物レイヤーが切り替わったため、再診断してください';
+    const currentSection = $('secSun');
+    const hadSunlightContext = !!sunCtx
+      || !!currentSection?.querySelector('.spinner')
+      || !!currentSection?.querySelector('#sunFloorSelect');
+    cancelSunlight('日照計算を中断しました。');
+    sunCtx = null;
+    sunlightRecalcProgress = null;
+
+    if (panel.classList.contains('hidden') || !hadSunlightContext) return;
+    const secSun = $('secSun');
+    if (!secSun) return;
+    const select = $('sunFloorSelect');
+    if (select) {
+      select.disabled = true;
+    } else {
+      fill('secSun', '');
+    }
+    if (!secSun.querySelector('.sun-layer-change-note')) {
+      secSun.insertAdjacentHTML(
+        'beforeend',
+        `<div class="diag-note sun-layer-change-note">${escapeHtml(message)}</div>`
+      );
+    }
+  }
+
   /** キャンセルされた日照計算をe2eから観測できるよう記録する */
   function recordSunlightCancellation(result) {
     if (!result?.cancelled) return;
@@ -559,6 +640,7 @@ export function initDiagnosis(ctx) {
     const entry = ctx.floorCtx.floors.find((f) => f.key === key);
     if (!entry) return; // 不正な選択値は無視（DOM改変やレース以外では起きない）
     const isCancelled = () => !isCurrentRequest();
+    notifyDiagnosisStart();
     sunlightRecalcProgress = 0;
     renderSunStale(ctx, 0);
 
@@ -679,6 +761,7 @@ export function initDiagnosis(ctx) {
    * @returns {Promise<object>} lastResult（コア項目まで埋まった状態）
    */
   async function diagnose(req) {
+    notifyDiagnosisStart();
     const { lon, lat, title = null, picked = null, fly = true, skipSunlight = false } = req;
     const token = ++runToken;
     const alive = () => token === runToken;
@@ -787,12 +870,18 @@ export function initDiagnosis(ctx) {
 
   async function runSunlight(lon, lat, picked, alive, fly) {
     const tileset = getCurrentBuildingTileset();
-    const isCancelled = () => !alive();
+    const requestToken = sunRunToken;
+    const isCancelled = () => !alive() || requestToken !== sunRunToken;
+    const excludeFeatures = picked ? [picked] : [];
     fill('secSun', '<span class="diag-loading"><span class="spinner"></span>周辺の建物を読み込み中…</span>');
 
     // 先読みのレイ原点に地面高さが要るので、先に地面高さを求める
-    const baseInfo = await estimateBaseHeight(viewer, lon, lat, picked);
-    if (!alive()) return;
+    const estimatedBaseInfo = await estimateBaseHeight(viewer, lon, lat, picked);
+    const resolvedBaseHeight = resolveBaseHeight(estimatedBaseInfo.height, DEFAULT_BASE_HEIGHT);
+    const baseInfo = resolvedBaseHeight === estimatedBaseInfo.height
+      ? estimatedBaseInfo
+      : { height: resolvedBaseHeight, source: '既定値' };
+    if (isCancelled()) return;
 
     // 先読みで読み込んだタイルが計算中に追い出されないよう、
     // 「先読み開始〜日照計算完了」を1つの区間としてキャッシュ上限を引き上げる（R3 P1.1）
@@ -805,15 +894,18 @@ export function initDiagnosis(ctx) {
       preload = await preloadForSunlight(viewer, tileset, lon, lat, baseInfo.height, {
         fly,
         isCancelled,
+        excludeFeatures,
       });
-      if (!alive()) return;
+      if (isCancelled()) return;
 
       fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
       sunlightRunCount++;
       result = await estimateSunlight(viewer, tileset, lon, lat, baseInfo.height, {
         excludeEntities: pinEntity ? [pinEntity] : [],
+        excludeFeatures,
         isCancelled,
         onProgress: (f) => {
+          if (isCancelled()) return;
           const el = $('sunPct');
           if (el) el.textContent = Math.round(f * 100) + '%';
         },
@@ -822,7 +914,7 @@ export function initDiagnosis(ctx) {
       restoreCache();
     }
     recordSunlightCancellation(result);
-    if (!alive() || result.cancelled) return;
+    if (isCancelled() || result.cancelled) return;
     result.preload = preload;
     lastResult.sunlight = result;
     lastResult.baseHeight = baseInfo;
@@ -834,7 +926,7 @@ export function initDiagnosis(ctx) {
     sunCtx = {
       lon, lat, tileset, picked,
       baseInfo, floorCtx, selectedKey: 'f1',
-      excludeFeatures: picked ? [picked] : [],
+      excludeFeatures,
       initialPreload: preload,
       initialPreloadFailed: !!(preload && preload.ok === false),
       lastResult: result,
@@ -1097,6 +1189,10 @@ export function initDiagnosis(ctx) {
       return diagnose({ lon, lat, picked: null, ...opts });
     },
     close,
+    /** 実行中または開始待ちの日照計算だけを中断し、診断カード自体は閉じない。 */
+    cancelSunlight,
+    /** 建物レイヤー切替時に旧タイルセットを参照する日照再計算文脈を無効化する。 */
+    onBuildingLayerChange,
     isActive: () => toggle.checked,
     setActive,
     onClose: (fn) => closeHandlers.push(fn),

@@ -37,9 +37,12 @@ export const EYE_HEIGHT = 1.2;
 /** 地面高さが取得できなかったときの既定値（中野駅周辺の実測 _zmin ≒ 33m に基づく） */
 export const DEFAULT_BASE_HEIGHT = 35;
 
-const SAMPLE_STEP_MIN = 20;
-const HOUR_START = 7;
-const HOUR_END = 17;
+/** 日照・日影計算のサンプリング間隔（分） */
+export const SAMPLE_STEP_MIN = 20;
+/** 日照・日影計算の開始時刻（JST） */
+export const HOUR_START = 7;
+/** 日照・日影計算の終了時刻（JST） */
+export const HOUR_END = 17;
 
 // ---- R3: 階数→高さ変換の定数 ---------------------------------------------------
 

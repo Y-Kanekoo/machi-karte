@@ -25,10 +25,11 @@ const shadeMapCache = new ShadeMapCache(4);
  * 日影マップUIを初期化する。
  *
  * @param {{viewer:object,
- *          getBuildingState:()=>({tileset:object|null,layerKind:string|null})}} deps
+ *          getBuildingState:()=>({tileset:object|null,layerKind:string|null}),
+ *          cancelDiagnosisSunlight?:(()=>void)}} deps
  */
 export function initShadeMap(deps) {
-  const { viewer, getBuildingState } = deps;
+  const { viewer, getBuildingState, cancelDiagnosisSunlight = null } = deps;
   const runButton = document.getElementById('shadeRun');
   const abortButton = document.getElementById('shadeAbort');
   const clearButton = document.getElementById('shadeClear');
@@ -595,6 +596,13 @@ export function initShadeMap(deps) {
    * エンジンrun()が重なることはない。
    */
   function run(options = {}) {
+    if (typeof cancelDiagnosisSunlight === 'function') {
+      try {
+        cancelDiagnosisSunlight();
+      } catch (error) {
+        console.warn('診断日照計算の中断に失敗しました', error);
+      }
+    }
     abortInternal('再実行');
     const token = { id: ++generation, cancelled: false, reason: null };
     activeToken = token;
