@@ -9,8 +9,6 @@ import {
   report,
   shotPath,
 } from './harness.mjs';
-import { chromium } from 'playwright';
-import fs from 'node:fs';
 
 const MEBIBYTE = 1024 * 1024;
 
@@ -188,57 +186,45 @@ try {
 }
 
 console.log('\n=== Service Worker登録 ===');
-let swBrowser;
+const swViewer = await launchViewer({
+  viewport: { width: 1280, height: 720 },
+  goto: false,
+});
 try {
-  const launchOptions = {
-    args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
-  };
-  const chromiumPath = process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium';
-  if (fs.existsSync(chromiumPath)) launchOptions.executablePath = chromiumPath;
-  swBrowser = await chromium.launch(launchOptions);
-} catch (error) {
-  console.warn(`  skip Service Worker対応ブラウザを起動できませんでした: ${error}`);
-}
+  const { page, errors } = swViewer;
+  const registrationAttempt = page.waitForEvent('console', {
+    predicate: (message) => message.type() === 'warning'
+      && message.text().includes('Service Workerを登録できませんでした'),
+    timeout: 20000,
+  }).then(() => true, () => false);
 
-if (swBrowser) {
-  try {
-    const context = await swBrowser.newContext({ viewport: { width: 1280, height: 720 } });
-    const baseOrigin = new URL(BASE_URL).origin;
-    await context.route('**/*', (route) => {
-      const requestOrigin = new URL(route.request().url()).origin;
-      return requestOrigin === baseOrigin ? route.continue() : route.abort();
+  // launchViewerの自動遷移を使わず、noswなしで登録処理を実行させる。
+  await page.goto(BASE_URL, { waitUntil: 'load', timeout: 180000 });
+  const registrationBlocked = await registrationAttempt;
+  await page.waitForFunction(() => !!window.__nakano?.diagnosis);
+  const diagnosisState = await page.evaluate(async () => {
+    const result = await window.__nakano.diagnosis.runDiagnosisAt(139.6686, 35.7056, {
+      title: '中野駅',
+      fly: false,
+      skipSunlight: true,
     });
-    const page = await context.newPage();
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 180000 });
-    const supported = await page.evaluate(() => 'serviceWorker' in navigator);
-    if (!supported) {
-      console.warn('  skip ブラウザがService Workerに対応していません');
-    } else {
-      const swState = await page.evaluate(async () => {
-        try {
-          const registration = await Promise.race([
-            navigator.serviceWorker.ready,
-            new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('登録待ちがタイムアウトしました')), 20000);
-            }),
-          ]);
-          return {
-            active: registration.active?.state === 'activated',
-            scriptURL: registration.active?.scriptURL || '',
-          };
-        } catch (error) {
-          return { active: false, scriptURL: '', error: String(error) };
-        }
-      });
-      check(
-        '素の起動でService Workerが登録・有効化される',
-        swState.active && swState.scriptURL.endsWith('/sw.js'),
-        swState.error || swState.scriptURL,
-      );
-    }
-  } finally {
-    await swBrowser.close();
-  }
+    return {
+      title: result.title,
+      panelVisible: !document.getElementById('diagnosisPanel')?.classList.contains('hidden'),
+    };
+  });
+
+  check(
+    'SW登録はブロック環境でもグレースフルに失敗する',
+    registrationBlocked
+      && errors.length === 0
+      && diagnosisState.title === '中野駅'
+      && diagnosisState.panelVisible,
+    `登録失敗警告=${registrationBlocked}, 未処理エラー=${JSON.stringify(errors)}, `
+      + `診断=${JSON.stringify(diagnosisState)}`,
+  );
+} finally {
+  await swViewer.close();
 }
 
 report('R8a e2e');
