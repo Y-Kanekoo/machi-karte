@@ -121,7 +121,13 @@ function sunDirectionEcef(enuMatrix, azimuthDeg, elevationDeg) {
  * 建物クリック時はその建物の `_zmin`、それ以外は sampleHeightMostDetailed、
  * どちらも取れなければ既定値。
  */
-export async function estimateBaseHeight(viewer, lon, lat, pickedFeature) {
+export async function estimateBaseHeight(
+  viewer,
+  lon,
+  lat,
+  pickedFeature,
+  fallbackHeight = DEFAULT_BASE_HEIGHT,
+) {
   if (pickedFeature) {
     try {
       const zmin = pickedFeature.getProperty('_zmin');
@@ -137,7 +143,8 @@ export async function estimateBaseHeight(viewer, lon, lat, pickedFeature) {
   } catch (e) {
     console.warn('sampleHeightMostDetailed failed', e);
   }
-  return { height: DEFAULT_BASE_HEIGHT, source: '既定値' };
+  const height = Number.isFinite(fallbackHeight) ? fallbackHeight : DEFAULT_BASE_HEIGHT;
+  return { height, source: '既定値' };
 }
 
 // ---- R3 F3-1: 階数 → レイ原点の高さ（純関数） ---------------------------------------

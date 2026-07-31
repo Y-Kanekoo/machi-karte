@@ -25,8 +25,8 @@
   </div>
 
   <div id="controlPanel">
-    <h1>中野区 3Dビューア</h1>
-    <p class="subtitle">PLATEAU 3D都市モデル (2025年度版)</p>
+    <h1 id="areaTitle">中野区 3Dビューア</h1>
+    <p class="subtitle" id="areaSubtitle">PLATEAU 3D都市モデル (2025年度版)</p>
 
     <section>
       <h2>街カルテ（地点診断）</h2>
@@ -36,10 +36,12 @@
 
     <section>
       <h2>建物モデル</h2>
-      <label><input type="radio" name="bldg" value="lod2" checked> LOD2（テクスチャ付き・高精細）</label>
-      <label><input type="radio" name="bldg" value="lod2notex"> LOD2（テクスチャなし）</label>
-      <label><input type="radio" name="bldg" value="lod1"> LOD1（箱型・軽量）</label>
-      <label><input type="radio" name="bldg" value="none"> 非表示</label>
+      <div id="buildingLayers">
+        <label><input type="radio" name="bldg" value="lod2" checked> LOD2（テクスチャ付き・高精細）</label>
+        <label><input type="radio" name="bldg" value="lod2notex"> LOD2（テクスチャなし）</label>
+        <label><input type="radio" name="bldg" value="lod1"> LOD1（箱型・軽量）</label>
+        <label><input type="radio" name="bldg" value="none"> 非表示</label>
+      </div>
       <label class="sub"><input type="checkbox" id="heightColor"> 高さで色分け</label>
       <label class="sub"><input type="checkbox" id="shadows"> 影を表示（日照シミュレーション）</label>
       <div id="timeControl" class="hidden">
@@ -82,9 +84,11 @@
 
     <section>
       <h2>都市計画レイヤー</h2>
-      <label><input type="checkbox" id="ov-use"> 用途地域</label>
-      <label><input type="checkbox" id="ov-fire"> 防火・準防火地域</label>
-      <label><input type="checkbox" id="ov-height"> 高度地区</label>
+      <div id="zoningLayers">
+        <label><input type="checkbox" id="ov-use"> 用途地域</label>
+        <label><input type="checkbox" id="ov-fire"> 防火・準防火地域</label>
+        <label><input type="checkbox" id="ov-height"> 高度地区</label>
+      </div>
       <div id="overlayAlphaRow" class="hidden">
         <label for="overlayAlpha">透明度</label>
         <input type="range" id="overlayAlpha" min="30" max="80" step="5" value="55"
@@ -96,16 +100,20 @@
 
     <section>
       <h2>防災・その他レイヤー</h2>
-      <label><input type="checkbox" id="fldKanda"> 洪水浸水想定（神田川流域・L2）</label>
-      <label><input type="checkbox" id="fldArakawa"> 洪水浸水想定（荒川水系 神田川等・L2）</label>
+      <div id="floodLayers">
+        <label><input type="checkbox" id="fldKanda"> 洪水浸水想定（神田川流域・L2）</label>
+        <label><input type="checkbox" id="fldArakawa"> 洪水浸水想定（荒川水系 神田川等・L2）</label>
+      </div>
       <label><input type="checkbox" id="shelterLayer"> 避難所・避難場所</label>
       <div id="shelterLegend" class="hidden">
         <span class="shelter-key"><i style="background:#5ecb7a"></i>震災時</span>
         <span class="shelter-key"><i style="background:#5aa9f0"></i>水害時</span>
         <span class="shelter-key"><i style="background:#f0a44a"></i>広域</span>
       </div>
-      <label><input type="checkbox" id="tran"> 道路（LOD3）</label>
-      <label><input type="checkbox" id="wtr"> 水部（LOD1）</label>
+      <div id="transportLayers">
+        <label><input type="checkbox" id="tran"> 道路（LOD3）</label>
+        <label><input type="checkbox" id="wtr"> 水部（LOD1）</label>
+      </div>
     </section>
 
     <section>
@@ -116,7 +124,7 @@
 
     <section>
       <h2>スポットへ移動</h2>
-      <div class="presets">
+      <div class="presets" id="presetButtons">
         <button data-preset="nakanoSta">中野駅</button>
         <button data-preset="sunplaza">サンプラザ跡・四季の森</button>
         <button data-preset="broadway">中野ブロードウェイ</button>

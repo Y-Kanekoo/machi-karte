@@ -114,7 +114,8 @@ export function renderTileToCanvas(kind, tile, size = TILE_SIZE) {
  */
 export class ZoningImageryProvider {
   /**
-   * @param {{kind:string, url:string, minimumLevel?:number, maximumLevel?:number, solidColor?:string}} options
+   * @param {{kind:string, url:string, minimumLevel?:number, maximumLevel?:number,
+   *          solidColor?:string, rectangle?:object}} options
    */
   constructor(options) {
     this._kind = options.kind;
@@ -125,8 +126,9 @@ export class ZoningImageryProvider {
     this._tileHeight = TILE_SIZE;
     this._minimumLevel = options.minimumLevel ?? OVERLAY_MIN_LEVEL;
     this._maximumLevel = options.maximumLevel ?? OVERLAY_MAX_LEVEL;
+    const rect = options.rectangle || AREA_RECT;
     this._rectangle = Cesium.Rectangle.fromDegrees(
-      AREA_RECT.west, AREA_RECT.south, AREA_RECT.east, AREA_RECT.north
+      rect.west, rect.south, rect.east, rect.north
     );
     this._errorEvent = new Cesium.Event();
     this._credit = new Cesium.Credit('都市計画決定情報 (Project PLATEAU)');
@@ -230,7 +232,9 @@ function legendItems(key) {
  * @param {{viewer: object}} ctx
  */
 export function initZoningOverlay(ctx) {
-  const { viewer } = ctx;
+  const { viewer, areaConfig = null } = ctx;
+  const zoningTiles = areaConfig?.zoning || ZONING_TILES;
+  const areaRectangle = areaConfig?.rect || AREA_RECT;
   const layers = {};    // key -> Cesium.ImageryLayer
   const providers = {}; // key -> ZoningImageryProvider
   let alpha = OVERLAY_DEFAULT_ALPHA;
@@ -257,7 +261,9 @@ export function initZoningOverlay(ctx) {
               `<div class="legend-row"><span class="swatch" style="background:${it.color}"></span>${escapeHtml(it.label)}</div>`
           )
           .join('');
-        return `<div class="legend-block"><strong>${escapeHtml(ZONING_TILES[k].label)}</strong>${rows}</div>`;
+        return `<div class="legend-block"><strong>${escapeHtml(
+          zoningTiles[k]?.label || ZONING_TILES[k].label,
+        )}</strong>${rows}</div>`;
       })
       .join('');
     legendBox.classList.remove('hidden');
@@ -273,8 +279,16 @@ export function initZoningOverlay(ctx) {
   function setEnabled(key, on) {
     if (!OVERLAY_KEYS.includes(key)) return;
     const checkbox = document.getElementById('ov-' + key);
+    if (!zoningTiles[key]) {
+      if (checkbox) checkbox.checked = false;
+      return;
+    }
     if (on && !layers[key]) {
-      const provider = new ZoningImageryProvider({ kind: key, url: ZONING_TILES[key].url });
+      const provider = new ZoningImageryProvider({
+        kind: key,
+        url: zoningTiles[key].url,
+        rectangle: areaRectangle,
+      });
       // addImageryProvider ではなく ImageryLayer を明示的に作って add する
       // （Cesium 1.130 で確実に通る経路）
       const layer = new Cesium.ImageryLayer(provider, { alpha });
@@ -313,7 +327,12 @@ export function initZoningOverlay(ctx) {
    * （e2eの「最小プロバイダ」チェックから呼ぶ）
    */
   function addSolidTestLayer(color = '#ff00ff') {
-    const provider = new ZoningImageryProvider({ kind: 'use', url: '', solidColor: color });
+    const provider = new ZoningImageryProvider({
+      kind: 'use',
+      url: '',
+      solidColor: color,
+      rectangle: areaRectangle,
+    });
     const layer = new Cesium.ImageryLayer(provider, { alpha });
     viewer.imageryLayers.add(layer);
     return { layer, provider, remove: () => viewer.imageryLayers.remove(layer, true) };

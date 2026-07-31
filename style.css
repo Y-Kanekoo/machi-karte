@@ -60,6 +60,23 @@ html, body, #cesiumContainer {
   color: #cfe3f5;
 }
 
+#controlPanel label.layer-unavailable {
+  color: #8ea3b8;
+  cursor: default;
+}
+
+#controlPanel label.layer-unavailable input {
+  opacity: 0.55;
+}
+
+#controlPanel .unavailable-text {
+  display: block;
+  margin: 2px 0 4px 23px;
+  color: #8ea3b8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 #controlPanel input[type="radio"],
 #controlPanel input[type="checkbox"] {
   margin-right: 6px;

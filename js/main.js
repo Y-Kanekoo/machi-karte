@@ -6,7 +6,9 @@ import { HEIGHT_PROP_CANDIDATES } from './config.js';
 import {
   parseCityCode,
   loadAreaIndex,
+  loadSpots,
   resolveArea,
+  enrichAreaConfig,
   buildNakanoFallback,
 } from './area.js';
 import { escapeHtml } from './util.js';
@@ -20,30 +22,165 @@ import { initShadeMap } from './shademap-ui.js';
 // ---- AreaConfig -------------------------------------------------------------
 
 const requestedCityCode = parseCityCode(location);
-const areaIndex = await loadAreaIndex();
+const [areaIndex, spots] = await Promise.all([loadAreaIndex(), loadSpots()]);
 const resolvedArea = requestedCityCode
-  ? resolveArea(areaIndex, requestedCityCode)
+  ? resolveArea(areaIndex, requestedCityCode, spots)
   : null;
 const unsupportedArea = requestedCityCode === null
   || (areaIndex !== null && resolvedArea === null);
-const areaConfig = resolvedArea || buildNakanoFallback();
+const baseAreaConfig = resolvedArea || buildNakanoFallback(spots);
+const areaConfig = await enrichAreaConfig(baseAreaConfig);
 
-// P2でレイヤーUIを動的生成するまで、既存DOMのキーをAreaConfigへ写像する。
-const kandaFlood = areaConfig.tilesets.fld.find(
-  ({ label }) => label === '神田川流域',
-) || areaConfig.tilesets.fld[0] || null;
-const arakawaFlood = areaConfig.tilesets.fld.find(
-  ({ label }) => label === '荒川水系神田川流域',
-) || areaConfig.tilesets.fld[1] || null;
+const LEGACY_PRESET_LABELS = {
+  nakanoSta: '中野駅',
+  sunplaza: 'サンプラザ跡・四季の森',
+  broadway: '中野ブロードウェイ',
+  araiyakushi: '新井薬師',
+  tetsugakudo: '哲学堂公園',
+  overview: '全体俯瞰',
+};
+
+function floodControl(entry, index) {
+  if (entry.label === '神田川流域') {
+    return {
+      ...entry,
+      id: 'fldKanda',
+      key: 'fldKandaL2',
+      text: '洪水浸水想定（神田川流域・L2）',
+    };
+  }
+  if (entry.label === '荒川水系神田川流域') {
+    return {
+      ...entry,
+      id: 'fldArakawa',
+      key: 'fldArakawaL2',
+      text: '洪水浸水想定（荒川水系 神田川等・L2）',
+    };
+  }
+  return {
+    ...entry,
+    id: `fld-${index}`,
+    key: `fld${index}`,
+    text: `洪水浸水想定（${entry.label}・L2）`,
+  };
+}
+
+const areaFloods = areaConfig.code === '13114'
+  ? [
+    areaConfig.tilesets.fld.find(({ label }) => label === '神田川流域'),
+    areaConfig.tilesets.fld.find(({ label }) => label === '荒川水系神田川流域'),
+  ].filter(Boolean)
+  : areaConfig.tilesets.fld;
+const floodControls = areaFloods.filter((entry) => entry?.url).map(floodControl);
 const tilesetUrls = {
   bldgLod1: areaConfig.tilesets.bldgLod1,
   bldgLod2: areaConfig.tilesets.bldgLod2,
   bldgLod2NoTex: areaConfig.tilesets.bldgLod2NoTex,
-  fldKandaL2: kandaFlood?.url || null,
-  fldArakawaL2: arakawaFlood?.url || null,
+  ...Object.fromEntries(floodControls.map(({ key, url }) => [key, url])),
   tranLod3: areaConfig.tilesets.tranLod3,
   wtrLod1: areaConfig.tilesets.wtrLod1,
 };
+const initialBuildingMode = areaConfig.tilesets.bldgLod2 ? 'lod2' : 'lod1';
+
+function unavailableText() {
+  return '<span class="unavailable-text">このエリアでは提供されていません</span>';
+}
+
+function renderAreaChrome() {
+  if (areaConfig.code !== '13114') {
+    const title = `3D街カルテ — ${areaConfig.name}`;
+    document.title = `${title} | PLATEAU`;
+    document.getElementById('areaTitle').textContent = title;
+    document.getElementById('areaSubtitle').textContent =
+      `PLATEAU 3D都市モデル (${areaConfig.year}年度版)`;
+    document.getElementById('searchInput').placeholder =
+      `住所で診断（例: ${areaConfig.name}○○）`;
+    document.getElementById('attribution').innerHTML =
+      `出典: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">` +
+      `国土交通省 Project PLATEAU</a>（${escapeHtml(areaConfig.name)} 3D都市モデル ` +
+      `${escapeHtml(areaConfig.year)}年度・CC BY 4.0）／` +
+      `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">` +
+      `地理院タイル</a>／` +
+      `<a href="https://catalog.data.metro.tokyo.lg.jp/" target="_blank" rel="noopener">` +
+      `中野区オープンデータ</a>（避難所・避難場所・CC BY 4.0）`;
+  }
+
+  const buildingOptions = [
+    {
+      value: 'lod2',
+      text: 'LOD2（テクスチャ付き・高精細）',
+      available: !!areaConfig.tilesets.bldgLod2,
+    },
+    {
+      value: 'lod2notex',
+      text: 'LOD2（テクスチャなし）',
+      available: !!areaConfig.tilesets.bldgLod2NoTex,
+    },
+    {
+      value: 'lod1',
+      text: 'LOD1（箱型・軽量）',
+      available: !!areaConfig.tilesets.bldgLod1,
+    },
+    { value: 'none', text: '非表示', available: true },
+  ];
+  document.getElementById('buildingLayers').innerHTML = buildingOptions
+    .map(({ value, text, available }) =>
+      `<label${available ? '' : ' class="layer-unavailable"'}>` +
+      `<input type="radio" name="bldg" value="${value}"` +
+      `${value === initialBuildingMode ? ' checked' : ''}${available ? '' : ' disabled'}> ` +
+      `${text}${available ? '' : unavailableText()}</label>`)
+    .join('');
+
+  const zoningLabels = {
+    use: '用途地域',
+    fire: '防火・準防火地域',
+    height: '高度地区',
+  };
+  document.getElementById('zoningLayers').innerHTML = Object.entries(zoningLabels)
+    .map(([key, text]) => {
+      const available = !!areaConfig.zoning[key];
+      return `<label${available ? '' : ' class="layer-unavailable"'}>` +
+        `<input type="checkbox" id="ov-${key}"${available ? '' : ' disabled'}> ${text}` +
+        `${available ? '' : unavailableText()}</label>`;
+    })
+    .join('');
+
+  document.getElementById('floodLayers').innerHTML = floodControls.length
+    ? floodControls
+      .map(({ id, text }) =>
+        `<label><input type="checkbox" id="${escapeHtml(id)}"> ${escapeHtml(text)}</label>`)
+      .join('')
+    : `<label class="layer-unavailable"><input type="checkbox" id="fldUnavailable" disabled> ` +
+      `洪水浸水想定${unavailableText()}</label>`;
+
+  const transportOptions = [
+    {
+      id: 'tran',
+      text: '道路（LOD3）',
+      available: !!areaConfig.tilesets.tranLod3,
+    },
+    {
+      id: 'wtr',
+      text: '水部（LOD1）',
+      available: !!areaConfig.tilesets.wtrLod1,
+    },
+  ];
+  document.getElementById('transportLayers').innerHTML = transportOptions
+    .map(({ id, text, available }) =>
+      `<label${available ? '' : ' class="layer-unavailable"'}>` +
+      `<input type="checkbox" id="${id}"${available ? '' : ' disabled'}> ${text}` +
+      `${available ? '' : unavailableText()}</label>`)
+    .join('');
+
+  document.getElementById('presetButtons').innerHTML = Object.entries(areaConfig.presets || {})
+    .map(([key, preset]) =>
+      `<button data-preset="${escapeHtml(key)}">${escapeHtml(
+        preset.label || LEGACY_PRESET_LABELS[key] || key,
+      )}</button>`)
+    .join('');
+}
+
+renderAreaChrome();
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -221,13 +358,14 @@ document.getElementById('timeSlider').addEventListener('input', (e) => {
 });
 
 const CHECK_LAYERS = {
-  fldKanda: 'fldKandaL2',
-  fldArakawa: 'fldArakawaL2',
+  ...Object.fromEntries(floodControls.map(({ id, key }) => [id, key])),
   tran: 'tranLod3',
   wtr: 'wtrLod1',
 };
 for (const [id, key] of Object.entries(CHECK_LAYERS)) {
-  document.getElementById(id).addEventListener('change', async (e) => {
+  const checkbox = document.getElementById(id);
+  if (!checkbox || checkbox.disabled) continue;
+  checkbox.addEventListener('change', async (e) => {
     if (e.target.checked) {
       const ts = await getTileset(key);
       if (ts) ts.show = true;
@@ -263,7 +401,7 @@ function flyTo(p, duration = 2.0) {
     duration,
   });
 }
-document.querySelectorAll('.presets button').forEach((btn) => {
+document.querySelectorAll('#presetButtons button').forEach((btn) => {
   btn.addEventListener('click', () => {
     const preset = areaConfig.presets?.[btn.dataset.preset];
     if (preset) flyTo(preset);
@@ -436,19 +574,22 @@ let restored = null;
 
 (async () => {
   if (areaConfig.presets?.overview) flyTo(areaConfig.presets.overview, 0);
-  await showBuildings('lod2');
+  await showBuildings(initialBuildingMode);
   // 共有URLがあればそちらを優先する（既定の中野駅プリセットへは飛ばさない）
   const hasHash = !!location.hash && location.hash.length > 1;
-  if (!hasHash && areaConfig.presets?.nakanoSta) {
-    flyTo(areaConfig.presets.nakanoSta, 3.0);
+  const initialPreset = areaConfig.presets?.nakanoSta
+    || Object.values(areaConfig.presets || {})[0]
+    || null;
+  if (!hasHash && initialPreset) {
+    flyTo(initialPreset, 3.0);
   }
   restored = share.restoreFromHash().catch((e) => {
     console.warn('share: restore failed', e);
     return null;
   });
   const state = await restored;
-  if (!state && hasHash && areaConfig.presets?.nakanoSta) {
-    flyTo(areaConfig.presets.nakanoSta, 3.0);
+  if (!state && hasHash && initialPreset) {
+    flyTo(initialPreset, 3.0);
   }
 })();
 

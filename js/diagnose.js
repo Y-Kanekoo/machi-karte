@@ -66,11 +66,11 @@ const SPINNER = '<span class="diag-loading"><span class="spinner"></span>取得�
 /** R3 F3-1: 視点高さセレクタ変更から再計算までのデバウンス（ms） */
 const SUN_RECALC_DEBOUNCE_MS = 400;
 
-/** 対応エリア（中野区周辺）の内側か。区外では建物3Dと日照が使えない旨を出す */
-export function isInServiceArea(lon, lat) {
+/** 対応エリア矩形の内側か。範囲外では建物3Dと日照が使えない旨を出す */
+export function isInServiceArea(lon, lat, rect = AREA_RECT) {
   return (
-    lon >= AREA_RECT.west && lon <= AREA_RECT.east &&
-    lat >= AREA_RECT.south && lat <= AREA_RECT.north
+    lon >= rect.west && lon <= rect.east &&
+    lat >= rect.south && lat <= rect.north
   );
 }
 
@@ -89,11 +89,18 @@ function measuredHeightOf(picked) {
 export function initDiagnosis(ctx) {
   const {
     viewer,
+    areaConfig,
     getCurrentBuildingTileset,
     buildingTableHtml,
     setStatus,
     onDiagnosisStart = null,
   } = ctx;
+  const serviceRect = areaConfig?.rect || AREA_RECT;
+  const serviceAreaName = areaConfig?.name || '中野区';
+  const fallbackGroundHeight = Number.isFinite(areaConfig?.groundHeight)
+    ? areaConfig.groundHeight
+    : DEFAULT_BASE_HEIGHT;
+  const inServiceArea = (lon, lat) => isInServiceArea(lon, lat, serviceRect);
 
   const panel = document.getElementById('diagnosisPanel');
   const body = document.getElementById('diagBody');
@@ -339,6 +346,7 @@ export function initDiagnosis(ctx) {
         '「2週間〜4週間」の色は、自治体により「2週間以上」を意味する場合があります。'
       )}</div>`);
     }
+    parts.push(`<div class="diag-note">浸水想定が公表されていない河川は表示されません。</div>`);
     parts.push(`<div class="diag-note">内水（雨水出水）の浸水想定は本ツール未対応です。` +
       `<a href="${NAKANO_HAZARDMAP_URL}" target="_blank" rel="noopener">中野区ハザードマップ</a>` +
       `をご確認ください。いずれも参考情報であり、避難の判断は必ず公式の発表に従ってください。</div>`);
@@ -421,14 +429,14 @@ export function initDiagnosis(ctx) {
     try {
       const base = Number.isFinite(r.baseHeight?.height)
         ? r.baseHeight
-        : await estimateBaseHeight(viewer, r.lon, r.lat, null);
+        : await estimateBaseHeight(viewer, r.lon, r.lat, null, fallbackGroundHeight);
       r.baseHeight = base;
       showFloodDepth(viewer, {
         lon: r.lon,
         lat: r.lat,
         depthMax: r.flood.depthMax,
         // 建物タイル未読込の地点では 0m（楕円体）が返るので、その場合は既定値に寄せる
-        baseHeight: resolveBaseHeight(base.height, DEFAULT_BASE_HEIGHT),
+        baseHeight: resolveBaseHeight(base.height, fallbackGroundHeight),
       });
     } catch (e) {
       console.warn('flood depth 3D failed', e);
@@ -439,9 +447,14 @@ export function initDiagnosis(ctx) {
   }
 
   function renderZoning(z) {
+    if (z.unavailable) {
+      return '<div class="diag-note">このエリアでは都市計画データが提供されていません</div>';
+    }
     if (z.error) return failMsg(z.error);
     const rows = [];
-    if (z.use) {
+    if (z.use?.unavailable) {
+      rows.push(kvRow('用途地域', 'このエリアでは提供されていません'));
+    } else if (z.use) {
       rows.push(`<div class="diag-badge zone">${escapeHtml(z.use.name || '不明')}</div>`);
       const nums = [];
       if (z.use.coverage != null) nums.push(`建蔽率 ${z.use.coverage}%`);
@@ -451,10 +464,14 @@ export function initDiagnosis(ctx) {
     } else {
       rows.push(`<div class="diag-row"><span class="diag-key">用途地域</span><span class="diag-val">該当なし</span></div>`);
     }
-    rows.push(`<div class="diag-row"><span class="diag-key">防火地域</span><span class="diag-val">${
-      escapeHtml(z.fire?.name || '指定なし')}</span></div>`);
-    rows.push(`<div class="diag-row"><span class="diag-key">高度地区</span><span class="diag-val">${
-      escapeHtml(z.height?.name || '指定なし')}</span></div>`);
+    rows.push(kvRow(
+      '防火地域',
+      z.fire?.unavailable ? 'このエリアでは提供されていません' : z.fire?.name || '指定なし',
+    ));
+    rows.push(kvRow(
+      '高度地区',
+      z.height?.unavailable ? 'このエリアでは提供されていません' : z.height?.name || '指定なし',
+    ));
     if (z.use?.location) {
       rows.push(`<div class="diag-note">告示上の区域名: ${escapeHtml(z.use.location)}</div>`);
     }
@@ -783,7 +800,7 @@ export function initDiagnosis(ctx) {
       flood: null, floodKeizoku: null, floodL1: null,
       landslide: null, shelters: null, zoning: null, sunlight: null,
       buildingHeight: measuredHeightOf(picked),
-      inArea: isInServiceArea(lon, lat),
+      inArea: inServiceArea(lon, lat),
     };
     lastResult = result;
     pushHistory({ title, lon, lat, at: Date.now() });
@@ -832,7 +849,7 @@ export function initDiagnosis(ctx) {
       });
 
     // 都市計画
-    const pZone = queryZoning(lon, lat)
+    const pZone = queryZoning(lon, lat, areaConfig?.zoning)
       .then((r) => { if (alive()) { result.zoning = r; fill('secZoning', renderZoning(r)); } })
       .catch((e) => {
         console.warn('zoning failed', e);
@@ -843,7 +860,9 @@ export function initDiagnosis(ctx) {
     if (skipSunlight) {
       fill('secSun', '<div class="diag-note">日照は未計算です（比較URLからの復元では省略しています）。</div>');
     } else if (!result.inArea) {
-      fill('secSun', failMsg('対応エリア外です（建物3Dは中野区のみ）。日照は計算できません。'));
+      fill('secSun', failMsg(
+        `対応エリア外です（建物3Dは${serviceAreaName}のみ）。日照は計算できません。`,
+      ));
     } else {
       runSunlight(lon, lat, picked, alive, fly).catch((e) => {
         console.warn('sunlight failed', e);
@@ -855,7 +874,11 @@ export function initDiagnosis(ctx) {
       const sec = body.querySelector('[data-sec="building"]');
       if (sec && !picked) {
         sec.classList.remove('hidden');
-        fill('secBuilding', '<div class="diag-note">対応エリア外です（建物3Dは中野区のみ）。ハザードと都市計画は全国のデータで診断しています。</div>');
+        fill(
+          'secBuilding',
+          `<div class="diag-note">対応エリア外です（建物3Dは${escapeHtml(serviceAreaName)}のみ）。` +
+          `ハザードと都市計画は全国のデータで診断しています。</div>`,
+        );
       }
     }
 
@@ -876,8 +899,17 @@ export function initDiagnosis(ctx) {
     fill('secSun', '<span class="diag-loading"><span class="spinner"></span>周辺の建物を読み込み中…</span>');
 
     // 先読みのレイ原点に地面高さが要るので、先に地面高さを求める
-    const estimatedBaseInfo = await estimateBaseHeight(viewer, lon, lat, picked);
-    const resolvedBaseHeight = resolveBaseHeight(estimatedBaseInfo.height, DEFAULT_BASE_HEIGHT);
+    const estimatedBaseInfo = await estimateBaseHeight(
+      viewer,
+      lon,
+      lat,
+      picked,
+      fallbackGroundHeight,
+    );
+    const resolvedBaseHeight = resolveBaseHeight(
+      estimatedBaseInfo.height,
+      fallbackGroundHeight,
+    );
     const baseInfo = resolvedBaseHeight === estimatedBaseInfo.height
       ? estimatedBaseInfo
       : { height: resolvedBaseHeight, source: '既定値' };
@@ -1148,9 +1180,13 @@ export function initDiagnosis(ctx) {
         flyToPoint(lon, lat);
         // diagnose() が検索メッセージを消すので、エリア外の案内はその後に出す
         diagnose({ lon, lat, title: null, picked: null });
-        if (!isInServiceArea(lon, lat)) {
+        if (!inServiceArea(lon, lat)) {
           // エリア外でもハザード・都市計画のタイルは全国分あるので診断自体は実行する
-          showSearchMsg('対応エリア外です（建物3Dは中野区のみ）。ハザードと都市計画のみ診断します', true);
+          showSearchMsg(
+            `対応エリア外です（建物3Dは${serviceAreaName}のみ）。` +
+            'ハザードと都市計画のみ診断します',
+            true,
+          );
         }
       },
       (err) => {
