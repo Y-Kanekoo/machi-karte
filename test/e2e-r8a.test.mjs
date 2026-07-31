@@ -191,7 +191,18 @@ const swViewer = await launchViewer({
   goto: false,
 });
 try {
-  const { page, errors } = swViewer;
+  const { page } = swViewer;
+  const consoleErrors = [];
+  const pageErrors = [];
+  page.on('console', (message) => {
+    const text = message.text();
+    const isExpectedResource404 = text.includes('Failed to load resource')
+      && text.includes('404');
+    if (message.type() === 'error' && !isExpectedResource404) {
+      consoleErrors.push(text.slice(0, 300));
+    }
+  });
+  page.on('pageerror', (error) => pageErrors.push(String(error).slice(0, 400)));
   const registrationAttempt = page.waitForEvent('console', {
     predicate: (message) => message.type() === 'warning'
       && message.text().includes('Service Workerを登録できませんでした'),
@@ -217,10 +228,12 @@ try {
   check(
     'SW登録はブロック環境でもグレースフルに失敗する',
     registrationBlocked
-      && errors.length === 0
+      && consoleErrors.length === 0
+      && pageErrors.length === 0
       && diagnosisState.title === '中野駅'
       && diagnosisState.panelVisible,
-    `登録失敗警告=${registrationBlocked}, 未処理エラー=${JSON.stringify(errors)}, `
+    `登録失敗警告=${registrationBlocked}, コンソールエラー=${JSON.stringify(consoleErrors)}, `
+      + `pageerror=${JSON.stringify(pageErrors)}, `
       + `診断=${JSON.stringify(diagnosisState)}`,
   );
 } finally {
