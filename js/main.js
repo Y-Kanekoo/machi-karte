@@ -9,6 +9,7 @@ import { initShare } from './share.js';
 import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
 import { createShelterLayer } from './shelter.js';
+import { initShadeMap } from './shademap-ui.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -113,18 +114,23 @@ function heightStyle(prop) {
 
 const BLDG_KEYS = { lod1: 'bldgLod1', lod2: 'bldgLod2', lod2notex: 'bldgLod2NoTex' };
 let currentBldg = null;
+let currentBldgKind = null;
+let shadeMapController = null;
 
 async function showBuildings(mode) {
+  shadeMapController?.onBuildingLayerChange();
   for (const k of Object.values(BLDG_KEYS)) {
     if (loaded[k]) loaded[k].show = false;
   }
   currentBldg = null;
+  currentBldgKind = null;
   if (mode === 'none') return;
   const key = BLDG_KEYS[mode];
   const ts = await getTileset(key);
   if (!ts) return;
   ts.show = true;
   currentBldg = ts;
+  currentBldgKind = mode;
   applyHeightColor();
 }
 
@@ -191,6 +197,7 @@ document.querySelectorAll('input[name="imagery"]').forEach((el) => {
     // ImageryLayer.destroy() は provider を壊さないので、毎回新しい層を作って古い層は破棄してよい
     if (baseImageryLayer) viewer.imageryLayers.remove(baseImageryLayer, true);
     baseImageryLayer = next;
+    shadeMapController?.ensureTop();
   });
 });
 
@@ -260,6 +267,37 @@ const diagnosis = initDiagnosis({
   toast,
 });
 diagnosis.onClose(clearHighlight);
+
+// ---- R3: 日影マップ -----------------------------------------------------------
+
+shadeMapController = initShadeMap({
+  viewer,
+  getBuildingState: () => ({
+    tileset: currentBldg,
+    layerKind: currentBldgKind,
+  }),
+});
+
+// 公開経路は診断開始前に即時中断する。検索ボタン等、diagnose.js内部から直接始まる
+// 経路は下のMutationObserverでsectionShellの作り直しを検知して補完する。
+for (const method of ['diagnose', 'runDiagnosisAt', 'searchAndDiagnose', 'diagnoseCurrentLocation']) {
+  const original = diagnosis[method].bind(diagnosis);
+  diagnosis[method] = (...args) => {
+    shadeMapController.abortForDiagnosis();
+    return original(...args);
+  };
+}
+const diagBody = document.getElementById('diagBody');
+const diagnosisStartObserver = new MutationObserver((records) => {
+  const started = records.some((record) =>
+    record.target === diagBody
+    && [...record.addedNodes].some((node) =>
+      node.nodeType === Node.ELEMENT_NODE && node.matches?.('.diag-sec[data-sec="place"]')
+    )
+  );
+  if (started) shadeMapController.abortForDiagnosis();
+});
+diagnosisStartObserver.observe(diagBody, { childList: true });
 
 // ---- R2: 避難所レイヤー ----------------------------------------------------------
 // Entityは専用の CustomDataSource に入るので、診断ピン（viewer.entities）とは独立。
@@ -366,5 +404,11 @@ let restored = null;
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
   diagnosis, overlays, compare, share, toast, shelterLayer,
+  shadeMap: {
+    run: (opts) => shadeMapController.run(opts),
+    clear: () => shadeMapController.clear(),
+    abort: () => shadeMapController.abort(),
+    getState: () => shadeMapController.getState(),
+  },
   getRestored: () => restored,
 };
