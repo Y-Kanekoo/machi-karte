@@ -263,9 +263,26 @@ try {
       high.dispatchEvent(new Event('change', { bubbles: true }));
     }),
   ]);
+  const readQualityFromLocalStorage = async () => {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await page.waitForFunction(
+          () => document.readyState === 'complete',
+          { timeout: 30000 },
+        );
+        return await page.evaluate(() => localStorage.getItem('quality'));
+      } catch (error) {
+        if (!String(error).includes('Execution context was destroyed') || attempt === 3) {
+          throw error;
+        }
+        await page.waitForTimeout(300);
+      }
+    }
+    throw new Error('localStorageの読み取りに失敗しました');
+  };
   equal(
     '高画質選択をlocalStorageへ保存する',
-    await page.evaluate(() => localStorage.getItem('quality')),
+    await readQualityFromLocalStorage(),
     'high',
   );
 } finally {
