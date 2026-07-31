@@ -514,7 +514,8 @@ export function initDiagnosis(ctx) {
       + `読み込み済みの建物のみを考慮した簡易計算です（地形・未読込の建物・樹木は考慮しません）。`
       + `太陽高度${MIN_SUN_ELEVATION}度未満は日照に数えません。地面高さ ${baseInfo.height.toFixed(1)}m（${baseInfo.source}）。`
       + preloadNote(result.preload)
-      + floorNoteText(result, floorCtx, resultKey);
+      + floorNoteText(result, floorCtx, resultKey)
+      + `区外の建物・樹木等は考慮しておらず、参考情報のため法的な検討には使用できません。`;
     const warn = result.error ? `<div class="diag-fail">${escapeHtml(result.error)}</div>` : '';
     const recalcWarn = recalcError
       ? `<div class="diag-note sun-recalc-error">${escapeHtml(recalcError)}</div>`
