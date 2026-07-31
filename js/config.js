@@ -3,16 +3,18 @@
 export const DEFAULT_CITY = '13114';
 export const AREA_INDEX_URL = 'data/area-index.json';
 
-// 表示品質。defaultはR8a以前のPC向け設定値をそのまま明示する。
+// 表示品質。defaultとhighはR8a以前のPC向け設定値をそのまま使う。
+const PC_QUALITY_PROFILE = {
+  initialBuildingMode: 'lod2',
+  maximumScreenSpaceError: 16,
+  cacheBytes: 512 * 1024 * 1024,
+  dynamicScreenSpaceError: false,
+  resolutionScale: 1,
+  requestRenderMode: false,
+};
+
 export const QUALITY_PROFILES = {
-  default: {
-    initialBuildingMode: 'lod2',
-    maximumScreenSpaceError: 16,
-    cacheBytes: 512 * 1024 * 1024,
-    dynamicScreenSpaceError: false,
-    resolutionScale: 1,
-    requestRenderMode: false,
-  },
+  default: { ...PC_QUALITY_PROFILE },
   light: {
     initialBuildingMode: 'lod1',
     maximumScreenSpaceError: 24,
@@ -23,14 +25,7 @@ export const QUALITY_PROFILES = {
     requestRenderMode: true,
     maximumRenderTimeChange: 0.5,
   },
-  high: {
-    initialBuildingMode: 'lod2',
-    maximumScreenSpaceError: 16,
-    cacheBytes: 256 * 1024 * 1024,
-    dynamicScreenSpaceError: true,
-    resolutionScale: Math.min(globalThis.devicePixelRatio ?? 1, 2),
-    requestRenderMode: true,
-  },
+  high: { ...PC_QUALITY_PROFILE },
 };
 
 export const TILESETS = {

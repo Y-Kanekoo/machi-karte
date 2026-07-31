@@ -95,6 +95,7 @@ export function initDiagnosis(ctx) {
     getCurrentBuildingTileset,
     buildingTableHtml,
     setStatus,
+    requestRender = () => {},
     onDiagnosisStart = null,
   } = ctx;
   const serviceRect = resolveServiceRect(areaConfig);
@@ -171,6 +172,7 @@ export function initDiagnosis(ctx) {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
+    requestRender();
     return pinEntity;
   }
 
@@ -178,6 +180,7 @@ export function initDiagnosis(ctx) {
     if (pinEntity) {
       viewer.entities.remove(pinEntity);
       pinEntity = null;
+      requestRender();
     }
   }
 
@@ -442,6 +445,7 @@ export function initDiagnosis(ctx) {
   async function toggleFloodDepth(btn) {
     if (isFloodDepthVisible()) {
       clearFloodDepth();
+      requestRender();
       updateFloodDepthButton();
       return;
     }
@@ -460,6 +464,7 @@ export function initDiagnosis(ctx) {
         // 建物タイル未読込の地点では 0m（楕円体）が返るので、その場合は既定値に寄せる
         baseHeight: resolveBaseHeight(base.height, fallbackGroundHeight),
       });
+      requestRender();
     } catch (e) {
       console.warn('flood depth 3D failed', e);
     } finally {
@@ -815,6 +820,7 @@ export function initDiagnosis(ctx) {
     document.body.classList.add('sheet-open');
     showSearchMsg(''); // 前の診断で出したメッセージを残さない
     clearFloodDepth();  // 前の地点の水面を残さない（日照のレイキャストにも影響させない）
+    requestRender();
     sectionShell();
     fill('secPlace', renderPlace(lon, lat, title));
     setPin(lon, lat, title || '診断地点');
@@ -1007,6 +1013,7 @@ export function initDiagnosis(ctx) {
     document.body.classList.remove('sheet-open');
     clearPin();
     clearFloodDepth();
+    requestRender();
     for (const h of closeHandlers) h();
   }
 

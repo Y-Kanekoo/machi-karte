@@ -934,7 +934,8 @@ body.diag-mode #cesiumContainer canvas {
 }
 
 /* トースト */
-#toast {
+#toast,
+#swUpdateToast {
   position: absolute;
   bottom: 64px;
   left: 50%;
@@ -952,14 +953,16 @@ body.diag-mode #cesiumContainer canvas {
   text-align: center;
 }
 
-#toast.update-toast {
+#swUpdateToast {
+  bottom: 108px;
   display: flex;
   align-items: center;
   gap: 12px;
   pointer-events: auto;
+  z-index: 31;
 }
 
-#toast .update-reload-button {
+#swUpdateToast .update-reload-button {
   border: 1px solid rgba(127, 196, 255, 0.7);
   border-radius: 999px;
   padding: 4px 10px;
@@ -971,7 +974,7 @@ body.diag-mode #cesiumContainer canvas {
   white-space: nowrap;
 }
 
-#toast .update-reload-button:focus-visible {
+#swUpdateToast .update-reload-button:focus-visible {
   outline: 2px solid #7fc4ff;
   outline-offset: 2px;
 }
@@ -1259,13 +1262,11 @@ body.diag-mode #cesiumContainer canvas {
     padding: 6px 10px;
     gap: 7px;
   }
-  /* 比較バーが出ているときは診断カードを押し上げて重ならないようにする */
-  #compareBar:not(.hidden) ~ #diagnosisPanel {
-    bottom: 68px;
-    max-height: 46%;
-  }
   #toast {
     bottom: 78px;
+  }
+  #swUpdateToast {
+    bottom: 126px;
   }
   .cmp-panel {
     padding: 10px 12px 12px;
@@ -1278,13 +1279,17 @@ body.diag-mode #cesiumContainer canvas {
 /* ---- R8a-P2: モバイル診断ボトムシート -------------------------------------- */
 
 @media (max-width: 767px) {
-  #diagnosisPanel,
-  #compareBar:not(.hidden) ~ #diagnosisPanel {
+  :root {
+    --mobile-compare-sheet-offset: 68px;
+  }
+
+  #diagnosisPanel {
     --sheet-translate-y: calc(100% - 50vh);
+    --sheet-bottom-offset: 0px;
     position: fixed;
     top: auto;
     right: 0;
-    bottom: 0;
+    bottom: var(--sheet-bottom-offset);
     left: 0;
     display: flex;
     flex-direction: column;
@@ -1299,6 +1304,12 @@ body.diag-mode #cesiumContainer canvas {
     transition: transform 0.25s ease-out;
     touch-action: pan-y;
     box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.3);
+    z-index: 12;
+  }
+
+  /* 比較バー（z-index: 13）の上までシート下端を移し、双方を操作可能に保つ。 */
+  #compareBar:not(.hidden) ~ #diagnosisPanel {
+    --sheet-bottom-offset: var(--mobile-compare-sheet-offset);
   }
 
   #diagnosisPanel.sheet-dragging {

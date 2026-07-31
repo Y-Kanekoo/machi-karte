@@ -63,4 +63,33 @@ check(
   swSource.indexOf('if (isZoningMvt(url))') < swSource.indexOf('if (isPlateau3DTile(url))'),
 );
 
+const areaIndexRoute = swSource.match(
+  /if \(isAreaIndex\(url\)\) \{([\s\S]*?)\n  \}/,
+);
+check('area-index.jsonの専用分岐がある', !!areaIndexRoute);
+check(
+  'area-index.jsonはnetwork-firstで取得する',
+  !!areaIndexRoute
+    && areaIndexRoute[1].includes('networkFirst(event, CACHE_NAMES.appdata)')
+    && !areaIndexRoute[1].includes('staleWhileRevalidate'),
+);
+check(
+  'network-firstは5秒でキャッシュfallbackへ移る',
+  /withTimeout\(network, 5000\)/.test(swSource),
+);
+
+const appDataRoute = swSource.match(
+  /if \(isAppData\(url\)\) \{([\s\S]*?)\n  \}/,
+);
+check(
+  'spots.jsonとshelters.geojsonはSWRのまま',
+  !!appDataRoute
+    && appDataRoute[1].includes('staleWhileRevalidate(event, CACHE_NAMES.appdata)')
+    && !appDataRoute[1].includes('networkFirst'),
+);
+check(
+  'area-index.jsonを他のアプリデータより先に判定する',
+  swSource.indexOf('if (isAreaIndex(url))') < swSource.indexOf('if (isAppData(url))'),
+);
+
 report('sw.test.mjs');

@@ -1,4 +1,4 @@
-const VERSION = 'v2';
+const VERSION = 'v3';
 
 const CACHE_NAMES = {
   shell: `shell-${VERSION}`,
@@ -42,8 +42,8 @@ const PRECACHE_URLS = [
   './assets/icons/icon.svg',
 ];
 
+const AREA_INDEX_PATH = new URL('./data/area-index.json', self.location.href).pathname;
 const APP_DATA_PATHS = new Set([
-  './data/area-index.json',
   './data/spots.json',
   './data/shelters.geojson',
 ].map((relativePath) => new URL(relativePath, self.location.href).pathname));
@@ -167,6 +167,10 @@ function isAppData(url) {
   return url.origin === self.location.origin && APP_DATA_PATHS.has(url.pathname);
 }
 
+function isAreaIndex(url) {
+  return url.origin === self.location.origin && url.pathname === AREA_INDEX_PATH;
+}
+
 async function clearOldVersionedCaches() {
   const currentCaches = new Set(Object.values(CACHE_NAMES));
   const cacheNames = await caches.keys();
@@ -239,6 +243,11 @@ self.addEventListener('fetch', (event) => {
 
   if (isPlateau3DTile(url)) {
     event.respondWith(fetch(event.request));
+    return;
+  }
+
+  if (isAreaIndex(url)) {
+    event.respondWith(networkFirst(event, CACHE_NAMES.appdata));
     return;
   }
 

@@ -3,7 +3,11 @@
 // 配信: PLATEAU Streaming (assets.cms.plateau.reearth.io)
 
 import { HEIGHT_PROP_CANDIDATES, DEFAULT_CITY, QUALITY_PROFILES } from './config.js';
-import { QUALITY_STORAGE_KEY, resolveQualityProfile } from './pwa.js';
+import {
+  QUALITY_STORAGE_KEY,
+  reloadWithoutQualityOverride,
+  resolveQualityProfile,
+} from './pwa.js';
 import {
   parseCityCode,
   loadAreaIndex,
@@ -320,7 +324,7 @@ function initQualityControl() {
     input.addEventListener('change', () => {
       if (!input.checked || !saveQualityPreference(input.value)) return;
       warning.classList.toggle('hidden', !ios || input.value !== 'high');
-      setTimeout(() => location.reload(), 120);
+      setTimeout(reloadWithoutQualityOverride, 120);
     });
   }
   warning.classList.toggle('hidden', !ios || selectedProfile !== 'high');
@@ -461,9 +465,10 @@ async function showBuildings(mode) {
   }
   currentBldg = null;
   currentBldgKind = null;
+  // 旧タイルを消した時点で反映する。新タイルの取得完了を待つと軽量モードでは残像になる。
+  requestRender();
   if (mode === 'none') {
     diagnosis.onBuildingLayerChange();
-    requestRender();
     return;
   }
   const key = BLDG_KEYS[mode];
@@ -628,7 +633,7 @@ viewer.scene.canvas.addEventListener('webglcontextlost', (event) => {
   resettingAfterContextLoss = true;
   toast('メモリ不足のため表示をリセットします', 4000);
   saveQualityPreference('light');
-  setTimeout(() => location.reload(), 500);
+  setTimeout(reloadWithoutQualityOverride, 500);
 });
 
 // ---- 街カルテ（地点診断） -------------------------------------------------------
@@ -640,6 +645,7 @@ const diagnosis = initDiagnosis({
   buildingTableHtml,
   setStatus,
   toast,
+  requestRender,
   onDiagnosisStart: () => shadeMapController?.abortForDiagnosis(),
 });
 const bottomSheet = initBottomSheet({ diagnosis });
@@ -746,6 +752,7 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
     picked.color = Cesium.Color.YELLOW.withAlpha(0.8);
     highlighted = picked;
   }
+  requestRender();
 
   // 診断モードON、または建物クリック時に診断カードを開く
   if (diagnosis.isActive() || isBuilding) {

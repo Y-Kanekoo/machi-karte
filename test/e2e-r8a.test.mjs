@@ -43,6 +43,40 @@ try {
   equal('建物レイヤーUIもLOD1を示す', state.checkedLayer, 'lod1');
   equal('軽量プロファイルのmaximumScreenSpaceErrorは24', state.maximumScreenSpaceError, 24);
   equal('軽量プロファイルのcacheBytesは128MB', state.cacheBytes, 128 * MEBIBYTE);
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 180000 }),
+    page.evaluate(() => {
+      const high = document.getElementById('qualityHigh');
+      high.checked = true;
+      high.dispatchEvent(new Event('change', { bubbles: true }));
+    }),
+  ]);
+  await waitForInitialBuilding(page);
+  const highState = await page.evaluate(() => {
+    const profile = window.__nakano.qualityProfile;
+    const building = window.__nakano.getBuildingState();
+    return {
+      qualityParam: new URL(location.href).searchParams.get('quality'),
+      saved: localStorage.getItem('quality'),
+      profileName: window.__nakano.qualityProfileName,
+      layerKind: building.layerKind,
+      maximumScreenSpaceError: building.tileset.maximumScreenSpaceError,
+      cacheBytes: building.tileset.cacheBytes,
+      dynamicScreenSpaceError: profile.dynamicScreenSpaceError,
+      resolutionScale: profile.resolutionScale,
+      requestRenderMode: profile.requestRenderMode,
+    };
+  });
+  equal('品質変更後はURLのquality指定を除去する', highState.qualityParam, null);
+  equal('URL上書き除去後は保存済み高画質を適用する', highState.saved, 'high');
+  equal('再読み込み後の実効プロファイルは高画質', highState.profileName, 'high');
+  equal('高画質プロファイルの初期レイヤーはLOD2', highState.layerKind, 'lod2');
+  equal('高画質のmaximumScreenSpaceErrorは既定PCと同じ16', highState.maximumScreenSpaceError, 16);
+  equal('高画質のcacheBytesは既定PCと同じ512MB', highState.cacheBytes, 512 * MEBIBYTE);
+  equal('高画質のdynamicScreenSpaceErrorは既定PCと同じfalse', highState.dynamicScreenSpaceError, false);
+  equal('高画質のresolutionScaleは既定PCと同じ1', highState.resolutionScale, 1);
+  equal('高画質は既定PCと同じ連続描画', highState.requestRenderMode, false);
 } finally {
   await lightViewer.close();
 }
@@ -82,6 +116,20 @@ try {
   equal('manifestのstart_url', manifest.body?.start_url, './?source=pwa');
   equal('manifestのscope', manifest.body?.scope, './');
   equal('manifestのdisplay', manifest.body?.display, 'standalone');
+
+  const toastElements = await page.evaluate(() => {
+    const shared = document.getElementById('toast');
+    const swUpdate = document.getElementById('swUpdateToast');
+    return {
+      sharedExists: !!shared,
+      swUpdateExists: !!swUpdate,
+      distinct: shared !== swUpdate,
+    };
+  });
+  check(
+    'SW更新通知トーストは共有・比較トーストと別要素',
+    toastElements.sharedExists && toastElements.swUpdateExists && toastElements.distinct,
+  );
 } finally {
   await defaultViewer.close();
 }
@@ -152,6 +200,36 @@ try {
   });
   equal('fullからhalfへ遷移する', halfSheet.state, 'half');
   equal('half状態ではシート内スクロールが無効', halfSheet.overflowY, 'hidden');
+
+  await page.evaluate(() => window.__nakano.compare.add());
+  await page.waitForSelector('#compareBar:not(.hidden)');
+  await page.evaluate(() => window.__nakano.bottomSheet.setState('full'));
+  await page.waitForTimeout(350);
+  const mobileLayout = await page.evaluate(() => {
+    const sheet = document.getElementById('diagnosisPanel');
+    const bar = document.getElementById('compareBar');
+    const sheetBox = sheet.getBoundingClientRect();
+    const barBox = bar.getBoundingClientRect();
+    return {
+      sheetBottom: sheetBox.bottom,
+      compareTop: barBox.top,
+      sheetZIndex: Number(getComputedStyle(sheet).zIndex),
+      compareZIndex: Number(getComputedStyle(bar).zIndex),
+    };
+  });
+  check(
+    'モバイルで診断シートと比較バーが重ならない',
+    mobileLayout.sheetBottom <= mobileLayout.compareTop,
+    JSON.stringify(mobileLayout),
+  );
+  check(
+    '比較バーは診断シートより前面で操作できる',
+    mobileLayout.compareZIndex > mobileLayout.sheetZIndex,
+    JSON.stringify(mobileLayout),
+  );
+  await page.evaluate(() => window.__nakano.compare.clearAll());
+  await page.evaluate(() => window.__nakano.bottomSheet.setState('half'));
+  await page.waitForTimeout(350);
   await page.screenshot({ path: shotPath('r8a-p2-bottomsheet-half.png') });
 
   const qualityUi = await page.evaluate(() => ({

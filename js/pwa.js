@@ -4,8 +4,23 @@ export const QUALITY_STORAGE_KEY = 'quality';
 
 const SELECTABLE_QUALITY_PROFILES = new Set(['light', 'high']);
 
+function ensureSwUpdateToast() {
+  const doc = globalThis.document;
+  if (!doc) return null;
+  const existing = doc.getElementById('swUpdateToast');
+  if (existing) return existing;
+
+  const toast = doc.createElement('div');
+  toast.id = 'swUpdateToast';
+  toast.className = 'hidden';
+  toast.setAttribute('role', 'status');
+  toast.setAttribute('aria-live', 'polite');
+  doc.body.append(toast);
+  return toast;
+}
+
 function showUpdateToast(registration, worker) {
-  const toast = globalThis.document?.getElementById('toast');
+  const toast = ensureSwUpdateToast();
   if (!toast) return;
 
   const message = document.createElement('span');
@@ -31,7 +46,6 @@ function showUpdateToast(registration, worker) {
   });
 
   toast.replaceChildren(message, reloadButton);
-  toast.classList.add('update-toast');
   toast.classList.remove('hidden');
 }
 
@@ -80,7 +94,16 @@ export async function registerServiceWorker() {
 }
 
 if (typeof globalThis.window !== 'undefined') {
+  ensureSwUpdateToast();
   void registerServiceWorker();
+}
+
+/** qualityのURL上書きを外し、保存済み設定が有効になるURLで再読み込みする。 */
+export function reloadWithoutQualityOverride() {
+  const url = new URL(globalThis.location.href);
+  url.searchParams.delete('quality');
+  globalThis.history.replaceState(globalThis.history.state, '', url.href);
+  globalThis.location.reload();
 }
 
 /** ポインター・画面サイズまたは端末メモリからモバイル相当かを判定する。 */

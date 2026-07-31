@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "中野区 3D都市モデルビューア（テスト用のみnpm依存。アプリ本体はビルドレス・無依存）",
+  "description": "3D街カルテ（PLATEAU 3D都市モデル・全国対応）",
   "license": "MIT",
   "scripts": {
     "serve": "python3 -m http.server 8123",
