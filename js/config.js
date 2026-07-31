@@ -3,6 +3,36 @@
 export const DEFAULT_CITY = '13114';
 export const AREA_INDEX_URL = 'data/area-index.json';
 
+// 表示品質。defaultはR8a以前のPC向け設定値をそのまま明示する。
+export const QUALITY_PROFILES = {
+  default: {
+    initialBuildingMode: 'lod2',
+    maximumScreenSpaceError: 16,
+    cacheBytes: 512 * 1024 * 1024,
+    dynamicScreenSpaceError: false,
+    resolutionScale: 1,
+    requestRenderMode: false,
+  },
+  light: {
+    initialBuildingMode: 'lod1',
+    maximumScreenSpaceError: 24,
+    cacheBytes: 128 * 1024 * 1024,
+    maximumCacheOverflowBytes: 64 * 1024 * 1024,
+    dynamicScreenSpaceError: true,
+    resolutionScale: 1,
+    requestRenderMode: true,
+    maximumRenderTimeChange: 0.5,
+  },
+  high: {
+    initialBuildingMode: 'lod2',
+    maximumScreenSpaceError: 16,
+    cacheBytes: 256 * 1024 * 1024,
+    dynamicScreenSpaceError: true,
+    resolutionScale: Math.min(globalThis.devicePixelRatio ?? 1, 2),
+    requestRenderMode: true,
+  },
+};
+
 export const TILESETS = {
   bldgLod1:
     'https://assets.cms.plateau.reearth.io/assets/00/0bafbd-0652-4f11-ab1f-ca88d81a98a7/13114_nakano-ku_pref_2025_citygml_1_op_bldg_3dtiles_13114_nakano-ku_lod1/tileset.json',
