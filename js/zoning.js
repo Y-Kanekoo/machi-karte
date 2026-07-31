@@ -112,8 +112,15 @@ async function queryLayer(cfg, lon, lat) {
  *   error: string|null
  * }>}
  */
-export async function queryZoning(lon, lat) {
+export async function queryZoning(lon, lat, tiles = ZONING_TILES) {
   const out = { use: null, fire: null, height: null, error: null };
+  const availableTiles = tiles || {};
+  for (const key of ['use', 'fire', 'height']) {
+    if (!availableTiles[key]) out[key] = { unavailable: true };
+  }
+  if (!availableTiles.use && !availableTiles.fire && !availableTiles.height) {
+    return { unavailable: true };
+  }
   try {
     await loadMvtLib();
   } catch (e) {
@@ -123,9 +130,15 @@ export async function queryZoning(lon, lat) {
   }
 
   const [use, fire, height] = await Promise.all([
-    queryLayer(ZONING_TILES.use, lon, lat).catch((e) => { console.warn('zoning use', e); return null; }),
-    queryLayer(ZONING_TILES.fire, lon, lat).catch((e) => { console.warn('zoning fire', e); return null; }),
-    queryLayer(ZONING_TILES.height, lon, lat).catch((e) => { console.warn('zoning height', e); return null; }),
+    availableTiles.use
+      ? queryLayer(availableTiles.use, lon, lat).catch((e) => { console.warn('zoning use', e); return null; })
+      : null,
+    availableTiles.fire
+      ? queryLayer(availableTiles.fire, lon, lat).catch((e) => { console.warn('zoning fire', e); return null; })
+      : null,
+    availableTiles.height
+      ? queryLayer(availableTiles.height, lon, lat).catch((e) => { console.warn('zoning height', e); return null; })
+      : null,
   ]);
 
   if (use) {

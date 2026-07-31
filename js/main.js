@@ -2,7 +2,13 @@
 // データ: 国土交通省 Project PLATEAU 中野区 2025年度 (CC BY 4.0)
 // 配信: PLATEAU Streaming (assets.cms.plateau.reearth.io)
 
-import { TILESETS, PRESETS, HEIGHT_PROP_CANDIDATES } from './config.js';
+import { HEIGHT_PROP_CANDIDATES } from './config.js';
+import {
+  parseCityCode,
+  loadAreaIndex,
+  resolveArea,
+  buildNakanoFallback,
+} from './area.js';
 import { escapeHtml } from './util.js';
 import { initDiagnosis } from './diagnose.js';
 import { initShare } from './share.js';
@@ -10,6 +16,34 @@ import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
 import { createShelterLayer } from './shelter.js';
 import { initShadeMap } from './shademap-ui.js';
+
+// ---- AreaConfig -------------------------------------------------------------
+
+const requestedCityCode = parseCityCode(location);
+const areaIndex = await loadAreaIndex();
+const resolvedArea = requestedCityCode
+  ? resolveArea(areaIndex, requestedCityCode)
+  : null;
+const unsupportedArea = requestedCityCode === null
+  || (areaIndex !== null && resolvedArea === null);
+const areaConfig = resolvedArea || buildNakanoFallback();
+
+// P2でレイヤーUIを動的生成するまで、既存DOMのキーをAreaConfigへ写像する。
+const kandaFlood = areaConfig.tilesets.fld.find(
+  ({ label }) => label === '神田川流域',
+) || areaConfig.tilesets.fld[0] || null;
+const arakawaFlood = areaConfig.tilesets.fld.find(
+  ({ label }) => label === '荒川水系神田川流域',
+) || areaConfig.tilesets.fld[1] || null;
+const tilesetUrls = {
+  bldgLod1: areaConfig.tilesets.bldgLod1,
+  bldgLod2: areaConfig.tilesets.bldgLod2,
+  bldgLod2NoTex: areaConfig.tilesets.bldgLod2NoTex,
+  fldKandaL2: kandaFlood?.url || null,
+  fldArakawaL2: arakawaFlood?.url || null,
+  tranLod3: areaConfig.tilesets.tranLod3,
+  wtrLod1: areaConfig.tilesets.wtrLod1,
+};
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -64,9 +98,11 @@ function setStatus(msg) {
 
 async function getTileset(key) {
   if (loaded[key]) return loaded[key];
+  const url = tilesetUrls[key];
+  if (!url) return null;
   setStatus('データ読み込み中…');
   try {
-    const tileset = await Cesium.Cesium3DTileset.fromUrl(TILESETS[key], {
+    const tileset = await Cesium.Cesium3DTileset.fromUrl(url, {
       maximumScreenSpaceError: 16,
     });
     viewer.scene.primitives.add(tileset);
@@ -228,7 +264,10 @@ function flyTo(p, duration = 2.0) {
   });
 }
 document.querySelectorAll('.presets button').forEach((btn) => {
-  btn.addEventListener('click', () => flyTo(PRESETS[btn.dataset.preset]));
+  btn.addEventListener('click', () => {
+    const preset = areaConfig.presets?.[btn.dataset.preset];
+    if (preset) flyTo(preset);
+  });
 });
 
 // ---- Feature picking ---------------------------------------------------------
@@ -271,11 +310,13 @@ function toast(msg, ms = 2000) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.add('hidden'), ms);
 }
+if (unsupportedArea) toast('未対応のエリア指定です', 3000);
 
 // ---- 街カルテ（地点診断） -------------------------------------------------------
 
 const diagnosis = initDiagnosis({
   viewer,
+  areaConfig,
   getCurrentBuildingTileset: () => currentBldg,
   buildingTableHtml,
   setStatus,
@@ -288,6 +329,7 @@ diagnosis.onClose(clearHighlight);
 
 shadeMapController = initShadeMap({
   viewer,
+  areaConfig,
   getBuildingState: () => ({
     tileset: currentBldg,
     layerKind: currentBldgKind,
@@ -316,7 +358,7 @@ shelterCheckbox.addEventListener('change', async () => {
 
 // ---- R1: 都市計画オーバーレイ / 地点比較 / 共有URL -----------------------------------
 
-const overlays = initZoningOverlay({ viewer });
+const overlays = initZoningOverlay({ viewer, areaConfig });
 
 // compare は「比較のリンクをコピー」でのみ share を使うので、実体は後から差し込む
 // （share は起動時復元で compare.restoreFromPoints を呼ぶため、相互に必要になる）
@@ -324,10 +366,18 @@ const shareRef = {};
 const compare = initCompare({
   diagnosis,
   viewer,
+  areaConfig,
   toast,
   share: { shareCompare: (pts) => shareRef.api.shareCompare(pts) },
 });
-const share = initShare({ viewer, diagnosis, overlays, compare, toast });
+const share = initShare({
+  viewer,
+  diagnosis,
+  overlays,
+  compare,
+  toast,
+  areaConfig,
+});
 shareRef.api = share;
 
 /** クリック位置の経緯度を求める（建物表面 → 地表の順にフォールバック） */
@@ -385,23 +435,27 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
 let restored = null;
 
 (async () => {
-  flyTo(PRESETS.overview, 0);
+  if (areaConfig.presets?.overview) flyTo(areaConfig.presets.overview, 0);
   await showBuildings('lod2');
   // 共有URLがあればそちらを優先する（既定の中野駅プリセットへは飛ばさない）
   const hasHash = !!location.hash && location.hash.length > 1;
-  if (!hasHash) flyTo(PRESETS.nakanoSta, 3.0);
+  if (!hasHash && areaConfig.presets?.nakanoSta) {
+    flyTo(areaConfig.presets.nakanoSta, 3.0);
+  }
   restored = share.restoreFromHash().catch((e) => {
     console.warn('share: restore failed', e);
     return null;
   });
   const state = await restored;
-  if (!state && hasHash) flyTo(PRESETS.nakanoSta, 3.0);
+  if (!state && hasHash && areaConfig.presets?.nakanoSta) {
+    flyTo(areaConfig.presets.nakanoSta, 3.0);
+  }
 })();
 
 // テスト用フック（e2eから内部状態を参照するため）
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
-  diagnosis, overlays, compare, share, toast, shelterLayer,
+  diagnosis, overlays, compare, share, toast, shelterLayer, areaConfig,
   shadeMap: {
     run: (opts) => shadeMapController.run(opts),
     clear: () => shadeMapController.clear(),
