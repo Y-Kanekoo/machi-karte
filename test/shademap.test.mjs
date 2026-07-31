@@ -27,6 +27,32 @@ function near(name, actual, expected, tolerance = 1e-9) {
   );
 }
 
+function throws(name, fn, ErrorClass, messagePart) {
+  try {
+    fn();
+    ok(name, false, '例外が発生しませんでした');
+  } catch (error) {
+    ok(
+      name,
+      error instanceof ErrorClass && String(error.message).includes(messagePart),
+      `${error?.constructor?.name}: ${error?.message}`
+    );
+  }
+}
+
+async function rejects(name, promise, ErrorClass, messagePart) {
+  try {
+    await promise;
+    ok(name, false, '例外が発生しませんでした');
+  } catch (error) {
+    ok(
+      name,
+      error instanceof ErrorClass && String(error.message).includes(messagePart),
+      `${error?.constructor?.name}: ${error?.message}`
+    );
+  }
+}
+
 function report() {
   console.log(`\nshademap.test.mjs: ${passed} passed, ${failures.length} failed`);
   for (const failure of failures) console.log(`  ✗ ${failure}`);
@@ -106,7 +132,19 @@ const {
   hoursToColor,
   shadeCacheKey,
 } = await import('../js/shademap.js');
-const { sampleDay, solarKeyDates } = await import('../js/solar.js');
+const { jstDate, sampleDay, solarKeyDates, sunPosition } = await import('../js/solar.js');
+
+function haversineMeters(a, b) {
+  const earthRadiusM = 6371008.8;
+  const toRad = Math.PI / 180;
+  const lat1 = a.lat * toRad;
+  const lat2 = b.lat * toRad;
+  const deltaLat = (b.lat - a.lat) * toRad;
+  const deltaLon = (b.lon - a.lon) * toRad;
+  const h = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  return 2 * earthRadiusM * Math.asin(Math.sqrt(h));
+}
 
 // ---- グリッド --------------------------------------------------------------------
 
@@ -131,6 +169,10 @@ ok(
   'セルindexは計算順と一致',
   grid.cells.every((cell, index) => cell.index === index)
 );
+ok(
+  '各レベルは新規セルをnewCellsだけで公開する',
+  grid.levels.every((level) => Array.isArray(level.newCells) && !('cells' in level))
+);
 const lowResolutionGrid = buildShadeGrid({
   centerLon: SHADE_GRID_ORIGIN.lon,
   centerLat: SHADE_GRID_ORIGIN.lat,
@@ -139,9 +181,9 @@ const lowResolutionGrid = buildShadeGrid({
 });
 equal('100m/20mの縮小グリッドは36点', lowResolutionGrid.cells.length, 36);
 ok(
-  '20mモードは40m→20mの2レベル',
+  '100m/20mは割り切れない40mレベルを生成しない',
   JSON.stringify(lowResolutionGrid.levels.map((level) => level.level))
-    === JSON.stringify([40, 20])
+    === JSON.stringify([20])
 );
 
 const nearCenter = buildShadeGrid({
@@ -152,15 +194,66 @@ equal('10m未満の近傍中心は同じcenterIdへスナップ', nearCenter.cen
 near('同一centerIdのスナップ済み経度が一致', nearCenter.center.lon, grid.center.lon);
 near('同一centerIdのスナップ済み緯度が一致', nearCenter.center.lat, grid.center.lat);
 
-for (const index of [0, 35, 120, 440]) {
-  const cell = grid.cells[index];
-  const eastM = (cell.lon - grid.center.lon)
-    * 111320
-    * Math.cos(grid.center.lat * Math.PI / 180);
-  const northM = (cell.lat - grid.center.lat) * 111320;
-  near(`セル${index}の経度→東西m往復`, eastM, cell.eastM, 1e-6);
-  near(`セル${index}の緯度→南北m往復`, northM, cell.northM, 1e-6);
-}
+const centerCell = grid.cells.find((cell) => cell.column === 10 && cell.row === 10);
+const eastNeighbor = grid.cells.find((cell) => cell.column === 11 && cell.row === 10);
+const northNeighbor = grid.cells.find((cell) => cell.column === 10 && cell.row === 11);
+near(
+  '東西の隣接セル距離は独立したハバーサイン式で約10m',
+  haversineMeters(centerCell, eastNeighbor),
+  grid.pitchM,
+  0.03
+);
+near(
+  '南北の隣接セル距離は独立したハバーサイン式で約10m',
+  haversineMeters(centerCell, northNeighbor),
+  grid.pitchM,
+  0.03
+);
+ok(
+  'boundsOuterはboundsより半ピッチずつ外側',
+  grid.boundsOuter.west < grid.bounds.west
+    && grid.boundsOuter.south < grid.bounds.south
+    && grid.boundsOuter.east > grid.bounds.east
+    && grid.boundsOuter.north > grid.bounds.north
+);
+near(
+  'boundsOuter西端はセル中心bboxより約半ピッチ外側',
+  haversineMeters(
+    { lon: grid.boundsOuter.west, lat: grid.center.lat },
+    { lon: grid.bounds.west, lat: grid.center.lat }
+  ),
+  grid.pitchM / 2,
+  0.03
+);
+
+throws(
+  'NaN中心座標を拒否する',
+  () => buildShadeGrid({ centerLon: Number.NaN, centerLat: SHADE_GRID_ORIGIN.lat }),
+  TypeError,
+  '中心座標'
+);
+throws(
+  '非正の範囲・ピッチを拒否する',
+  () => buildShadeGrid({
+    centerLon: SHADE_GRID_ORIGIN.lon,
+    centerLat: SHADE_GRID_ORIGIN.lat,
+    sizeM: 0,
+    pitchM: -1,
+  }),
+  RangeError,
+  '正の数'
+);
+throws(
+  'ピッチで割り切れない範囲を拒否する',
+  () => buildShadeGrid({
+    centerLon: SHADE_GRID_ORIGIN.lon,
+    centerLat: SHADE_GRID_ORIGIN.lat,
+    sizeM: 100,
+    pitchM: 30,
+  }),
+  RangeError,
+  '割り切れる'
+);
 
 // ---- 色スケール ------------------------------------------------------------------
 
@@ -232,7 +325,36 @@ for (const [name, changed] of [
 ]) {
   ok(`${name}が違えば別キャッシュキー`, shadeCacheKey({ ...keyParams, ...changed }) !== baseKey);
 }
-ok('キャッシュキーに高精度モード項目を含めない', !baseKey.includes('highPrecision'));
+equal(
+  'springとequinoxは同じキャッシュキーへ正規化する',
+  shadeCacheKey({ ...keyParams, date: 'spring' }),
+  shadeCacheKey({ ...keyParams, date: 'equinox' })
+);
+ok(
+  '計算年が違えば別キャッシュキー',
+  shadeCacheKey({ ...keyParams, year: 2026 }) !== shadeCacheKey({ ...keyParams, year: 2027 })
+);
+equal(
+  '余分な高精度パラメータを与えてもキャッシュキーは変わらない',
+  shadeCacheKey({ ...keyParams, highPrecision: true }),
+  baseKey
+);
+throws(
+  '未定義の日付キーを拒否する',
+  () => shadeCacheKey({ ...keyParams, date: 'autumn' }),
+  RangeError,
+  'winter、spring、equinox、summer'
+);
+for (const field of ['date', 'pitchM', 'sizeM', 'centerId', 'layerKind']) {
+  const missing = { ...keyParams };
+  delete missing[field];
+  throws(
+    `キャッシュキーの必須項目${field}欠損を拒否する`,
+    () => shadeCacheKey(missing),
+    TypeError,
+    field
+  );
+}
 
 const cache = new ShadeMapCache();
 equal('LRUの既定容量は4', cache.capacity, 4);
@@ -260,6 +382,10 @@ equal('未完走結果はsetを拒否する', cache.set('partial', cacheValue(9,
 equal('未完走結果は格納されない', cache.has('partial'), false);
 equal('Float32Array以外はsetを拒否する', cache.set('bad', { cells: [1], completed: true }), false);
 equal('拒否後も容量は変わらない', cache.size, 4);
+const mutableCacheValue = cacheValue(7);
+cache.set('copy', mutableCacheValue);
+mutableCacheValue.cells[0] = 99;
+equal('キャッシュはcellsをコピーして格納する', cache.get('copy').cells[0], 7);
 
 // ---- 計算エンジン: 完走・進捗・方向共有 -------------------------------------------
 
@@ -268,9 +394,15 @@ const fullTileset = { cacheBytes: originalCacheBytes };
 const fullProgress = [];
 const fullLevels = [];
 const fullDirections = new Set();
+const fullRays = new Set();
+const raysPerFrame = [];
 let fullRafCalls = 0;
 let detailedCalls = 0;
+let detailedInFlight = 0;
+let detailedMaxInFlight = 0;
 let sampleCalls = 0;
+let fullPickCalls = 0;
+let pickCallsAtPreviousFrame = 0;
 const cacheBytesDuringWarmUp = [];
 let clock = 0;
 
@@ -281,11 +413,18 @@ const fullScene = {
   },
   pickFromRayMostDetailed() {
     detailedCalls++;
+    detailedInFlight++;
+    detailedMaxInFlight = Math.max(detailedMaxInFlight, detailedInFlight);
     cacheBytesDuringWarmUp.push(fullTileset.cacheBytes);
-    return Promise.resolve(undefined);
+    return Promise.resolve().then(() => {
+      detailedInFlight--;
+      return undefined;
+    });
   },
   pickFromRay(ray) {
+    fullPickCalls++;
     fullDirections.add(ray.direction);
+    fullRays.add(ray);
     return undefined;
   },
 };
@@ -299,6 +438,8 @@ const fullEngine = createShadeMapEngine({
   },
   raf: (callback) => {
     fullRafCalls++;
+    raysPerFrame.push(fullPickCalls - pickCallsAtPreviousFrame);
+    pickCallsAtPreviousFrame = fullPickCalls;
     callback();
   },
 });
@@ -324,8 +465,17 @@ const activeWinterSlots = sampleDay(
   { hourStart: 7, hourEnd: 17, stepMinutes: 20 }
 ).filter((slot) => slot.elevationDeg >= 5).length;
 const expectedHours = activeWinterSlots * 20 / 60;
+const validWarmDirections = [8, 12, 16].filter((hour) => {
+  const position = sunPosition(
+    jstDate(winterDate.year, winterDate.month, winterDate.day, hour, 0),
+    fullResult.grid.center.lon,
+    fullResult.grid.center.lat
+  );
+  return position.elevationDeg >= 5;
+}).length;
 
 equal('完走結果はcompleted:true', fullResult.completed, true);
+equal('完走結果のerrorはnull', fullResult.error, null);
 ok('セル値はFloat32Array', fullResult.cells instanceof Float32Array);
 equal('縮小グリッドは25セル', fullResult.cells.length, 25);
 ok(
@@ -334,15 +484,27 @@ ok(
 );
 equal('有効スロット数を返す', fullResult.slotCount, activeWinterSlots);
 equal('全レイを完了する', fullResult.raysCompleted, 25 * activeWinterSlots);
-equal('多原点warm-upは5点×3方向の15本', detailedCalls, 15);
+equal('完走時のcomputedCountは全セル数', fullResult.computedCount, 25);
+equal('多原点warm-upは高度5度以上の方向×5点', detailedCalls, validWarmDirections * 5);
+equal('多原点warm-upの最大並列度は4', detailedMaxInFlight, 4);
 equal('中心高さ取得+25点屋上判定の2回サンプル', sampleCalls, 2);
 equal('本計算の共有方向オブジェクト数はスロット数だけ', fullDirections.size, activeWinterSlots);
+equal('本計算はCesium.Rayを1本だけ使い回す', fullRays.size, 1);
 equal(
-  '方向変換はwarm-up15回+本計算のスロット数だけ',
+  '方向変換はwarm-up有効方向×5+本計算のスロット数だけ',
   matrixDirectionCalls,
-  15 + activeWinterSlots
+  validWarmDirections * 5 + activeWinterSlots
 );
 ok('8ms予算超過でrAFへ処理を譲る', fullRafCalls > 0);
+ok(
+  '1フレームに予算内の複数レイを実行してからyieldする',
+  raysPerFrame.length > 0 && raysPerFrame.every((count) => count === 2),
+  JSON.stringify(raysPerFrame.slice(0, 10))
+);
+ok(
+  'フレーム予算を無視せず計算途中で複数回yieldする',
+  fullRafCalls > 1 && fullRafCalls < fullResult.raysCompleted
+);
 ok('進捗コールバックが呼ばれる', fullProgress.length > 1);
 ok(
   '進捗値は厳密に単調増加する',
@@ -359,6 +521,11 @@ ok(
   fullLevels.every((item) =>
     item.partial.cells === fullResult.cells && item.partial.grid === fullResult.grid
   )
+);
+ok(
+  'レベル完了ごとのcomputedCountは確定済み累積セル数',
+  JSON.stringify(fullLevels.map((item) => item.partial.computedCount))
+    === JSON.stringify([4, 9, 25])
 );
 near('レイ時間中央値はnowスタブどおり4ms', fullResult.msPerRayMedian, 4);
 ok(
@@ -411,6 +578,7 @@ equal('中途キャンセルはcompleted:false', cancelResult.completed, false);
 ok('キャンセル前の部分レイ結果を返す', cancelResult.raysCompleted > 0);
 ok('キャンセル時は全レイ未満で停止', cancelResult.raysCompleted < cancelResult.totalRays);
 ok('キャンセル結果もFloat32Array', cancelResult.cells instanceof Float32Array);
+equal('セル途中のキャンセルではcomputedCountは増えない', cancelResult.computedCount, 0);
 equal('予算超過後のrAFでキャンセルを検出', cancelRafCalls, 1);
 ok('キャンセル時の進捗は1未満', cancelProgress.at(-1) < 1);
 equal('キャンセル後もcacheBytesを復元する', cancelTileset.cacheBytes, originalCacheBytes);
@@ -464,6 +632,221 @@ near(
   11.2
 );
 
+// ---- 計算エンジン: 地盤高ガード --------------------------------------------------
+
+let zeroBaseSampleCalls = 0;
+const zeroBaseScene = {
+  async sampleHeightMostDetailed(items) {
+    zeroBaseSampleCalls++;
+    return items.map((item) => ({ ...item, height: 0 }));
+  },
+  pickFromRayMostDetailed() {
+    return Promise.resolve(undefined);
+  },
+  pickFromRay() {
+    return undefined;
+  },
+};
+const zeroBaseResult = await createShadeMapEngine({
+  viewer: { scene: zeroBaseScene },
+  tileset: { cacheBytes: originalCacheBytes },
+  now: () => 0,
+  raf: (callback) => callback(),
+}).run({
+  center: SHADE_GRID_ORIGIN,
+  sizeM: 10,
+  pitchM: 10,
+  frameBudgetMs: 1000,
+});
+
+equal('中心サンプル0mは既定地盤高35mへフォールバックする', zeroBaseResult.baseHeight, 35);
+ok(
+  '妥当なバッチ値が無い場合も全セルで0mを使わない',
+  [...zeroBaseResult.cellHeights].every((height) => height === 35)
+);
+equal('0mガードでも中心+バッチの両方を取得する', zeroBaseSampleCalls, 2);
+
+let rooftopCenterSampleCalls = 0;
+const rooftopCenterScene = {
+  async sampleHeightMostDetailed(items) {
+    rooftopCenterSampleCalls++;
+    if (rooftopCenterSampleCalls === 1) {
+      return items.map((item) => ({ ...item, height: 40 }));
+    }
+    return items.map((item, index) => ({
+      ...item,
+      height: index === 0 || index === 3 ? 10 : index === 1 ? 45 : 0,
+    }));
+  },
+  pickFromRayMostDetailed() {
+    return Promise.resolve(undefined);
+  },
+  pickFromRay() {
+    return undefined;
+  },
+};
+const rooftopCenterResult = await createShadeMapEngine({
+  viewer: { scene: rooftopCenterScene },
+  tileset: { cacheBytes: originalCacheBytes },
+  now: () => 0,
+  raf: (callback) => callback(),
+}).run({
+  center: SHADE_GRID_ORIGIN,
+  sizeM: 10,
+  pitchM: 10,
+  frameBudgetMs: 1000,
+});
+
+equal('屋上だった中心40mはバッチ最小妥当値10mへ落とす', rooftopCenterResult.baseHeight, 10);
+equal('サニタイズ後の地表+4m超だけ屋上セルにする', rooftopCenterResult.rooftopCells, 1);
+equal('屋上セルは45mを維持する', rooftopCenterResult.cellHeights[1], 45);
+equal('楕円体0mセルはサニタイズ後の地表10mを使う', rooftopCenterResult.cellHeights[2], 10);
+
+// ---- 計算エンジン: 機能検出・日付正規化・コールバック契約 --------------------------
+
+let unsupportedSampleCalls = 0;
+const unsupportedScene = {
+  async sampleHeightMostDetailed(items) {
+    unsupportedSampleCalls++;
+    return items;
+  },
+};
+const unsupportedResult = await createShadeMapEngine({
+  viewer: { scene: unsupportedScene },
+  tileset: { cacheBytes: originalCacheBytes },
+}).run({
+  center: SHADE_GRID_ORIGIN,
+  sizeM: 10,
+  pitchM: 10,
+});
+
+equal('pickFromRay非対応環境はcompleted:false', unsupportedResult.completed, false);
+equal('pickFromRay非対応環境はcomputedCount:0', unsupportedResult.computedCount, 0);
+equal('pickFromRay非対応環境はレイを1本も処理しない', unsupportedResult.raysCompleted, 0);
+equal('pickFromRay非対応環境では高さ取得も始めない', unsupportedSampleCalls, 0);
+equal(
+  'pickFromRay非対応理由を日本語で返す',
+  unsupportedResult.error,
+  'この描画環境ではレイキャスト（pickFromRay）が利用できないため日影マップを計算できません'
+);
+
+const dateScene = {
+  async sampleHeightMostDetailed(items) {
+    return items.map((item) => ({ ...item, height: 10 }));
+  },
+  pickFromRayMostDetailed() {
+    return Promise.resolve(undefined);
+  },
+  pickFromRay() {
+    return undefined;
+  },
+};
+let dateRafCalls = 0;
+const dateEngine = createShadeMapEngine({
+  viewer: { scene: dateScene },
+  tileset: { cacheBytes: originalCacheBytes },
+  now: () => 0,
+  raf: (callback) => {
+    dateRafCalls++;
+    callback();
+  },
+});
+const springResult = await dateEngine.run({
+  center: SHADE_GRID_ORIGIN,
+  sizeM: 10,
+  pitchM: 10,
+  date: 'spring',
+  year: 2026,
+  frameBudgetMs: 1000,
+});
+const equinoxResult = await dateEngine.run({
+  center: SHADE_GRID_ORIGIN,
+  sizeM: 10,
+  pitchM: 10,
+  date: 'equinox',
+  year: 2026,
+  frameBudgetMs: 1000,
+});
+const equinoxDate = solarKeyDates(2026).find((item) => item.key === 'equinox');
+const equinoxSlots = sampleDay(
+  equinoxDate.year,
+  equinoxDate.month,
+  equinoxDate.day,
+  equinoxResult.grid.center.lon,
+  equinoxResult.grid.center.lat,
+  { hourStart: 7, hourEnd: 17, stepMinutes: 20 }
+).filter((slot) => slot.elevationDeg >= 5).length;
+
+equal('springは内部キーequinoxへ正規化する', springResult.date, 'equinox');
+equal('equinoxを春分として受理する', equinoxResult.date, 'equinox');
+equal('equinoxの有効スロット数を使う', equinoxResult.slotCount, equinoxSlots);
+ok(
+  'springとequinoxの計算値は一致する',
+  [...springResult.cells].every((value, index) => value === equinoxResult.cells[index])
+);
+await rejects(
+  'runは未定義の日付キーをRangeErrorで拒否する',
+  dateEngine.run({
+    center: SHADE_GRID_ORIGIN,
+    sizeM: 10,
+    pitchM: 10,
+    date: 'autumn',
+  }),
+  RangeError,
+  'winter、spring、equinox、summer'
+);
+
+const callbackWarnings = [];
+const originalWarn = console.warn;
+let callbackResult;
+dateRafCalls = 0;
+try {
+  console.warn = (...args) => callbackWarnings.push(args.map(String).join(' '));
+  callbackResult = await dateEngine.run({
+    center: SHADE_GRID_ORIGIN,
+    sizeM: 10,
+    pitchM: 10,
+    frameBudgetMs: 1000000,
+    onProgress: () => {
+      throw new Error('進捗テスト例外');
+    },
+    onLevelComplete: () => {
+      throw new Error('レベルテスト例外');
+    },
+  });
+} finally {
+  console.warn = originalWarn;
+}
+equal('コールバック例外があっても計算を完走する', callbackResult.completed, true);
+equal('高いframeBudgetMsでは途中yieldしない', dateRafCalls, 0);
+ok(
+  '進捗コールバック例外を日本語warnへ記録する',
+  callbackWarnings.some((message) => message.includes('進捗コールバック'))
+);
+ok(
+  'レベル完了コールバック例外を日本語warnへ記録する',
+  callbackWarnings.some((message) => message.includes('レベル完了コールバック'))
+);
+
+const polarProgress = [];
+const polarLevels = [];
+const polarResult = await dateEngine.run({
+  center: { lon: SHADE_GRID_ORIGIN.lon, lat: 89 },
+  sizeM: 10,
+  pitchM: 10,
+  date: 'winter',
+  year: 2026,
+  frameBudgetMs: 1000,
+  onProgress: (fraction) => polarProgress.push(fraction),
+  onLevelComplete: (level, partial) => polarLevels.push({ level, partial }),
+});
+equal('有効太陽スロット0件でも完走する', polarResult.completed, true);
+equal('スロット0件ではtotalRaysも0', polarResult.totalRays, 0);
+equal('スロット0件でも全セルを確定済みにする', polarResult.computedCount, 4);
+equal('スロット0件でも最終進捗1を通知する', polarProgress.at(-1), 1);
+equal('新規セルがあるレベル完了通知は1回だけ', polarLevels.length, 1);
+equal('スロット0件の部分結果にもcomputedCountを含む', polarLevels[0].partial.computedCount, 4);
+
 // ---- 計算エンジン: 非公開API・高さバッチのgraceful degradation -------------------
 
 let fallbackSampleCalls = 0;
@@ -489,11 +872,18 @@ const fallbackEngine = createShadeMapEngine({
   now: () => 0,
   raf: (callback) => callback(),
 });
-const fallbackResult = await fallbackEngine.run({
-  center: SHADE_GRID_ORIGIN,
-  sizeM: 10,
-  pitchM: 10,
-});
+const fallbackWarnings = [];
+let fallbackResult;
+try {
+  console.warn = (...args) => fallbackWarnings.push(args.map(String).join(' '));
+  fallbackResult = await fallbackEngine.run({
+    center: SHADE_GRID_ORIGIN,
+    sizeM: 10,
+    pitchM: 10,
+  });
+} finally {
+  console.warn = originalWarn;
+}
 
 equal('非公開API例外でも計算は完走する', fallbackResult.completed, true);
 ok('pick例外のスロットをlit扱いにしない', [...fallbackResult.cells].every((hours) => hours === 0));
@@ -505,6 +895,10 @@ equal(
 ok(
   '高さバッチ失敗時は全セルで中心高さを使う',
   [...fallbackResult.cellHeights].every((height) => height === 12)
+);
+ok(
+  '高さバッチ失敗時は日本語warnを出す',
+  fallbackWarnings.some((message) => message.includes('高さバッチ取得に失敗'))
 );
 
 report();
