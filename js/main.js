@@ -11,12 +11,14 @@ import {
   enrichAreaConfig,
   buildNakanoFallback,
   groupAreasByPref,
+  resolveServiceRect,
 } from './area.js';
 import { escapeHtml } from './util.js';
 import { initDiagnosis } from './diagnose.js';
 import {
   initShare,
   normalizeCityQuery,
+  normalizeCityHash,
   serializeState,
 } from './share.js';
 import { initZoningOverlay } from './zoning-overlay.js';
@@ -26,16 +28,29 @@ import { initShadeMap } from './shademap-ui.js';
 
 // ---- AreaConfig -------------------------------------------------------------
 
+const initialHash = location.hash;
 const requestedCityCode = parseCityCode(location);
 const [areaIndex, spots] = await Promise.all([loadAreaIndex(), loadSpots()]);
 const resolvedArea = requestedCityCode
   ? resolveArea(areaIndex, requestedCityCode, spots)
   : null;
-const unsupportedArea = requestedCityCode === null
-  || (areaIndex !== null && resolvedArea === null);
 const baseAreaConfig = resolvedArea || buildNakanoFallback(spots);
 const areaConfig = await enrichAreaConfig(baseAreaConfig);
+const areaMismatch = requestedCityCode !== areaConfig.code;
+const areaFallbackMessage = !areaMismatch
+  ? null
+  : requestedCityCode === null
+    ? 'エリア指定が正しくないため中野区を表示しています'
+    : areaIndex === null
+      ? 'エリア情報を取得できなかったため中野区を表示しています'
+      : '未対応のエリア指定のため中野区を表示しています';
 normalizeCityQuery(location, history, areaConfig.code);
+if (areaMismatch) {
+  normalizeCityHash(location, history, areaConfig.code, { preserveState: false });
+}
+
+const areaDisplayName = areaConfig.displayName || areaConfig.name;
+const overlayRectKnown = !!resolveServiceRect(areaConfig);
 
 const LEGACY_PRESET_LABELS = {
   nakanoSta: '中野駅',
@@ -98,13 +113,13 @@ function renderAreaSelector() {
   const currentName = document.getElementById('areaCurrentName');
   if (!prefSelect || !citySelect || !currentName) return;
 
-  currentName.textContent = areaConfig.name;
+  currentName.textContent = areaDisplayName;
   const indexedGroups = groupAreasByPref(areaIndex);
   const groups = indexedGroups.length
     ? indexedGroups
     : [{
       pref: areaConfig.pref,
-      areas: [{ code: areaConfig.code, name: areaConfig.name }],
+      areas: [{ code: areaConfig.code, name: areaDisplayName }],
     }];
   const currentGroup = groups.find(
     ({ areas }) => areas.some(({ code }) => code === areaConfig.code),
@@ -154,7 +169,7 @@ function renderAreaSelector() {
 }
 
 function renderAreaChrome() {
-  const title = `3D街カルテ — ${areaConfig.name}`;
+  const title = `3D街カルテ — ${areaDisplayName}`;
   const titleEl = document.getElementById('areaTitle');
   document.title = title;
   titleEl.dataset.displayTitle = title;
@@ -167,15 +182,13 @@ function renderAreaChrome() {
     document.getElementById('areaSubtitle').textContent =
       `PLATEAU 3D都市モデル (${areaConfig.year}年度版)`;
     document.getElementById('searchInput').placeholder =
-      `住所で診断（例: ${areaConfig.name}○○）`;
+      `住所で診断（例: ${areaDisplayName}○○）`;
     document.getElementById('attribution').innerHTML =
       `出典: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">` +
-      `国土交通省 Project PLATEAU</a>（${escapeHtml(areaConfig.name)} 3D都市モデル ` +
+      `国土交通省 Project PLATEAU</a>（${escapeHtml(areaDisplayName)} 3D都市モデル ` +
       `${escapeHtml(areaConfig.year)}年度・CC BY 4.0）／` +
       `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">` +
-      `地理院タイル</a>／` +
-      `<a href="https://catalog.data.metro.tokyo.lg.jp/" target="_blank" rel="noopener">` +
-      `中野区オープンデータ</a>（避難所・避難場所・CC BY 4.0）`;
+      `地理院タイル</a>`;
   }
   renderAreaSelector();
 
@@ -212,10 +225,14 @@ function renderAreaChrome() {
   };
   document.getElementById('zoningLayers').innerHTML = Object.entries(zoningLabels)
     .map(([key, text]) => {
-      const available = !!areaConfig.zoning[key];
+      const dataAvailable = !!areaConfig.zoning[key];
+      const available = dataAvailable && overlayRectKnown;
+      const reason = dataAvailable && !overlayRectKnown
+        ? '<span class="unavailable-text">範囲不明のため地図表示を利用できません</span>'
+        : unavailableText();
       return `<label${available ? '' : ' class="layer-unavailable"'}>` +
         `<input type="checkbox" id="ov-${key}"${available ? '' : ' disabled'}> ${text}` +
-        `${available ? '' : unavailableText()}</label>`;
+        `${available ? '' : reason}</label>`;
     })
     .join('');
 
@@ -245,6 +262,18 @@ function renderAreaChrome() {
       `<input type="checkbox" id="${id}"${available ? '' : ' disabled'}> ${text}` +
       `${available ? '' : unavailableText()}</label>`)
     .join('');
+
+  const shelterCheckbox = document.getElementById('shelterLayer');
+  const shelterLabel = shelterCheckbox?.closest('label');
+  const sheltersAvailable = areaConfig.disaster?.shelters === true;
+  if (shelterCheckbox && shelterLabel && !sheltersAvailable) {
+    shelterCheckbox.checked = false;
+    shelterCheckbox.disabled = true;
+    shelterLabel.classList.add('layer-unavailable');
+    if (!shelterLabel.querySelector('.unavailable-text')) {
+      shelterLabel.insertAdjacentHTML('beforeend', unavailableText());
+    }
+  }
 
   document.getElementById('presetButtons').innerHTML = Object.entries(areaConfig.presets || {})
     .map(([key, preset]) =>
@@ -522,7 +551,7 @@ function toast(msg, ms = 2000) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.add('hidden'), ms);
 }
-if (unsupportedArea) toast('未対応のエリア指定です', 3000);
+if (areaFallbackMessage) toast(areaFallbackMessage, 4000);
 
 // ---- 街カルテ（地点診断） -------------------------------------------------------
 
@@ -560,6 +589,12 @@ const shelterCheckbox = document.getElementById('shelterLayer');
 const shelterLegend = document.getElementById('shelterLegend');
 
 shelterCheckbox.addEventListener('change', async () => {
+  if (areaConfig.disaster?.shelters !== true) {
+    shelterCheckbox.checked = false;
+    shelterLegend.classList.add('hidden');
+    diagnosis.updateShelterButton();
+    return;
+  }
   const on = shelterCheckbox.checked;
   shelterLegend.classList.toggle('hidden', !on);
   diagnosis.updateShelterButton();
@@ -657,7 +692,7 @@ let restored = null;
   if (!hasHash && initialPreset) {
     flyTo(initialPreset, 3.0);
   }
-  restored = share.restoreFromHash().catch((e) => {
+  restored = share.restoreFromHash(areaMismatch ? initialHash : location.hash).catch((e) => {
     console.warn('share: restore failed', e);
     return null;
   });

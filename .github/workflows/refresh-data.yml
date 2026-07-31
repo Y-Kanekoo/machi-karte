@@ -22,9 +22,17 @@ jobs:
           cache: npm
       - run: npm ci
       - name: カタログから自治体対応表を再生成
-        run: node scripts/build-area-index.mjs --out data/area-index.json --sanity-min 400
+        run: npm run area-index
+      - name: 生成物のsanityと単体テストを実行
+        run: SKIP_NETWORK=1 npm run test:unit
       - name: 実タイルとカタログURLの期待値を照合
         run: npm run expectations:check
+      - name: e2e用の対応表を保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-area-index
+          path: data/area-index.json
+          if-no-files-found: error
       - name: 差分があればPRを作成
         uses: peter-evans/create-pull-request@v6
         with:
@@ -51,6 +59,11 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+      - name: refreshジョブの対応表を取得
+        uses: actions/download-artifact@v4
+        with:
+          name: refreshed-area-index
+          path: data
       - uses: actions/setup-node@v4
         with:
           node-version: 22

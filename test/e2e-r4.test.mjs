@@ -125,6 +125,8 @@ try {
       fireText: labelText('ov-fire'),
       heightDisabled: document.getElementById('ov-height')?.disabled,
       heightText: labelText('ov-height'),
+      shelterDisabled: document.getElementById('shelterLayer')?.disabled,
+      shelterText: labelText('shelterLayer'),
       floodText: document.getElementById('floodLayers')?.textContent.replace(/\s+/g, ' ').trim(),
       floodCount: document.querySelectorAll('#floodLayers input:not(:disabled)').length,
       groundHeight: window.__nakano.areaConfig.groundHeight,
@@ -159,6 +161,12 @@ try {
     ui.heightDisabled === true && ui.heightText.includes('このエリアでは提供されていません'),
     ui.heightText,
   );
+  check(
+    '三島市の避難所レイヤーは未提供表示',
+    ui.shelterDisabled === true
+      && ui.shelterText.includes('このエリアでは提供されていません'),
+    ui.shelterText,
+  );
   equal('三島市の洪水レイヤーは1件', ui.floodCount, 1);
   check('三島市の洪水レイヤーは狩野川水系', ui.floodText.includes('狩野川水系'), ui.floodText);
   near('三島市のregion最小高を地盤高に採用', ui.groundHeight, 51.4, 0.2);
@@ -182,6 +190,13 @@ try {
   equal('一番町の容積率', ichibancho.floorArea, 200);
   check('一番町の防火地域は未提供', ichibancho.fireUnavailable, JSON.stringify(ichibancho));
   check('一番町の高度地区は未提供', ichibancho.heightUnavailable, JSON.stringify(ichibancho));
+  equal(
+    '三島市の避難所診断は未提供表示',
+    (await page.textContent('#secShelter')).replace(/\s+/g, ' ').trim(),
+    'このエリアでは提供されていません',
+  );
+  const mishimaHistory = await page.evaluate(() => window.__nakano.diagnosis.getHistory());
+  equal('診断履歴に三島市cityを保存', mishimaHistory[0]?.city, '22206');
 
   const zoningText = (await page.textContent('#secZoning')).replace(/\s+/g, ' ').trim();
   check(
@@ -202,6 +217,12 @@ try {
   check(
     '洪水注記に未公表河川の注意を表示',
     floodText.includes('浸水想定が公表されていない河川は表示されません'),
+    floodText,
+  );
+  check(
+    '三島市の内水注記は自治体汎用文言',
+    floodText.includes('お住まいの市区町村の公式ハザードマップをご確認ください')
+      && !floodText.includes('中野区ハザードマップ'),
     floodText,
   );
 
@@ -397,7 +418,11 @@ try {
     .then((handle) => handle.jsonValue());
   await waitForApp(page, '13114');
   const toastText = await toastPromise;
-  equal('不正コードのトースト', toastText, '未対応のエリア指定です');
+  equal(
+    '不正コードの理由付きトースト',
+    toastText,
+    '未対応のエリア指定のため中野区を表示しています',
+  );
   const invalid = await page.evaluate(() => ({
     search: location.search,
     hash: location.hash,
@@ -453,6 +478,45 @@ try {
   near('R1形式の緯度を復元', legacy.lat, 35.691502, 1e-6);
 } finally {
   await legacyViewer.close();
+}
+
+// ============================================================================
+// 7. cityなし比較URLの後方互換
+// ============================================================================
+
+console.log('\n=== cityなし比較URLの後方互換 ===');
+const legacyCompareViewer = await launchViewer({
+  viewport: { width: 1440, height: 900 },
+  url: BASE_URL + '#v=1&compare=139.673935,35.691502;139.66893,35.707859',
+});
+try {
+  const { page } = legacyCompareViewer;
+  await waitForApp(page, '13114');
+  await page.waitForFunction(
+    () => window.__nakano?.getRestored?.() instanceof Promise,
+    null,
+    { timeout: 180000, polling: 500 },
+  );
+  await page.evaluate(() => window.__nakano.getRestored());
+  await page.waitForFunction(
+    () => window.__nakano?.compare?.getItems?.().length === 2,
+    null,
+    { timeout: 120000, polling: 500 },
+  );
+  const legacyCompare = await page.evaluate(() => ({
+    city: window.__nakano.areaConfig.code,
+    itemCities: window.__nakano.compare.getItems().map((item) => item.city),
+    open: window.__nakano.compare.isOpen(),
+  }));
+  equal('cityなし比較URLは中野区で起動', legacyCompare.city, '13114');
+  equal(
+    'cityなし比較地点はすべて13114として復元',
+    JSON.stringify(legacyCompare.itemCities),
+    JSON.stringify(['13114', '13114']),
+  );
+  check('旧比較URLの比較モーダルを開く', legacyCompare.open, JSON.stringify(legacyCompare));
+} finally {
+  await legacyCompareViewer.close();
 }
 
 report('e2e-r4.test.mjs');

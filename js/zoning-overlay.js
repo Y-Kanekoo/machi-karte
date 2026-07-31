@@ -26,6 +26,7 @@ import {
 import { loadMvtLib, fetchTileBuffer } from './zoning.js';
 import { tileUrl } from './tilemath.js';
 import { escapeHtml } from './util.js';
+import { resolveServiceRect } from './area.js';
 
 export const TILE_SIZE = 256;
 
@@ -234,7 +235,7 @@ function legendItems(key) {
 export function initZoningOverlay(ctx) {
   const { viewer, areaConfig = null } = ctx;
   const zoningTiles = areaConfig?.zoning || ZONING_TILES;
-  const areaRectangle = areaConfig?.rect || AREA_RECT;
+  const areaRectangle = resolveServiceRect(areaConfig);
   const layers = {};    // key -> Cesium.ImageryLayer
   const providers = {}; // key -> ZoningImageryProvider
   let alpha = OVERLAY_DEFAULT_ALPHA;
@@ -272,14 +273,23 @@ export function initZoningOverlay(ctx) {
   function updateChrome() {
     const any = OVERLAY_KEYS.some((k) => layers[k]);
     if (alphaRow) alphaRow.classList.toggle('hidden', !any);
-    if (hint) hint.classList.toggle('hidden', !any);
+    if (hint) {
+      if (!areaRectangle) {
+        hint.textContent = 'このエリアは範囲不明のため、都市計画レイヤーの地図表示を利用できません。';
+        hint.classList.remove('hidden');
+      } else {
+        hint.textContent =
+          '重なりで見づらいときは背景地図を「淡色地図」に切り替えると見やすくなります。';
+        hint.classList.toggle('hidden', !any);
+      }
+    }
     renderLegend();
   }
 
   function setEnabled(key, on) {
     if (!OVERLAY_KEYS.includes(key)) return;
     const checkbox = document.getElementById('ov-' + key);
-    if (!zoningTiles[key]) {
+    if (!zoningTiles[key] || !areaRectangle) {
       if (checkbox) checkbox.checked = false;
       return;
     }
@@ -327,6 +337,7 @@ export function initZoningOverlay(ctx) {
    * （e2eの「最小プロバイダ」チェックから呼ぶ）
    */
   function addSolidTestLayer(color = '#ff00ff') {
+    if (!areaRectangle) return null;
     const provider = new ZoningImageryProvider({
       kind: 'use',
       url: '',

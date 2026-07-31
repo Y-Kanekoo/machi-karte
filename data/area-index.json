@@ -1,6 +1,6 @@
 {
   "prefix": "https://assets.cms.plateau.reearth.io/assets/",
-  "generatedAt": "2026-07-31T06:23:09.598Z",
+  "contentHash": "32b0757a9ce0414901892e4d12fedd960e31c7b89310036036335f0ec0fe03fa",
   "count": 448,
   "areas": {
     "10201": {
@@ -106,6 +106,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "e6/0f2355-9fb1-4f95-9e25-d35162886e96/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11101_nishi-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 西区",
       "fld": [
         {
           "label": "荒川水系鴨川流域",
@@ -154,6 +156,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "79/1cbe42-c931-49e9-b87e-47d7a8434ae5/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11102_kita-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 北区",
       "fld": [
         {
           "label": "荒川水系鴨川流域",
@@ -202,6 +206,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "3e/15c0d4-30df-4e7e-aea9-031acd9e2a1e/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11103_omiya-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 大宮区",
       "b2": "fb/dd5dd6-eae8-4173-9c3c-73516fdc0c10/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11103_omiya-ku_lod2/tileset.json",
       "b2n": "5c/099db8-3267-4ad6-82a3-c15609e6116c/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11103_omiya-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -252,6 +258,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "56/c73954-9c10-4220-a584-ae00e058cd10/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11104_minuma-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 見沼区",
       "fld": [
         {
           "label": "荒川水系鴨川流域",
@@ -300,6 +308,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "65/764a2b-72b3-4a0d-8005-265cf38f6698/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11105_chuo-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 中央区",
       "b2": "db/bc8662-fa14-4e03-a702-e366e367b1d4/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11105_chuo-ku_lod2/tileset.json",
       "b2n": "ba/00afca-d792-4be1-833f-ab9f23de6a58/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11105_chuo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -350,6 +360,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "cc/7b691c-47c4-47f5-ba6e-ef56848b545d/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11106_sakura-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 桜区",
       "fld": [
         {
           "label": "荒川水系鴨川流域",
@@ -398,6 +410,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "ea/2102eb-ab6c-405e-9968-23b9a8b43491/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11107_urawa-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 浦和区",
       "b2": "54/f558f0-9676-4976-b72e-325df2165799/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11107_urawa-ku_lod2/tileset.json",
       "b2n": "cd/fdea53-b556-4cce-b876-e662c2dce87f/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11107_urawa-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -448,6 +462,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "13/907203-33d1-4cda-892e-c811af81e8f9/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11108_minami-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 南区",
       "b2": "aa/d72d50-1fd6-4b49-8d03-8dfcc0789d02/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11108_minami-ku_lod2/tileset.json",
       "b2n": "d1/4acc8c-697c-4b22-ae6a-97c86ee0cb6c/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11108_minami-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -498,6 +514,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "e8/f0b09c-871d-4ca5-8bfd-f8eaac87aa7f/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11109_midori-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 緑区",
       "b2": "7b/41590b-da57-4fba-9140-269ddf6bbb13/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11109_midori-ku_lod2/tileset.json",
       "b2n": "a6/5a84a9-17b0-4038-97c6-73be589b581a/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11109_midori-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -548,6 +566,8 @@
       "pref": "埼玉県",
       "year": 2025,
       "b1": "45/06c81c-9561-4761-883d-8fe8555f9a18/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11110_iwatsuki-ku_lod1/tileset.json",
+      "parentName": "さいたま市",
+      "displayName": "さいたま市 岩槻区",
       "b2": "61/f34b51-0fa0-476c-ad4c-c0433310b3ee/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11110_iwatsuki-ku_lod2/tileset.json",
       "b2n": "16/9f3ac0-c566-4a2c-a210-a801d0bc9d47/11100_saitama-shi_city_2025_citygml_1_op_bldg_3dtiles_11110_iwatsuki-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -2216,6 +2236,8 @@
       "pref": "千葉県",
       "year": 2024,
       "b1": "9e/73e2df-8fe1-44a4-a57d-3f7c9886e5b2/12100_chiba-shi_city_2024_citygml_1_op_bldg_3dtiles_12101_chuo-ku_lod1/tileset.json",
+      "parentName": "千葉市",
+      "displayName": "千葉市 中央区",
       "b2": "19/3f90ce-ffa2-4dfa-945e-e84161ec4a0d/12100_chiba-shi_city_2024_citygml_1_op_bldg_3dtiles_12101_chuo-ku_lod2/tileset.json",
       "b2n": "17/c731d0-1bd6-4aec-8885-4d06930de96a/12100_chiba-shi_city_2024_citygml_1_op_bldg_3dtiles_12101_chuo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -4029,6 +4051,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "eb/368b4e-eb03-45dd-8fd4-f59b5faeb44b/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14101_tsurumi-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 鶴見区",
       "b2": "88/ca8e5f-33c7-46db-a272-64ad0a504633/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14101_tsurumi-ku_lod2/tileset.json",
       "b2n": "e9/5bf14f-3c10-44dc-bf08-824cf297bb26/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14101_tsurumi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -4119,6 +4143,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "fa/12701b-a5ed-454a-9693-a7b5263596b4/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14102_kanagawa-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 神奈川区",
       "b2": "67/51cc26-b148-4296-892d-807ba6798fa8/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14102_kanagawa-ku_lod2/tileset.json",
       "b2n": "75/06967a-28e7-4b1e-a952-df4a93bbf08b/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14102_kanagawa-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -4209,6 +4235,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "ad/5fd83a-161b-4a01-a666-a3e8c1c23759/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14103_nishi-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 西区",
       "b2": "4a/84f474-71c4-4b33-a328-0c5798b79f2f/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14103_nishi-ku_lod2/tileset.json",
       "b2n": "72/f0f73f-48ab-4661-a6b6-38290e2e05fb/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14103_nishi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -4299,6 +4327,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "48/507079-4d87-45fb-8941-253f3bd1c51e/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14104_naka-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 中区",
       "b2": "94/a960a4-7e19-439f-8249-b743e939102a/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14104_naka-ku_lod2/tileset.json",
       "b2n": "db/a01618-1d97-4212-ba0f-4bee03df7a43/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14104_naka-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -4389,6 +4419,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "1b/fc666f-c035-4af6-afa0-ffe0e8861643/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14105_minami-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 南区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -4477,6 +4509,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "f9/408540-ac01-4d51-929d-b25ad7ad7c1f/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14106_hodogaya-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 保土ケ谷区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -4565,6 +4599,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "87/d45a7d-3ebf-4504-886c-cf7459fe1a83/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14107_isogo-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 磯子区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -4653,6 +4689,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "9f/4616c4-ec75-4c0e-b3e1-c4db09d427cf/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14108_kanazawa-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 金沢区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -4741,6 +4779,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "1d/b1355d-4206-42f2-b75a-4b3831af1ac6/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14109_kohoku-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 港北区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -4829,6 +4869,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "db/aea506-216d-4f08-9352-e136c1e1467c/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14110_totsuka-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 戸塚区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -4917,6 +4959,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "5a/157715-1458-4408-9823-0fb70c91856a/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14111_konan-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 港南区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -5005,6 +5049,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "a8/b75061-0f14-4459-96bc-911aa0b61213/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14112_asahi-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 旭区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -5093,6 +5139,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "15/56c93f-7449-4716-ac37-175178da2e2f/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14113_midori-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 緑区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -5181,6 +5229,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "40/45bd26-1a54-4981-96a3-8522309d8c93/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14114_seya-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 瀬谷区",
       "b2": "25/728dfc-42c2-4c82-947f-fc5db2bf2ae7/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14114_seya-ku_lod2/tileset.json",
       "fld": [
         {
@@ -5270,6 +5320,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "2f/feca6f-b80f-4b79-939a-1be8aabce2c0/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14115_sakae-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 栄区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -5358,6 +5410,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "82/51fc14-4dcf-4ff3-97b3-0d0845240323/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14116_izumi-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 泉区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -5446,6 +5500,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "6e/8b2316-0304-4de5-b465-c1789c3a0add/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14117_aoba-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 青葉区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -5534,6 +5590,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "12/d3b4ec-fe21-4fdc-8509-126df613ba0d/14100_yokohama-shi_city_2024_citygml_2_op_bldg_3dtiles_14118_tsuzuki-ku_lod1/tileset.json",
+      "parentName": "横浜市",
+      "displayName": "横浜市 都筑区",
       "fld": [
         {
           "label": "宮川水系宮川",
@@ -5622,6 +5680,8 @@
       "pref": "神奈川県",
       "year": 2022,
       "b1": "ee/696401-0a95-44b8-ba7b-61dfe68e07aa/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14131_kawasaki-ku_lod1/tileset.json",
+      "parentName": "川崎市",
+      "displayName": "川崎市 川崎区",
       "b2": "a5/0d010f-3fac-4ece-abd3-48bcf5f9c566/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14131_kawasaki-ku_lod2/tileset.json",
       "b2n": "6e/2f92f1-9cb4-4759-857c-378864981e89/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14131_kawasaki-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -5681,6 +5741,8 @@
       "pref": "神奈川県",
       "year": 2022,
       "b1": "a2/f76be3-baff-42e6-8a77-a82dfeab6b16/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14132_saiwai-ku_lod1/tileset.json",
+      "parentName": "川崎市",
+      "displayName": "川崎市 幸区",
       "b2": "49/7f0c86-9d4d-495a-96d7-a946a7f6253e/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14132_saiwai-ku_lod2/tileset.json",
       "fld": [
         {
@@ -5739,6 +5801,8 @@
       "pref": "神奈川県",
       "year": 2022,
       "b1": "60/ec803d-7bbd-4574-b6f2-809ffc580419/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14133_nakahara-ku_lod1/tileset.json",
+      "parentName": "川崎市",
+      "displayName": "川崎市 中原区",
       "b2": "ac/c9d592-4f94-4a3b-9fe8-62f0d379950f/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14133_nakahara-ku_lod2/tileset.json",
       "b2n": "2b/61e6e4-6a1e-4d1b-900a-87199253b2cc/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14133_nakahara-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -5798,6 +5862,8 @@
       "pref": "神奈川県",
       "year": 2022,
       "b1": "16/003fe8-d709-469d-bf2f-d0233cfad231/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14134_takatsu-ku_lod1/tileset.json",
+      "parentName": "川崎市",
+      "displayName": "川崎市 高津区",
       "fld": [
         {
           "label": "多摩川水系多摩川・浅川・大栗川",
@@ -5855,6 +5921,8 @@
       "pref": "神奈川県",
       "year": 2022,
       "b1": "91/53db04-831f-4d05-a906-4d0419201285/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14135_tama-ku_lod1/tileset.json",
+      "parentName": "川崎市",
+      "displayName": "川崎市 多摩区",
       "fld": [
         {
           "label": "多摩川水系多摩川・浅川・大栗川",
@@ -5912,6 +5980,8 @@
       "pref": "神奈川県",
       "year": 2022,
       "b1": "60/33ccc8-8727-475e-946e-88c6020cc2f6/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14136_miyamae-ku_lod1/tileset.json",
+      "parentName": "川崎市",
+      "displayName": "川崎市 宮前区",
       "b2": "fa/1f604f-410e-4108-a9fe-2c68ab7c9fa5/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14136_miyamae-ku_lod2/tileset.json",
       "b2n": "ac/0eabf3-4155-4400-9a86-f60e15f3afb2/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14136_miyamae-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -5971,6 +6041,8 @@
       "pref": "神奈川県",
       "year": 2022,
       "b1": "de/d9ebc6-0fe4-4cb1-94b0-1affded44d42/14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14137_asao-ku_lod1/tileset.json",
+      "parentName": "川崎市",
+      "displayName": "川崎市 麻生区",
       "fld": [
         {
           "label": "多摩川水系多摩川・浅川・大栗川",
@@ -6028,6 +6100,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "f0/9dd459-29b8-44aa-828f-5afcc6f7344f/14150_sagamihara-shi_city_2024_citygml_1_op_bldg_3dtiles_14151_midori-ku_lod1/tileset.json",
+      "parentName": "相模原市",
+      "displayName": "相模原市 緑区",
       "b2": "c2/672b89-74f8-4e03-b6f1-8c3ac03e2cea/14150_sagamihara-shi_city_2024_citygml_1_op_bldg_3dtiles_14151_midori-ku_lod2/tileset.json",
       "b2n": "76/8c007d-a30d-47cd-9966-0e1676f2dff5/14150_sagamihara-shi_city_2024_citygml_1_op_bldg_3dtiles_14151_midori-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -6063,6 +6137,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "b7/b7a34b-1b0d-4ec6-bb1c-10113f195eb4/14150_sagamihara-shi_city_2024_citygml_1_op_bldg_3dtiles_14152_chuo-ku_lod1/tileset.json",
+      "parentName": "相模原市",
+      "displayName": "相模原市 中央区",
       "b2": "5b/07d400-ea5e-47ed-9fcc-51108c5ee88e/14150_sagamihara-shi_city_2024_citygml_1_op_bldg_3dtiles_14152_chuo-ku_lod2/tileset.json",
       "b2n": "c6/d9771d-751f-4f91-a52c-c13f552a8738/14150_sagamihara-shi_city_2024_citygml_1_op_bldg_3dtiles_14152_chuo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -6098,6 +6174,8 @@
       "pref": "神奈川県",
       "year": 2024,
       "b1": "35/cc4383-fc3c-41e4-ada6-916c2458e8b9/14150_sagamihara-shi_city_2024_citygml_1_op_bldg_3dtiles_14153_minami-ku_lod1/tileset.json",
+      "parentName": "相模原市",
+      "displayName": "相模原市 南区",
       "fld": [
         {
           "label": "境川水系境川",
@@ -6289,6 +6367,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "a9/773598-8295-4d57-bb22-e61fcd730955/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15101_kita-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 北区",
       "fld": [
         {
           "label": "阿賀野川水系阿賀野川",
@@ -6344,6 +6424,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "3a/e33abf-f354-4cf1-a931-9004b12bf4d5/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15102_higashi-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 東区",
       "fld": [
         {
           "label": "阿賀野川水系阿賀野川",
@@ -6399,6 +6481,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "cd/f0bfa1-f657-450a-b463-5b974eaee9de/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15103_chuo-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 中央区",
       "b2": "1a/a1aff2-e86f-4573-998f-b706ff95decf/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15103_chuo-ku_lod2/tileset.json",
       "b2n": "06/5712c4-c5c3-46ac-b6da-e0043532cf88/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15103_chuo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -6456,6 +6540,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "a0/4c02e1-691b-4395-bf8e-50156e43dbbe/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15104_konan-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 江南区",
       "fld": [
         {
           "label": "阿賀野川水系阿賀野川",
@@ -6511,6 +6597,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "7e/4446eb-89a4-415c-bfb9-59ac2fa80948/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15105_akiha-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 秋葉区",
       "fld": [
         {
           "label": "阿賀野川水系阿賀野川",
@@ -6566,6 +6654,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "89/58dd2a-cc69-4d54-a3dd-19c72af360f5/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15106_minami-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 南区",
       "fld": [
         {
           "label": "阿賀野川水系阿賀野川",
@@ -6621,6 +6711,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "90/b413ee-0b40-40f0-8ade-39f8b3946e5f/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15107_nishi-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 西区",
       "fld": [
         {
           "label": "阿賀野川水系阿賀野川",
@@ -6676,6 +6768,8 @@
       "pref": "新潟県",
       "year": 2023,
       "b1": "7f/8f7c27-bf2b-45c9-86d0-54991a94023a/15100_niigata-shi_city_2023_citygml_2_op_bldg_3dtiles_15108_nishikan-ku_lod1/tileset.json",
+      "parentName": "新潟市",
+      "displayName": "新潟市 西蒲区",
       "fld": [
         {
           "label": "阿賀野川水系阿賀野川",
@@ -7740,6 +7834,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "d5/087dc5-219d-4337-9703-4314f90cd3b1/22100_shizuoka-shi_city_2023_citygml_3_op_bldg_3dtiles_22101_aoi-ku_lod1/tileset.json",
+      "parentName": "静岡市",
+      "displayName": "静岡市 葵区",
       "b2": "16/f01621-f72d-4c64-9c40-67c97cee7c5f/22100_shizuoka-shi_city_2023_citygml_3_op_bldg_3dtiles_22101_aoi-ku_lod2/tileset.json",
       "b2n": "60/0d17eb-270c-478c-b4ec-29255f61882b/22100_shizuoka-shi_city_2023_citygml_3_op_bldg_3dtiles_22101_aoi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -7791,6 +7887,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "18/aba17e-da3b-441d-9712-a6db88f3e6c5/22100_shizuoka-shi_city_2023_citygml_3_op_bldg_3dtiles_22102_suruga-ku_lod1/tileset.json",
+      "parentName": "静岡市",
+      "displayName": "静岡市 駿河区",
       "fld": [
         {
           "label": "安倍川水系安倍川・藁科川",
@@ -7840,6 +7938,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "db/4e7d98-7baf-4fae-bf13-3c98fd53cf32/22100_shizuoka-shi_city_2023_citygml_3_op_bldg_3dtiles_22103_shimizu-ku_lod1/tileset.json",
+      "parentName": "静岡市",
+      "displayName": "静岡市 清水区",
       "b2": "f7/8d92ad-e4e2-416e-8ea7-8968145878c3/22100_shizuoka-shi_city_2023_citygml_3_op_bldg_3dtiles_22103_shimizu-ku_lod2/tileset.json",
       "b2n": "ee/499c8c-3104-40c2-a5a3-ee09f3fc20ff/22100_shizuoka-shi_city_2023_citygml_3_op_bldg_3dtiles_22103_shimizu-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -7891,6 +7991,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "8d/01deb7-3c29-4faf-9d15-818d79158d52/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22131_naka-ku_lod1/tileset.json",
+      "parentName": "浜松市",
+      "displayName": "浜松市 中区",
       "b2": "8e/e64279-974c-4b98-861d-1d2fa7c6a327/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22131_naka-ku_lod2/tileset.json",
       "fld": [
         {
@@ -7969,6 +8071,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "b6/a0856d-d0c1-4d23-8ef9-b394fc6cb282/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22132_higashi-ku_lod1/tileset.json",
+      "parentName": "浜松市",
+      "displayName": "浜松市 東区",
       "b2": "4c/42de6c-ad75-430f-a05d-e38ac912591d/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22132_higashi-ku_lod2/tileset.json",
       "fld": [
         {
@@ -8047,6 +8151,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "ae/ab773c-c81c-4f8f-a430-e322dbc99d32/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22133_nishi-ku_lod1/tileset.json",
+      "parentName": "浜松市",
+      "displayName": "浜松市 西区",
       "b2": "80/6d4bf9-528b-46f8-9cde-8745daf91e26/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22133_nishi-ku_lod2/tileset.json",
       "fld": [
         {
@@ -8125,6 +8231,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "27/147bc6-2af0-4c8e-961f-b6fc72369ea5/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22134_minami-ku_lod1/tileset.json",
+      "parentName": "浜松市",
+      "displayName": "浜松市 南区",
       "b2": "85/fc3819-da13-496a-8df8-38a94f68d1a0/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22134_minami-ku_lod2/tileset.json",
       "fld": [
         {
@@ -8203,6 +8311,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "e6/0624ae-ccaa-4ac0-ab10-24195af4668a/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22135_kita-ku_lod1/tileset.json",
+      "parentName": "浜松市",
+      "displayName": "浜松市 北区",
       "b2": "bb/837a45-ce49-4fa9-b677-5a851f91aaaa/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22135_kita-ku_lod2/tileset.json",
       "fld": [
         {
@@ -8281,6 +8391,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "40/904295-ce38-46e5-a5b7-c3f27999d88f/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22136_hamakita-ku_lod1/tileset.json",
+      "parentName": "浜松市",
+      "displayName": "浜松市 浜北区",
       "b2": "16/7e978c-2c6c-4f13-87e1-56c702dcc2c1/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22136_hamakita-ku_lod2/tileset.json",
       "fld": [
         {
@@ -8359,6 +8471,8 @@
       "pref": "静岡県",
       "year": 2023,
       "b1": "3d/a710d8-9e60-4935-8bf6-0d42aed3e26f/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22137_tenryu-ku_lod1/tileset.json",
+      "parentName": "浜松市",
+      "displayName": "浜松市 天竜区",
       "b2": "2b/cefa4f-e3c9-4b98-8e72-e528e85295b8/22130_hamamatsu-shi_city_2023_citygml_2_op_bldg_3dtiles_22137_tenryu-ku_lod2/tileset.json",
       "fld": [
         {
@@ -9110,6 +9224,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "e3/c5a409-dfb4-415c-a0a1-3c2c565fb3b8/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23101_chikusa-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 千種区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9135,6 +9251,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "02/d91205-c321-4541-b93d-47d699041068/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23102_higashi-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 東区",
       "b2": "8c/61d87b-1235-4a68-8f92-d9fabc3a83a6/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23102_higashi-ku_lod2/tileset.json",
       "b2n": "f5/70535e-559f-4479-acee-b49051d3afb0/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23102_higashi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -9162,6 +9280,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "5d/9e8a10-159a-4aab-b7fb-9b50e4739f53/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23103_kita-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 北区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9187,6 +9307,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "83/8dff0f-7706-4a88-8de5-2418f41889aa/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23104_nishi-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 西区",
       "b2": "39/2a339e-9442-4e4e-bed6-ee48d5ca8feb/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23104_nishi-ku_lod2/tileset.json",
       "b2n": "b9/bf279f-54e1-428f-b65a-ead4d5ccdf98/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23104_nishi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -9214,6 +9336,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "20/220623-b369-4fd9-9525-0cf09de0c447/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23105_nakamura-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 中村区",
       "b2": "e2/807542-e5d2-4f05-a1e2-85fa59db11b3/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23105_nakamura-ku_lod2/tileset.json",
       "b2n": "74/4a013a-96e7-4152-b662-5d28b4801be9/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23105_nakamura-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -9241,6 +9365,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "ea/bf8edc-e0d9-466f-a9f7-822b3ef34851/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23106_naka-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 中区",
       "b2": "40/8090fa-6b99-4e7c-b21c-0e2634f65e01/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23106_naka-ku_lod2/tileset.json",
       "b2n": "37/ca8d9a-f78f-470f-a7e6-d598b9493faf/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23106_naka-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -9268,6 +9394,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "ad/df2ca9-381e-41fa-b79b-dfcc964638a7/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23107_showa-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 昭和区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9293,6 +9421,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "ed/2043ca-8471-4d5d-ae9f-cedcb46a75aa/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23108_mizuho-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 瑞穂区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9318,6 +9448,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "48/98bbde-44d2-483f-9191-6653e5744ad3/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23109_atsuta-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 熱田区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9343,6 +9475,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "a9/1dc07d-d6b2-470a-8431-6a73334ce00a/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23110_nakagawa-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 中川区",
       "b2": "07/acbe1b-356a-47a1-8ea3-b6d7490f7989/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23110_nakagawa-ku_lod2/tileset.json",
       "b2n": "52/c5d139-a803-4bd5-84cc-4cc3be4e7069/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23110_nakagawa-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -9370,6 +9504,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "79/d67234-5b9d-4515-a16b-55edfe7d3bd3/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23111_minato-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 港区",
       "b2": "a0/e447aa-07b0-4036-bb01-56dc6cbb9984/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23111_minato-ku_lod2/tileset.json",
       "b2n": "14/985308-f6cd-4fbb-b71e-ba61c9501556/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23111_minato-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -9397,6 +9533,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "52/c3206f-5462-4b84-ad50-a34ccf9303f4/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23112_minami-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 南区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9422,6 +9560,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "42/4f909f-374b-4fae-8dde-1023720e7ea5/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23113_moriyama-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 守山区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9447,6 +9587,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "4b/c438fd-635e-4b65-ae6f-df30d2cf5bdf/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23114_midori-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 緑区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9472,6 +9614,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "e8/fb6aed-a8cb-4a04-8729-c73d12705f94/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23115_meito-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 名東区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -9497,6 +9641,8 @@
       "pref": "愛知県",
       "year": 2022,
       "b1": "aa/899325-e5ab-4d5b-9c34-4e9c420e5035/23100_nagoya-shi_city_2022_citygml_4_op_bldg_3dtiles_23116_tempaku-ku_lod1/tileset.json",
+      "parentName": "名古屋市",
+      "displayName": "名古屋市 天白区",
       "fld": [
         {
           "label": "庄内川水系庄内川",
@@ -10062,6 +10208,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "e7/2aaaf0-1ab3-40e8-af5b-db3310fb4f15/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26101_kita-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 北区",
       "b2": "7a/918715-89fb-4f45-a48a-a77ee6288577/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26101_kita-ku_lod2/tileset.json",
       "b2n": "e2/863a08-1305-48d4-b6cf-1ffa0559589a/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26101_kita-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -10249,6 +10397,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "7f/4d517a-10cc-4489-b1b2-5c754caa0561/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26102_kamigyo-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 上京区",
       "b2": "71/0af6ab-875e-4c69-bb5e-9e06096e6fcb/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26102_kamigyo-ku_lod2/tileset.json",
       "b2n": "4e/75ed90-a912-447a-8013-0868b9e91b22/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26102_kamigyo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -10436,6 +10586,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "95/ec9c15-9c08-4c97-b073-029636f84818/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26103_sakyo-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 左京区",
       "b2": "96/d17b9d-5527-4610-90c8-9e9c44d500c3/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26103_sakyo-ku_lod2/tileset.json",
       "b2n": "39/1d59ba-57ab-46b9-8433-d8a0ee0016d9/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26103_sakyo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -10623,6 +10775,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "65/c601e9-7ba9-42f2-8400-bd1ec5282421/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26104_nakagyo-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 中京区",
       "b2": "04/eaac56-936e-49e2-a91b-0db31a6ed192/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26104_nakagyo-ku_lod2/tileset.json",
       "b2n": "1a/bba122-47e9-45f6-bf4e-f8ce0dce172f/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26104_nakagyo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -10810,6 +10964,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "ce/6e26ee-9c98-4df7-bc06-4ea5049162c3/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26105_higashiyama-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 東山区",
       "b2": "25/dd4c50-5342-4a0b-ac51-05ffb138b8b5/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26105_higashiyama-ku_lod2/tileset.json",
       "b2n": "f6/af38ee-5eae-4032-a861-fb460adecd16/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26105_higashiyama-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -10997,6 +11153,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "64/f8be59-d43b-47fe-a7f0-ce936ae5bc8e/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26106_shimogyo-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 下京区",
       "b2": "f0/2ed501-5480-4ccb-8293-9469a3856f9a/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26106_shimogyo-ku_lod2/tileset.json",
       "b2n": "1a/742b55-cd5f-460e-991c-f3b03242f2db/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26106_shimogyo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -11184,6 +11342,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "af/70c122-184c-46e7-8200-056f326851a9/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26107_minami-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 南区",
       "b2": "1c/596e87-af58-4394-a4e7-ef429ba5732c/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26107_minami-ku_lod2/tileset.json",
       "b2n": "be/101c86-15df-431f-b0eb-6739397abd5e/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26107_minami-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -11371,6 +11531,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "1c/369350-e66e-4526-bdb0-ff014a15460e/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26108_ukyo-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 右京区",
       "b2": "64/cf6354-e5ff-4ee4-84d6-1751734da17c/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26108_ukyo-ku_lod2/tileset.json",
       "b2n": "6f/c4fa62-ac7a-4a21-9248-2326520a22d7/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26108_ukyo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -11558,6 +11720,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "d2/d06236-cb09-4229-a086-469dac391966/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26109_fushimi-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 伏見区",
       "b2": "6c/10f912-836b-483d-a6b2-881e298d7006/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26109_fushimi-ku_lod2/tileset.json",
       "b2n": "2b/2aca71-8487-41f0-ba72-1209a2cac988/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26109_fushimi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -11745,6 +11909,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "ac/8c8272-b229-42b9-8091-fcace8039948/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26110_yamashina-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 山科区",
       "fld": [
         {
           "label": "淀川水系鞍馬川・静原川・貴船川",
@@ -11930,6 +12096,8 @@
       "pref": "京都府",
       "year": 2025,
       "b1": "e4/bab58f-04c7-4673-a6c0-e36f58f5237f/26100_kyoto-shi_city_2025_citygml_1_op_bldg_3dtiles_26111_nishikyo-ku_lod1/tileset.json",
+      "parentName": "京都市",
+      "displayName": "京都市 西京区",
       "fld": [
         {
           "label": "淀川水系鞍馬川・静原川・貴船川",
@@ -12179,6 +12347,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "ea/520f01-415e-424f-a973-6a35856e6430/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27102_miyakojima-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 都島区",
       "b2": "f6/438555-e27f-4fb7-bce3-7a11906ce06a/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27102_miyakojima-ku_lod2/tileset.json",
       "b2n": "0a/e022cb-aa2e-46ff-9cdb-40ba8fe9080b/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27102_miyakojima-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -12239,6 +12409,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "db/dadcf8-1214-4161-bf22-a60d9142cfc7/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27103_fukushima-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 福島区",
       "b2": "72/90e183-bf4b-463e-b8d9-11936f32d256/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27103_fukushima-ku_lod2/tileset.json",
       "fld": [
         {
@@ -12298,6 +12470,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "4c/7f47b0-6ff9-41ce-92b4-b2dbeb3be119/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27104_konohana-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 此花区",
       "b2": "1b/2acef6-47d7-46b1-a391-050836fe0a96/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27104_konohana-ku_lod2/tileset.json",
       "b2n": "e1/c16fa3-3415-42d7-b11f-952a8cfaede6/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27104_konohana-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -12358,6 +12532,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "37/00bcbf-5b8c-49be-9c89-76a68507aa61/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27106_nishi-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 西区",
       "b2": "32/6117a6-a930-4fe1-bce2-7cbdddc6c52f/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27106_nishi-ku_lod2/tileset.json",
       "fld": [
         {
@@ -12417,6 +12593,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "58/e2ff4e-4afe-40d9-97ff-f12371127bb9/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27107_minato-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 港区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -12475,6 +12653,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "06/2458e8-5ace-4b51-9f99-c4a048852a11/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27108_taisho-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 大正区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -12533,6 +12713,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "84/435ce6-00dd-47fe-87db-19958af5a6ac/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27109_tennoji-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 天王寺区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -12591,6 +12773,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "01/9e98f9-121f-4a18-80c8-32b2c3fc071c/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27111_naniwa-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 浪速区",
       "b2": "32/d6ef51-5aac-4519-a690-aea78e8bd039/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27111_naniwa-ku_lod2/tileset.json",
       "fld": [
         {
@@ -12650,6 +12834,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "87/d206f3-29c6-4b1e-8135-08f9a9a870a3/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27113_nishiyodogawa-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 西淀川区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -12708,6 +12894,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "ba/a16b05-652a-491b-9e0e-b3550398e65f/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27114_higashiyodogawa-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 東淀川区",
       "b2": "e2/4e8207-5f8d-4d8e-8891-334c4b090eb2/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27114_higashiyodogawa-ku_lod2/tileset.json",
       "b2n": "6d/56eabf-b0ee-4774-a92a-16e3ddb418e2/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27114_higashiyodogawa-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -12768,6 +12956,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "0e/c24fa1-af58-48c9-bf24-63bc58daaaf1/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27115_higashinari-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 東成区",
       "b2": "62/c35aea-229b-4345-9535-7d9f9146d433/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27115_higashinari-ku_lod2/tileset.json",
       "b2n": "71/1ce44f-d586-4897-8b89-5c5aa18e5421/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27115_higashinari-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -12828,6 +13018,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "4a/9f6675-d430-4170-8a40-df8308ee9984/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27116_ikuno-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 生野区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -12886,6 +13078,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "25/e6ec51-85da-4133-b595-91a1dca16fea/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27117_asahi-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 旭区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -12944,6 +13138,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "bb/0993c8-e192-458b-8c87-bd507f7d811a/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27118_joto-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 城東区",
       "b2": "02/821890-fea9-4a5b-b480-6e14102b6eb0/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27118_joto-ku_lod2/tileset.json",
       "b2n": "35/638788-b5ed-4c60-9d0c-3098adea6318/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27118_joto-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -13004,6 +13200,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "43/2982ec-f91c-4d81-a70f-d13c997f520a/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27119_abeno-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 阿倍野区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -13062,6 +13260,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "48/116eb6-d434-4920-9de1-5951e53b099e/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27120_sumiyoshi-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 住吉区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -13120,6 +13320,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "e6/22e19a-e2d1-4334-8b5c-85eb5401c0ce/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27121_higashisumiyoshi-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 東住吉区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -13178,6 +13380,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "33/62510b-6c6f-4937-94d4-777874906ac8/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27122_nishinari-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 西成区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -13236,6 +13440,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "da/6340ff-d3c4-4e15-8577-975d0ba44446/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27123_yodogawa-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 淀川区",
       "b2": "54/260d5c-b57b-4882-92c6-b2cb20f65198/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27123_yodogawa-ku_lod2/tileset.json",
       "b2n": "78/81f873-7832-44f0-8afb-98a22cfa99df/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27123_yodogawa-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -13296,6 +13502,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "2c/2d107b-375a-49c9-8877-106ed53db820/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27124_tsurumi-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 鶴見区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -13354,6 +13562,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "74/4f2272-b0ef-4742-bb22-f9f97ef662cf/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27125_suminoe-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 住之江区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -13412,6 +13622,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "de/f68892-cd4e-476e-899e-7a9818f41fee/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27126_hirano-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 平野区",
       "fld": [
         {
           "label": "大和川水系西除川（狭山池ダム下流区間）・西除川放水路",
@@ -13470,6 +13682,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "73/bc9017-e521-43f2-8777-2837eefd9795/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27127_kita-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 北区",
       "b2": "92/1459fa-4102-4cfe-a56f-6fe5c7764178/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27127_kita-ku_lod2/tileset.json",
       "b2n": "40/e1dacb-f310-4e2b-84f0-b68ce6d43899/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27127_kita-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -13530,6 +13744,8 @@
       "pref": "大阪府",
       "year": 2025,
       "b1": "6e/cc10bb-07ec-4f6c-949d-aaace115b581/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27128_chuo-ku_lod1/tileset.json",
+      "parentName": "大阪市",
+      "displayName": "大阪市 中央区",
       "b2": "6b/bea10b-2d85-46e6-8786-4ef504aeeb28/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27128_chuo-ku_lod2/tileset.json",
       "b2n": "ad/fc63fd-5c85-4032-92a5-a3d9d521f2cb/27100_osaka-shi_city_2025_citygml_1_op_bldg_3dtiles_27128_chuo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -13590,6 +13806,8 @@
       "pref": "大阪府",
       "year": 2024,
       "b1": "e7/63daa2-efca-4ce1-b563-16851fc95f7c/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27141_sakai-ku_lod1/tileset.json",
+      "parentName": "堺市",
+      "displayName": "堺市 堺区",
       "b2": "b6/575505-d65d-452d-a572-be462c2b2d99/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27141_sakai-ku_lod2/tileset.json",
       "b2n": "8d/9573ca-924e-4ee5-8920-bd76fc7ac298/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27141_sakai-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -13625,6 +13843,8 @@
       "pref": "大阪府",
       "year": 2024,
       "b1": "a4/3efb49-d4a4-4d1d-b547-30d7ae1ee30c/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27142_naka-ku_lod1/tileset.json",
+      "parentName": "堺市",
+      "displayName": "堺市 中区",
       "fld": [
         {
           "label": "芦田川水系芦田川・芦田川分水路",
@@ -13658,6 +13878,8 @@
       "pref": "大阪府",
       "year": 2024,
       "b1": "47/fe62c8-1c7b-45e3-8aa4-535d973ae7f9/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27143_higashi-ku_lod1/tileset.json",
+      "parentName": "堺市",
+      "displayName": "堺市 東区",
       "fld": [
         {
           "label": "芦田川水系芦田川・芦田川分水路",
@@ -13691,6 +13913,8 @@
       "pref": "大阪府",
       "year": 2024,
       "b1": "a1/99c1f4-c998-410d-89d9-b45652f1f2a8/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27144_nishi-ku_lod1/tileset.json",
+      "parentName": "堺市",
+      "displayName": "堺市 西区",
       "b2": "fc/86811d-685b-4773-9f69-6f2e01f9d597/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27144_nishi-ku_lod2/tileset.json",
       "b2n": "ac/4f6e87-3954-4f30-82aa-26ecc546614d/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27144_nishi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -13726,6 +13950,8 @@
       "pref": "大阪府",
       "year": 2024,
       "b1": "18/7e1474-084a-4d85-a026-ca229d9b4a29/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27145_minami-ku_lod1/tileset.json",
+      "parentName": "堺市",
+      "displayName": "堺市 南区",
       "fld": [
         {
           "label": "芦田川水系芦田川・芦田川分水路",
@@ -13759,6 +13985,8 @@
       "pref": "大阪府",
       "year": 2024,
       "b1": "03/cb7028-84ac-4d40-bc4e-b74b99a2209f/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27146_kita-ku_lod1/tileset.json",
+      "parentName": "堺市",
+      "displayName": "堺市 北区",
       "fld": [
         {
           "label": "芦田川水系芦田川・芦田川分水路",
@@ -13792,6 +14020,8 @@
       "pref": "大阪府",
       "year": 2024,
       "b1": "bb/53ed4e-0fa2-4b27-a48e-e530fce83997/27140_sakai-shi_city_2024_citygml_1_op_bldg_3dtiles_27147_mihara-ku_lod1/tileset.json",
+      "parentName": "堺市",
+      "displayName": "堺市 美原区",
       "fld": [
         {
           "label": "芦田川水系芦田川・芦田川分水路",
@@ -14831,6 +15061,8 @@
       "pref": "岡山県",
       "year": 2025,
       "b1": "be/463a8c-0382-4c34-a77c-86369807cfa4/33100_okayama-shi_city_2025_citygml_1_op_bldg_3dtiles_33101_kita-ku_lod1/tileset.json",
+      "parentName": "岡山市",
+      "displayName": "岡山市 北区",
       "b2": "85/287c2c-3aef-4d97-873f-ce323360dfda/33100_okayama-shi_city_2025_citygml_1_op_bldg_3dtiles_33101_kita-ku_lod2/tileset.json",
       "b2n": "53/bdc91e-caeb-4473-aa50-ee7d4af2814e/33100_okayama-shi_city_2025_citygml_1_op_bldg_3dtiles_33101_kita-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -14902,6 +15134,8 @@
       "pref": "岡山県",
       "year": 2025,
       "b1": "6b/96089e-bc8d-4684-beec-3d2a7ed897db/33100_okayama-shi_city_2025_citygml_1_op_bldg_3dtiles_33102_naka-ku_lod1/tileset.json",
+      "parentName": "岡山市",
+      "displayName": "岡山市 中区",
       "fld": [
         {
           "label": "旭川水系旭川洪水浸水想定区域図",
@@ -14971,6 +15205,8 @@
       "pref": "岡山県",
       "year": 2025,
       "b1": "70/de8ab7-f5de-46de-b4f3-f4313c290cd1/33100_okayama-shi_city_2025_citygml_1_op_bldg_3dtiles_33103_higashi-ku_lod1/tileset.json",
+      "parentName": "岡山市",
+      "displayName": "岡山市 東区",
       "fld": [
         {
           "label": "旭川水系旭川洪水浸水想定区域図",
@@ -15040,6 +15276,8 @@
       "pref": "岡山県",
       "year": 2025,
       "b1": "11/8770e4-12ed-4684-adac-7e67bff4124b/33100_okayama-shi_city_2025_citygml_1_op_bldg_3dtiles_33104_minami-ku_lod1/tileset.json",
+      "parentName": "岡山市",
+      "displayName": "岡山市 南区",
       "fld": [
         {
           "label": "旭川水系旭川洪水浸水想定区域図",
@@ -15203,6 +15441,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "9b/776f13-5dfc-4fc9-b358-2cf7a1067cc7/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34101_naka-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 中区",
       "b2": "c3/b0b031-11c9-47c8-90a7-404c5f4c186a/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34101_naka-ku_lod2/tileset.json",
       "b2n": "96/b46095-22bc-4190-b658-3ef163e36c9f/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34101_naka-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -15294,6 +15534,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "2e/6ce2b3-3e5d-4ad3-8c51-f4dec384245e/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34102_higashi-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 東区",
       "b2": "0a/7618a4-d9f9-4a3b-a1bb-a8000be1aa39/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34102_higashi-ku_lod2/tileset.json",
       "b2n": "1e/8f7e65-212f-418b-b85a-47a6e0c2eecc/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34102_higashi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -15385,6 +15627,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "1d/4cda01-9592-4d65-a8e7-c1388fde31c7/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34103_minami-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 南区",
       "b2": "60/984e4f-a2d5-44c3-9b9a-0c2561d260bc/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34103_minami-ku_lod2/tileset.json",
       "b2n": "a0/c32169-a6f4-4a88-9132-eb2925f4106f/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34103_minami-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -15476,6 +15720,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "d3/c2581a-3e4d-4c8a-8720-0df22205699b/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34104_nishi-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 西区",
       "fld": [
         {
           "label": "岡ノ下川水系岡ノ下川",
@@ -15565,6 +15811,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "0e/46ea83-788b-4c95-ad2d-d36928bfd400/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34105_asaminami-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 安佐南区",
       "fld": [
         {
           "label": "岡ノ下川水系岡ノ下川",
@@ -15654,6 +15902,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "17/f525fd-6bd6-4fe4-92c0-e37a9a89f1fe/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34106_asakita-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 安佐北区",
       "fld": [
         {
           "label": "岡ノ下川水系岡ノ下川",
@@ -15743,6 +15993,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "82/266468-654b-458d-a58b-406303515108/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34107_aki-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 安芸区",
       "fld": [
         {
           "label": "岡ノ下川水系岡ノ下川",
@@ -15832,6 +16084,8 @@
       "pref": "広島県",
       "year": 2024,
       "b1": "a1/c93261-c42f-4019-aaf5-a6d8f4b7c16d/34100_hiroshima-shi_city_2024_citygml_1_op_bldg_3dtiles_34108_saeki-ku_lod1/tileset.json",
+      "parentName": "広島市",
+      "displayName": "広島市 佐伯区",
       "fld": [
         {
           "label": "岡ノ下川水系岡ノ下川",
@@ -16358,6 +16612,8 @@
       "pref": "福岡県",
       "year": 2020,
       "b1": "51/b0eef2-b883-42b7-a140-82e6a6b16a30/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40101_moji-ku_lod1/tileset.json",
+      "parentName": "北九州市",
+      "displayName": "北九州市 門司区",
       "fld": [
         {
           "label": "遠賀川水系遠賀川",
@@ -16380,15 +16636,15 @@
           "url": "30/69ad23-b9ff-4f42-a4de-68f523fd4278/40100_kitakyushu-shi_city_2020_citygml_7_op_fld_pref_itabitsugawa_itabitsugawa_3dtiles_l2_no_texture/tileset.json"
         }
       ],
-      "urf": {
-        "use": "58/566055-82bb-4506-a18e-1f89b46c1ab1/40100_kitakyushu-shi_city_2023_citygml_7_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "40103": {
       "name": "若松区",
       "pref": "福岡県",
       "year": 2020,
       "b1": "a7/36e16c-6294-4f5d-b872-9f4373734da5/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40103_wakamatsu-ku_lod1/tileset.json",
+      "parentName": "北九州市",
+      "displayName": "北九州市 若松区",
       "fld": [
         {
           "label": "遠賀川水系遠賀川",
@@ -16411,15 +16667,15 @@
           "url": "30/69ad23-b9ff-4f42-a4de-68f523fd4278/40100_kitakyushu-shi_city_2020_citygml_7_op_fld_pref_itabitsugawa_itabitsugawa_3dtiles_l2_no_texture/tileset.json"
         }
       ],
-      "urf": {
-        "use": "58/566055-82bb-4506-a18e-1f89b46c1ab1/40100_kitakyushu-shi_city_2023_citygml_7_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "40105": {
       "name": "戸畑区",
       "pref": "福岡県",
       "year": 2020,
       "b1": "bc/5a87ff-4b6b-4905-809f-2c06d6c59aee/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40105_tobata-ku_lod1/tileset.json",
+      "parentName": "北九州市",
+      "displayName": "北九州市 戸畑区",
       "fld": [
         {
           "label": "遠賀川水系遠賀川",
@@ -16442,15 +16698,15 @@
           "url": "30/69ad23-b9ff-4f42-a4de-68f523fd4278/40100_kitakyushu-shi_city_2020_citygml_7_op_fld_pref_itabitsugawa_itabitsugawa_3dtiles_l2_no_texture/tileset.json"
         }
       ],
-      "urf": {
-        "use": "58/566055-82bb-4506-a18e-1f89b46c1ab1/40100_kitakyushu-shi_city_2023_citygml_7_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "40106": {
       "name": "小倉北区",
       "pref": "福岡県",
       "year": 2020,
       "b1": "05/5a5a3b-ee3d-4532-a824-c88e4f15de94/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40106_kokurakita-ku_lod1/tileset.json",
+      "parentName": "北九州市",
+      "displayName": "北九州市 小倉北区",
       "b2": "0e/a8d7bc-9d5b-42f4-a1af-e79555656f38/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40106_kokurakita-ku_lod2/tileset.json",
       "b2n": "d6/1830bb-650e-4f62-946d-0498a200d2a4/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40106_kokurakita-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -16475,15 +16731,15 @@
           "url": "30/69ad23-b9ff-4f42-a4de-68f523fd4278/40100_kitakyushu-shi_city_2020_citygml_7_op_fld_pref_itabitsugawa_itabitsugawa_3dtiles_l2_no_texture/tileset.json"
         }
       ],
-      "urf": {
-        "use": "58/566055-82bb-4506-a18e-1f89b46c1ab1/40100_kitakyushu-shi_city_2023_citygml_7_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "40107": {
       "name": "小倉南区",
       "pref": "福岡県",
       "year": 2020,
       "b1": "ff/03a644-51e3-4880-909a-d7817e337973/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40107_kokuraminami-ku_lod1/tileset.json",
+      "parentName": "北九州市",
+      "displayName": "北九州市 小倉南区",
       "fld": [
         {
           "label": "遠賀川水系遠賀川",
@@ -16506,15 +16762,15 @@
           "url": "30/69ad23-b9ff-4f42-a4de-68f523fd4278/40100_kitakyushu-shi_city_2020_citygml_7_op_fld_pref_itabitsugawa_itabitsugawa_3dtiles_l2_no_texture/tileset.json"
         }
       ],
-      "urf": {
-        "use": "58/566055-82bb-4506-a18e-1f89b46c1ab1/40100_kitakyushu-shi_city_2023_citygml_7_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "40108": {
       "name": "八幡東区",
       "pref": "福岡県",
       "year": 2020,
       "b1": "49/f89249-7561-41aa-898d-4fa270f92c67/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40108_yahatahigashi-ku_lod1/tileset.json",
+      "parentName": "北九州市",
+      "displayName": "北九州市 八幡東区",
       "b2": "ab/247b62-f07e-401a-a90a-e181af1b0a38/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40108_yahatahigashi-ku_lod2/tileset.json",
       "b2n": "14/9d9e06-a8e9-4867-a17a-3cbb707569b3/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40108_yahatahigashi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -16539,15 +16795,15 @@
           "url": "30/69ad23-b9ff-4f42-a4de-68f523fd4278/40100_kitakyushu-shi_city_2020_citygml_7_op_fld_pref_itabitsugawa_itabitsugawa_3dtiles_l2_no_texture/tileset.json"
         }
       ],
-      "urf": {
-        "use": "58/566055-82bb-4506-a18e-1f89b46c1ab1/40100_kitakyushu-shi_city_2023_citygml_7_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "40109": {
       "name": "八幡西区",
       "pref": "福岡県",
       "year": 2020,
       "b1": "5c/d17ff2-fc84-4baf-a81e-d9e5abc7c3c0/40100_kitakyushu-shi_city_2020_citygml_7_op_bldg_3dtiles_40109_yahatanishi-ku_lod1/tileset.json",
+      "parentName": "北九州市",
+      "displayName": "北九州市 八幡西区",
       "fld": [
         {
           "label": "遠賀川水系遠賀川",
@@ -16570,15 +16826,15 @@
           "url": "30/69ad23-b9ff-4f42-a4de-68f523fd4278/40100_kitakyushu-shi_city_2020_citygml_7_op_fld_pref_itabitsugawa_itabitsugawa_3dtiles_l2_no_texture/tileset.json"
         }
       ],
-      "urf": {
-        "use": "58/566055-82bb-4506-a18e-1f89b46c1ab1/40100_kitakyushu-shi_city_2023_citygml_7_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "40131": {
       "name": "東区",
       "pref": "福岡県",
       "year": 2024,
       "b1": "d2/833c4a-acbd-476c-8fe7-c0cde4d9d579/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40131_higashi-ku_lod1/tileset.json",
+      "parentName": "福岡市",
+      "displayName": "福岡市 東区",
       "b2": "9b/97b1bd-2c68-469e-bfd2-9e5e65e0128a/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40131_higashi-ku_lod2/tileset.json",
       "fld": [
         {
@@ -16669,6 +16925,8 @@
       "pref": "福岡県",
       "year": 2024,
       "b1": "19/b41be6-0ae1-4e9a-90b6-fe059b4d1ade/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40132_hakata-ku_lod1/tileset.json",
+      "parentName": "福岡市",
+      "displayName": "福岡市 博多区",
       "b2": "15/c3e22e-aa0a-411c-b34d-d40035ae940b/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40132_hakata-ku_lod2/tileset.json",
       "fld": [
         {
@@ -16759,6 +17017,8 @@
       "pref": "福岡県",
       "year": 2024,
       "b1": "39/0650bd-2980-4f07-8a33-ec9908ba8f80/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40133_chuo-ku_lod1/tileset.json",
+      "parentName": "福岡市",
+      "displayName": "福岡市 中央区",
       "b2": "bf/d8ff81-ad03-486b-a021-6865e50c3b23/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40133_chuo-ku_lod2/tileset.json",
       "fld": [
         {
@@ -16849,6 +17109,8 @@
       "pref": "福岡県",
       "year": 2024,
       "b1": "c4/b21110-51c3-4e3b-9e72-7bdbfdd45a41/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40134_minami-ku_lod1/tileset.json",
+      "parentName": "福岡市",
+      "displayName": "福岡市 南区",
       "fld": [
         {
           "label": "御笠川水系御笠川",
@@ -16938,6 +17200,8 @@
       "pref": "福岡県",
       "year": 2024,
       "b1": "2a/710dae-225a-4d0b-b144-c0af9b121609/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40135_nishi-ku_lod1/tileset.json",
+      "parentName": "福岡市",
+      "displayName": "福岡市 西区",
       "fld": [
         {
           "label": "御笠川水系御笠川",
@@ -17027,6 +17291,8 @@
       "pref": "福岡県",
       "year": 2024,
       "b1": "c2/716542-908e-46dc-958e-3670dc503372/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40136_jonan-ku_lod1/tileset.json",
+      "parentName": "福岡市",
+      "displayName": "福岡市 城南区",
       "fld": [
         {
           "label": "御笠川水系御笠川",
@@ -17116,6 +17382,8 @@
       "pref": "福岡県",
       "year": 2024,
       "b1": "d4/f3cdf5-d809-4f78-97c8-26d5b8874d2b/40130_fukuoka-shi_city_2024_citygml_2_op_bldg_3dtiles_40137_sawara-ku_lod1/tileset.json",
+      "parentName": "福岡市",
+      "displayName": "福岡市 早良区",
       "fld": [
         {
           "label": "御笠川水系御笠川",
@@ -17400,28 +17668,7 @@
       "year": 2025,
       "b1": "e0/7dc58e-0db1-4dc6-a2fe-9758b39dc9d8/40225_ukiha-shi_city_2025_citygml_1_op_bldg_3dtiles_lod1/tileset.json",
       "b2": "62/d0062d-3382-4843-bd54-cb0d2020f242/40225_ukiha-shi_city_2025_citygml_1_op_bldg_3dtiles_lod2/tileset.json",
-      "fld": [
-        {
-          "label": "筑後川水系巨瀬川",
-          "url": "cc/aa02bb-8c62-43bf-a096-aa601a6ecebd/40225_ukiha-shi_city_2023_citygml_2_op_fld_natl_chikugogawa_kosegawa_3dtiles_l2_no_texture/tileset.json"
-        },
-        {
-          "label": "筑後川水系巨瀬川・樋ノ口川・山曽谷川",
-          "url": "f8/aa6b1b-f004-49d8-b04b-1f5579c679ca/40225_ukiha-shi_city_2023_citygml_2_op_fld_pref_chikugogawa_kosegawa-hinokuchigawa-etc_3dtiles_l2_no_texture/tileset.json"
-        },
-        {
-          "label": "筑後川水系隈上川",
-          "url": "a9/a35f95-6a12-47f0-ada9-165002d20484/40225_ukiha-shi_city_2023_citygml_2_op_fld_natl_chikugogawa_kumanouegawa_3dtiles_l2_no_texture/tileset.json"
-        },
-        {
-          "label": "筑後川水系隈上川他",
-          "url": "e4/dc2610-eefa-47f2-9f52-71287b8b7f67/40225_ukiha-shi_city_2023_citygml_2_op_fld_pref_chikugogawa_kumanouegawahoka_3dtiles_l2_no_texture/tileset.json"
-        },
-        {
-          "label": "筑後川水系筑後川",
-          "url": "6a/d708fb-d659-4927-a2d4-8b3c93cd9b16/40225_ukiha-shi_city_2023_citygml_2_op_fld_natl_chikugogawa_chikugogawa_3dtiles_l2_no_texture/tileset.json"
-        }
-      ],
+      "fld": [],
       "urf": {}
     },
     "40447": {
@@ -17737,6 +17984,8 @@
       "pref": "熊本県",
       "year": 2022,
       "b1": "12/8c7b00-ac20-4af9-b169-86acf8f778bf/43100_kumamoto-shi_city_2022_citygml_4_op_bldg_3dtiles_43101_chuo-ku_lod1/tileset.json",
+      "parentName": "熊本市",
+      "displayName": "熊本市 中央区",
       "b2": "8f/1f1fdf-f581-4047-a65d-899224f82573/43100_kumamoto-shi_city_2022_citygml_4_op_bldg_3dtiles_43101_chuo-ku_lod2/tileset.json",
       "b2n": "fb/81ab56-3852-4ebc-bdf7-d11582980d5f/43100_kumamoto-shi_city_2022_citygml_4_op_bldg_3dtiles_43101_chuo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -17826,6 +18075,8 @@
       "pref": "熊本県",
       "year": 2022,
       "b1": "a0/5efe4f-664e-49dd-98be-81805885bb69/43100_kumamoto-shi_city_2022_citygml_4_op_bldg_3dtiles_43102_higashi-ku_lod1/tileset.json",
+      "parentName": "熊本市",
+      "displayName": "熊本市 東区",
       "fld": [
         {
           "label": "菊池川水系菊池川",
@@ -17913,6 +18164,8 @@
       "pref": "熊本県",
       "year": 2022,
       "b1": "16/16d07e-5954-49c0-ae46-6ad709c1e168/43100_kumamoto-shi_city_2022_citygml_4_op_bldg_3dtiles_43103_nishi-ku_lod1/tileset.json",
+      "parentName": "熊本市",
+      "displayName": "熊本市 西区",
       "fld": [
         {
           "label": "菊池川水系菊池川",
@@ -18000,6 +18253,8 @@
       "pref": "熊本県",
       "year": 2022,
       "b1": "4f/2475cd-a819-40d2-8f36-e2aa912223f2/43100_kumamoto-shi_city_2022_citygml_4_op_bldg_3dtiles_43104_minami-ku_lod1/tileset.json",
+      "parentName": "熊本市",
+      "displayName": "熊本市 南区",
       "fld": [
         {
           "label": "菊池川水系菊池川",
@@ -18087,6 +18342,8 @@
       "pref": "熊本県",
       "year": 2022,
       "b1": "8a/bde865-bd9b-4d19-a053-dfe42e25bded/43100_kumamoto-shi_city_2022_citygml_4_op_bldg_3dtiles_43105_kita-ku_lod1/tileset.json",
+      "parentName": "熊本市",
+      "displayName": "熊本市 北区",
       "fld": [
         {
           "label": "菊池川水系菊池川",
@@ -18173,13 +18430,11 @@
       "name": "荒尾市",
       "pref": "熊本県",
       "year": 2020,
-      "b1": "29/c1b9a6-5227-4cf7-aaa8-34013be68f3d/43443_mashiki-machi_city_2023_citygml_2_op_bldg_3dtiles_lod1/tileset.json",
-      "b2": "11/541c3a-11cc-4e83-87ec-c24026c2211a/43443_mashiki-machi_city_2023_citygml_2_op_bldg_3dtiles_lod2/tileset.json",
-      "b2n": "77/29a9cb-67eb-40ba-943c-c7c1eabe58e9/43443_mashiki-machi_city_2023_citygml_2_op_bldg_3dtiles_lod2_no_texture/tileset.json",
+      "b1": "https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/43204-bldg-lod1-texture-2020/tileset.json",
+      "b2": "https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/43204-bldg-lod2-texture-2020/tileset.json",
+      "b2n": "https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/43204-bldg-lod2-notexture-2020/tileset.json",
       "fld": [],
-      "urf": {
-        "use": "bb/87d5ee-77bb-4740-a529-d5c08ee3f23e/43443_mashiki-machi_city_2023_citygml_2_op_urf_UseDistrict_mvt/{z}/{x}/{y}.mvt"
-      }
+      "urf": {}
     },
     "43206": {
       "name": "玉名市",
@@ -18448,6 +18703,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "a6/031403-b4dc-4d5d-8c2f-50361fedc764/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01101_chuo-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 中央区",
       "b2": "16/06e56d-a2d4-4fe4-ac91-b2762b96e033/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01101_chuo-ku_lod2/tileset.json",
       "b2n": "bc/2e9ddc-cfe2-42fc-a91f-3bb95f97ddad/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01101_chuo-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -18527,6 +18784,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "b6/2fe16c-44c8-4a42-8138-82c971cd0e2c/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01102_kita-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 北区",
       "b2": "0d/7900b4-4d6c-4720-8edd-2f129b431235/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01102_kita-ku_lod2/tileset.json",
       "b2n": "a3/49edb5-4014-4e04-a668-7ceae68cd91b/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01102_kita-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -18606,6 +18865,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "98/2f5131-ad3c-4551-943a-3607ed6afa3c/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01103_higashi-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 東区",
       "b2": "18/cbc248-5c55-4a9e-a20d-78055b72b6d9/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01103_higashi-ku_lod2/tileset.json",
       "b2n": "76/337461-23ff-4818-8028-a607f19506bd/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01103_higashi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -18685,6 +18946,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "a2/2d4d91-f50a-4fd8-a055-771bf1495095/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01104_shiroishi-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 白石区",
       "fld": [
         {
           "label": "新川水系琴似川",
@@ -18762,6 +19025,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "02/d7a24f-76db-4295-844e-c667831fea43/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01105_toyohira-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 豊平区",
       "fld": [
         {
           "label": "新川水系琴似川",
@@ -18839,6 +19104,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "aa/5f71a5-4442-4dcb-80bb-a022adbe409c/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01106_minami-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 南区",
       "fld": [
         {
           "label": "新川水系琴似川",
@@ -18916,6 +19183,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "e1/e6b234-82bd-4311-b72b-5920b6dfc569/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01107_nishi-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 西区",
       "b2": "f0/03f2fd-3a52-4620-97a9-6b55a0e81933/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01107_nishi-ku_lod2/tileset.json",
       "b2n": "3a/5d6ed7-bc7f-4dca-96d2-a0adfcbf847f/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01107_nishi-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -18995,6 +19264,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "26/96d6b5-1c35-40e3-bb79-c5b53f15405a/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01108_atsubetsu-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 厚別区",
       "fld": [
         {
           "label": "新川水系琴似川",
@@ -19072,6 +19343,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "70/811042-e748-47a7-9f3e-420003f445b9/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01109_teine-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 手稲区",
       "fld": [
         {
           "label": "新川水系琴似川",
@@ -19149,6 +19422,8 @@
       "pref": "北海道",
       "year": 2020,
       "b1": "1d/c2a380-16cd-4a40-b860-0889727d752c/01100_sapporo-shi_city_2020_citygml_7_op_bldg_3dtiles_01110_kiyota-ku_lod1/tileset.json",
+      "parentName": "札幌市",
+      "displayName": "札幌市 清田区",
       "fld": [
         {
           "label": "新川水系琴似川",
@@ -19377,6 +19652,8 @@
       "pref": "宮城県",
       "year": 2024,
       "b1": "ec/e80d4a-8b3a-4f88-ae4e-d29c9f3e9647/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04101_aoba-ku_lod1/tileset.json",
+      "parentName": "仙台市",
+      "displayName": "仙台市 青葉区",
       "b2": "29/10aacf-3830-4ded-8adc-f58ecc71772e/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04101_aoba-ku_lod2/tileset.json",
       "b2n": "bd/e78220-9044-4dcd-9519-5ff5730e25f2/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04101_aoba-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -19429,6 +19706,8 @@
       "pref": "宮城県",
       "year": 2024,
       "b1": "09/6daefd-ecfb-4b0a-b95d-f5b4e6fd61ad/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04102_miyagino-ku_lod1/tileset.json",
+      "parentName": "仙台市",
+      "displayName": "仙台市 宮城野区",
       "b2": "df/87cf81-c64a-43df-8365-117b6d1a961b/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04102_miyagino-ku_lod2/tileset.json",
       "b2n": "1c/7b5b9c-e50e-47c1-a396-3d09639ae992/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04102_miyagino-ku_lod2_no_texture/tileset.json",
       "fld": [
@@ -19481,6 +19760,8 @@
       "pref": "宮城県",
       "year": 2024,
       "b1": "35/d17bce-10fb-42b7-a31d-b6a37c55ed90/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04103_wakabayashi-ku_lod1/tileset.json",
+      "parentName": "仙台市",
+      "displayName": "仙台市 若林区",
       "fld": [
         {
           "label": "砂押川水系砂押川",
@@ -19531,6 +19812,8 @@
       "pref": "宮城県",
       "year": 2024,
       "b1": "1a/082bec-f0d3-45b7-b7ce-94c9c9411928/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04104_taihaku-ku_lod1/tileset.json",
+      "parentName": "仙台市",
+      "displayName": "仙台市 太白区",
       "fld": [
         {
           "label": "砂押川水系砂押川",
@@ -19581,6 +19864,8 @@
       "pref": "宮城県",
       "year": 2024,
       "b1": "09/3f6e4d-272f-4177-b027-aa69735f5e02/04100_sendai-shi_city_2024_citygml_1_op_bldg_3dtiles_04105_izumi-ku_lod1/tileset.json",
+      "parentName": "仙台市",
+      "displayName": "仙台市 泉区",
       "fld": [
         {
           "label": "砂押川水系砂押川",

@@ -8,6 +8,7 @@ import {
   ZONING_TILES,
   PRESETS,
   AREA_RECT,
+  NAKANO_HAZARDMAP_URL,
 } from './config.js';
 
 const CITY_CODE_PATTERN = /^\d{5}$/;
@@ -85,7 +86,10 @@ export function groupAreasByPref(index) {
 
   for (const [code, area] of entries) {
     if (!groups.has(area.pref)) groups.set(area.pref, []);
-    groups.get(area.pref).push({ code, name: area.name });
+    groups.get(area.pref).push({
+      code,
+      name: area.displayName || area.name,
+    });
   }
 
   return Array.from(groups, ([pref, areas]) => ({ pref, areas }));
@@ -141,6 +145,8 @@ export function resolveArea(index, code, spots = null) {
   return {
     code,
     name: area.name,
+    displayName: area.displayName || area.name,
+    parentName: area.parentName || null,
     pref: area.pref,
     year: area.year,
     tilesets: {
@@ -158,7 +164,23 @@ export function resolveArea(index, code, spots = null) {
       || (code === DEFAULT_CITY ? clonePresets() : null),
     rect: code === DEFAULT_CITY ? { ...AREA_RECT } : null,
     groundHeight: code === DEFAULT_CITY ? 35 : null,
+    disaster: {
+      shelters: code === DEFAULT_CITY,
+      inlandFloodMapUrl: code === DEFAULT_CITY ? NAKANO_HAZARDMAP_URL : null,
+    },
   };
+}
+
+/**
+ * AreaConfigの診断・オーバーレイ用矩形を返す。
+ * 中野区の静的矩形は中野区（および旧呼び出し）だけで使用し、
+ * 非中野で範囲を取得できなかった場合はnullのまま扱う。
+ */
+export function resolveServiceRect(areaConfig = null) {
+  if (!areaConfig || areaConfig.code === DEFAULT_CITY) {
+    return areaConfig?.rect || AREA_RECT;
+  }
+  return areaConfig.rect || null;
 }
 
 /**
@@ -205,7 +227,8 @@ function overviewPreset(rect) {
 
 async function officePreset(areaConfig) {
   try {
-    const query = `${areaConfig.name}役所`;
+    const areaName = areaConfig.displayName || areaConfig.name;
+    const query = `${areaName.replace(/\s+/g, '')}役所`;
     const response = await fetch(`${GEOCODE_URL}?q=${encodeURIComponent(query)}`);
     if (!response.ok) return null;
     const features = await response.json();
@@ -227,7 +250,7 @@ async function officePreset(areaConfig) {
       pitch: -45,
     };
   } catch (error) {
-    console.warn(`${areaConfig.name}役所を検索できませんでした`, error);
+    console.warn(`${areaConfig.displayName || areaConfig.name}役所を検索できませんでした`, error);
     return null;
   }
 }
@@ -275,6 +298,8 @@ export function buildNakanoFallback(spots = null) {
   return {
     code: DEFAULT_CITY,
     name: '中野区',
+    displayName: '中野区',
+    parentName: null,
     pref: '東京都',
     year: 2025,
     tilesets: {
@@ -294,5 +319,9 @@ export function buildNakanoFallback(spots = null) {
     presets: cloneAreaPresets(spots, DEFAULT_CITY) || clonePresets(),
     rect: { ...AREA_RECT },
     groundHeight: 35,
+    disaster: {
+      shelters: true,
+      inlandFloodMapUrl: NAKANO_HAZARDMAP_URL,
+    },
   };
 }

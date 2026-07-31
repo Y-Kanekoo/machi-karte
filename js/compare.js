@@ -115,7 +115,8 @@ export function buildCompareTable(snapshots) {
       key: row.key,
       label: row.label,
       badge: row.badge || null,
-      cells: list.map((s) => row.get(s) ?? '未計算'),
+      cells: list.map((s) =>
+        s.otherArea ? '別エリアの地点' : row.get(s) ?? '未計算'),
     })),
   };
 }
@@ -234,6 +235,9 @@ export function initCompare(ctx) {
 
   function cellHtml(row, value) {
     if (value === '未計算') return `<td class="cmp-na">未計算</td>`;
+    if (value === '別エリアの地点') {
+      return `<td class="cmp-na">別エリアの地点</td>`;
+    }
     if (row.badge === 'flood') {
       const color = FLOOD_COLORS[value] || '#cccccc';
       return `<td><span class="diag-badge" style="background:${color}">${escapeHtml(value)}</span></td>`;
@@ -335,7 +339,11 @@ export function initCompare(ctx) {
   if (closeBtn) closeBtn.addEventListener('click', closeModal);
   if (shareBtn && share) {
     shareBtn.addEventListener('click', async () => {
-      const url = share.shareCompare(items.map((s) => ({ lon: s.lon, lat: s.lat })));
+      const url = share.shareCompare(items.map((s) => ({
+        city: isValidCityCode(s.city) ? s.city : DEFAULT_CITY,
+        lon: s.lon,
+        lat: s.lat,
+      })));
       try {
         await navigator.clipboard.writeText(url);
         toast('比較のリンクをコピーしました');
@@ -354,10 +362,22 @@ export function initCompare(ctx) {
     items = [];
     persist();
     for (const p of (points || []).slice(0, COMPARE_MAX)) {
+      const city = isValidCityCode(p.city) ? p.city : DEFAULT_CITY;
+      if (city !== (areaConfig?.code || DEFAULT_CITY)) {
+        items.push({
+          city,
+          lon: p.lon,
+          lat: p.lat,
+          title: '別エリアの地点',
+          otherArea: true,
+          at: Date.now(),
+        });
+        continue;
+      }
       await diagnosis.runDiagnosisAt(p.lon, p.lat, { fly: false, skipSunlight: true });
       const snap = snapshotFromResult(
         diagnosis.getLastResult(),
-        areaConfig?.code || DEFAULT_CITY,
+        city,
       );
       if (snap) items.push(snap);
     }
