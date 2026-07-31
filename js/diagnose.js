@@ -19,7 +19,10 @@ import { queryZoning } from './zoning.js';
 import {
   estimateSunlight,
   estimateBaseHeight,
-  prepareTiles,
+  preloadForSunlight,
+  boostTilesetCache,
+  floorHeights,
+  floorHeightsForFeature,
   MIN_SUN_ELEVATION,
   DEFAULT_BASE_HEIGHT,
 } from './sunlight.js';
@@ -60,6 +63,9 @@ function sessionSet(key, value) {
 
 const SPINNER = '<span class="diag-loading"><span class="spinner"></span>取得中…</span>';
 
+/** R3 F3-1: 視点高さセレクタ変更から再計算までのデバウンス（ms） */
+const SUN_RECALC_DEBOUNCE_MS = 400;
+
 /** 対応エリア（中野区周辺）の内側か。区外では建物3Dと日照が使えない旨を出す */
 export function isInServiceArea(lon, lat) {
   return (
@@ -81,7 +87,13 @@ function measuredHeightOf(picked) {
 }
 
 export function initDiagnosis(ctx) {
-  const { viewer, getCurrentBuildingTileset, buildingTableHtml, setStatus } = ctx;
+  const {
+    viewer,
+    getCurrentBuildingTileset,
+    buildingTableHtml,
+    setStatus,
+    onDiagnosisStart = null,
+  } = ctx;
 
   const panel = document.getElementById('diagnosisPanel');
   const body = document.getElementById('diagBody');
@@ -97,6 +109,28 @@ export function initDiagnosis(ctx) {
   let pinEntity = null;
   let runToken = 0;
   let lastResult = null;
+
+  // ---- R3 F3-1: 視点高さセレクタの再計算文脈 ---------------------------------
+  // セレクタのchange時点で sunRunToken を進め、デバウンス中も古い再計算を止める。
+  let sunRunToken = 0;
+  /** 現在の日照の再計算に必要な文脈。診断のたびに作り直す（診断カード全体の runToken と対応） */
+  let sunCtx = null;
+  let sunDebounceTimer = null;
+  // e2e用の観測値。window.__nakano.diagnosis.getSunlightTestState() から読み取る。
+  let sunlightRunCount = 0;
+  let sunlightCancelledRunCount = 0;
+  let lastCancelledRaysCast = null;
+  let sunlightRecalcProgress = null;
+
+  /** 診断開始・日照再計算開始を同じフックで通知し、日影マップとの排他に使う。 */
+  function notifyDiagnosisStart() {
+    if (typeof onDiagnosisStart !== 'function') return;
+    try {
+      onDiagnosisStart();
+    } catch (e) {
+      console.warn('診断開始フックの実行に失敗しました', e);
+    }
+  }
 
   // ---- ピン --------------------------------------------------------------
 
@@ -427,25 +461,292 @@ export function initDiagnosis(ctx) {
     return rows.join('');
   }
 
-  function renderSunlight(result, baseInfo) {
-    if (result.error && !result.days?.length) return failMsg('日照: ' + result.error);
-    const bars = result.days
+  // ---- R3 F3-1: 視点の高さセレクタ ------------------------------------------
+
+  /**
+   * 階選択肢のoption文言に併記する実高さ。
+   * 一般地点は地面からの相対高さ（+○○m、EYE_HEIGHT起点で直感的）、
+   * 建物は絶対高さ（○○m。zmin/zmaxからの内挿値そのもの）を表示する。
+   */
+  function floorOptionLabel(entry, floorCtx) {
+    if (floorCtx.kind === 'building') {
+      return `${entry.label}（${entry.height.toFixed(1)}m）`;
+    }
+    const rel = entry.height - floorCtx.base;
+    return `${entry.label}（+${rel.toFixed(1)}m）`;
+  }
+
+  function sunFloorSelectHtml(floorCtx, selectedKey) {
+    const options = floorCtx.floors
+      .map((f) => `<option value="${escapeHtml(f.key)}"${f.key === selectedKey ? ' selected' : ''}>${
+        escapeHtml(floorOptionLabel(f, floorCtx))}</option>`)
+      .join('');
+    return `<div class="sun-floor-row">
+      <label for="sunFloorSelect">視点の高さ</label>
+      <select id="sunFloorSelect" aria-label="視点の高さ">${options}</select>
+    </div>`;
+  }
+
+  /** 建物クリック時は picked から、それ以外は地面高さから階数の選択肢を作る */
+  function buildFloorContext(picked, baseHeight) {
+    return picked ? floorHeightsForFeature(picked, baseHeight) : floorHeights('ground', { base: baseHeight });
+  }
+
+  /** `.sun-day`/`.sun-bar`（93セル）のタイムライン。stale=true で再計算中の薄表示にする */
+  function sunDaysHtml(result, stale) {
+    return result.days
       .map((d) => {
         const cells = d.slots
           .map((s) => `<i class="${s.lit ? 'lit' : 'dark'}" title="${s.hourJst.toFixed(2)}時"></i>`)
           .join('');
-        return `<div class="sun-day">
+        return `<div class="sun-day${stale ? ' stale' : ''}">
           <div class="sun-head"><span>${escapeHtml(d.label)}（${escapeHtml(d.dateLabel)}）</span><b>${d.hours.toFixed(1)} h</b></div>
           <div class="sun-bar">${cells}</div>
         </div>`;
       })
       .join('');
-    const scale = `<div class="sun-scale"><span>${result.hourStart}時</span><span>12時</span><span>${result.hourEnd}時</span></div>`;
+  }
+
+  function sunScaleHtml(result) {
+    return `<div class="sun-scale"><span>${result.hourStart}時</span><span>12時</span><span>${result.hourEnd}時</span></div>`;
+  }
+
+  /** 「視点高さ ○○m（○階/屋上）」＋（推定時）「階数は高さからの推定です。」 */
+  function floorNoteText(result, floorCtx, selectedKey) {
+    const entry = floorCtx.floors.find((f) => f.key === selectedKey);
+    let text = `視点高さ ${result.originHeight.toFixed(1)}m（${entry ? entry.label : '不明'}）。`;
+    if (floorCtx.estimated) text += '階数は高さからの推定です。';
+    return text;
+  }
+
+  function renderSunlight(result, baseInfo, floorCtx, selectedKey, opts = {}) {
+    const { resultKey = selectedKey, recalcError = null } = opts;
+    const selectHtml = sunFloorSelectHtml(floorCtx, selectedKey);
+    if (result.error && !result.days?.length) return selectHtml + failMsg('日照: ' + result.error);
+    const bars = sunDaysHtml(result, false);
+    const scale = sunScaleHtml(result);
+    // 既存文の順序（「簡易計算」を含む文が先）は変えず、視点高さの注記は末尾に足す
     const note = `${result.hourStart}:00〜${result.hourEnd}:00 JSTを20分刻みでサンプリング。`
       + `読み込み済みの建物のみを考慮した簡易計算です（地形・未読込の建物・樹木は考慮しません）。`
-      + `太陽高度${MIN_SUN_ELEVATION}度未満は日照に数えません。地面高さ ${baseInfo.height.toFixed(1)}m（${baseInfo.source}）。`;
+      + `太陽高度${MIN_SUN_ELEVATION}度未満は日照に数えません。地面高さ ${baseInfo.height.toFixed(1)}m（${baseInfo.source}）。`
+      + preloadNote(result.preload)
+      + floorNoteText(result, floorCtx, resultKey)
+      + `区外の建物・樹木等は考慮しておらず、参考情報のため法的な検討には使用できません。`;
     const warn = result.error ? `<div class="diag-fail">${escapeHtml(result.error)}</div>` : '';
-    return bars + scale + warn + `<div class="diag-note">${escapeHtml(note)}</div>`;
+    const recalcWarn = recalcError
+      ? `<div class="diag-note sun-recalc-error">${escapeHtml(recalcError)}</div>`
+      : '';
+    return selectHtml + bars + scale + warn + `<div class="diag-note">${escapeHtml(note)}</div>` + recalcWarn;
+  }
+
+  /** 再計算中の表示。旧タイムラインを .stale（薄表示）のまま残し、進捗%を出す */
+  function renderSunStale(ctx, pct) {
+    if (!ctx.lastResult) return;
+    const selectHtml = sunFloorSelectHtml(ctx.floorCtx, ctx.selectedKey);
+    const status = `<div class="diag-note sun-recalc-status"><span class="diag-loading">` +
+      `<span class="spinner"></span>再計算中… <b id="sunRecalcPct">${pct}%</b></span></div>`;
+    const bars = sunDaysHtml(ctx.lastResult, true);
+    const scale = sunScaleHtml(ctx.lastResult);
+    fill('secSun', selectHtml + status + bars + scale);
+  }
+
+  /**
+   * 公開APIから呼べる日照計算のキャンセル。
+   * 初回計算はrunSunlightが捕捉したsunRunToken、再計算はisCurrentRequestを通じて中断する。
+   * 再計算中なら前回の完走結果へ戻し、初回計算中なら中断理由を表示してスピナーを残さない。
+   */
+  function cancelSunlight(message = '日照計算を中断しました。') {
+    const secSun = $('secSun');
+    const wasRunning = !!sunDebounceTimer
+      || !!secSun?.querySelector('.spinner')
+      || !!secSun?.querySelector('.sun-recalc-status');
+
+    sunRunToken++;
+    if (sunDebounceTimer) {
+      clearTimeout(sunDebounceTimer);
+      sunDebounceTimer = null;
+    }
+    sunlightRecalcProgress = null;
+    if (!wasRunning) return false;
+
+    if (sunCtx?.lastResult && sunCtx.alive()) {
+      sunCtx.selectedKey = sunCtx.lastResultKey;
+      fill('secSun', renderSunlight(
+        sunCtx.lastResult,
+        sunCtx.baseInfo,
+        sunCtx.floorCtx,
+        sunCtx.lastResultKey,
+        { recalcError: message }
+      ));
+    } else if (!panel.classList.contains('hidden')) {
+      fill('secSun', `<div class="diag-note sun-cancel-note">${escapeHtml(message)}</div>`);
+    }
+    return true;
+  }
+
+  /**
+   * 建物レイヤー切替時は旧tileset・旧pickedを含む日照文脈を破棄する。
+   * 既存結果は参照用に残すが、階セレクタから再計算できないよう無効化する。
+   */
+  function onBuildingLayerChange() {
+    const message = '建物レイヤーが切り替わったため、再診断してください';
+    const currentSection = $('secSun');
+    const hadSunlightContext = !!sunCtx
+      || !!currentSection?.querySelector('.spinner')
+      || !!currentSection?.querySelector('#sunFloorSelect');
+    cancelSunlight('日照計算を中断しました。');
+    sunCtx = null;
+    sunlightRecalcProgress = null;
+
+    if (panel.classList.contains('hidden') || !hadSunlightContext) return;
+    const secSun = $('secSun');
+    if (!secSun) return;
+    const select = $('sunFloorSelect');
+    if (select) {
+      select.disabled = true;
+    } else {
+      fill('secSun', '');
+    }
+    if (!secSun.querySelector('.sun-layer-change-note')) {
+      secSun.insertAdjacentHTML(
+        'beforeend',
+        `<div class="diag-note sun-layer-change-note">${escapeHtml(message)}</div>`
+      );
+    }
+  }
+
+  /** キャンセルされた日照計算をe2eから観測できるよう記録する */
+  function recordSunlightCancellation(result) {
+    if (!result?.cancelled) return;
+    sunlightCancelledRunCount++;
+    lastCancelledRaysCast = result.raysCast;
+  }
+
+  /**
+   * セレクタ変更のデバウンス後に呼ぶ。change時点で確定した要求世代だけを実行し、
+   * 完了時にも同じ診断・要求世代・選択キーであることを確認してから結果を反映する。
+   */
+  async function recalcSunlight(key, requestToken) {
+    const ctx = sunCtx;
+    const isCurrentRequest = () => {
+      const select = $('sunFloorSelect');
+      return !!ctx && ctx === sunCtx && ctx.alive()
+        && requestToken === sunRunToken
+        && ctx.selectedKey === key
+        && select?.value === key;
+    };
+    if (!isCurrentRequest()) return;
+
+    const entry = ctx.floorCtx.floors.find((f) => f.key === key);
+    if (!entry) return; // 不正な選択値は無視（DOM改変やレース以外では起きない）
+    const isCancelled = () => !isCurrentRequest();
+    notifyDiagnosisStart();
+    sunlightRecalcProgress = 0;
+    renderSunStale(ctx, 0);
+
+    try {
+      const restoreCache = boostTilesetCache(ctx.tileset);
+      let preload = null;
+      let result;
+      try {
+        // 初回の先読みが失敗していたときだけ、選んだ高さで再ウォームアップする
+        // （カメラは動かさない。preloadForSunlight は fly:false ではカメラ移動しない）
+        if (ctx.initialPreloadFailed) {
+          preload = await preloadForSunlight(viewer, ctx.tileset, ctx.lon, ctx.lat, ctx.baseInfo.height, {
+            fly: false,
+            isCancelled,
+            excludeFeatures: ctx.excludeFeatures,
+            originHeight: entry.height,
+          });
+          // 再ウォームアップが成功したら次回以降は繰り返さない。
+          if (preload.ok && !preload.cancelled && ctx.alive()) {
+            ctx.initialPreload = preload;
+            ctx.initialPreloadFailed = false;
+          }
+          if (isCancelled()) return;
+        }
+
+        sunlightRunCount++;
+        result = await estimateSunlight(viewer, ctx.tileset, ctx.lon, ctx.lat, ctx.baseInfo.height, {
+          excludeEntities: pinEntity ? [pinEntity] : [],
+          excludeFeatures: ctx.excludeFeatures,
+          originHeight: entry.height,
+          isCancelled,
+          onProgress: (f) => {
+            if (!isCurrentRequest()) return;
+            sunlightRecalcProgress = f;
+            const el = $('sunRecalcPct');
+            if (el) el.textContent = Math.round(f * 100) + '%';
+          },
+        });
+      } finally {
+        restoreCache();
+      }
+
+      recordSunlightCancellation(result);
+      if (!isCurrentRequest() || result.cancelled) return;
+
+      // 非同期計算の完了からDOM反映までの間にも、現在の要求世代と選択キーを再検証する。
+      if (!isCurrentRequest()) return;
+      result.preload = preload || ctx.initialPreload;
+      ctx.lastResult = result;
+      ctx.lastResultKey = key;
+      sunlightRecalcProgress = 1;
+      if (lastResult) lastResult.sunlight = result;
+      fill('secSun', renderSunlight(result, ctx.baseInfo, ctx.floorCtx, key));
+      for (const fn of resultHandlers) {
+        try { fn(lastResult); } catch (e) { console.warn('onResult handler failed', e); }
+      }
+    } catch (e) {
+      console.warn('日照の再計算に失敗しました', e);
+      if (!isCurrentRequest()) return;
+      sunlightRecalcProgress = null;
+      fill('secSun', renderSunlight(ctx.lastResult, ctx.baseInfo, ctx.floorCtx, key, {
+        resultKey: ctx.lastResultKey,
+        recalcError: '再計算に失敗しました。前回の結果を表示しています。',
+      }));
+    }
+  }
+
+  /**
+   * セレクタの change ハンドラ。400msデバウンスしてから再計算する。
+   * changeごとに要求世代と selectedKey を即時更新し、デバウンス待ちのタイマーへ渡す。
+   * 元の値へ選び直した場合も「戻す」という正当な変更として新しい世代を発行する。
+   */
+  function onSunFloorChange(key) {
+    const ctx = sunCtx;
+    if (!ctx || !ctx.alive() || !ctx.floorCtx.floors.some((f) => f.key === key)) return;
+
+    // changeを受けた時点で世代を進め、デバウンス待ちの間も実行中の旧計算を無効化する。
+    const requestToken = ++sunRunToken;
+    ctx.selectedKey = key;
+    sunlightRecalcProgress = 0;
+    const pct = $('sunRecalcPct');
+    if (pct) pct.textContent = '0%';
+
+    if (sunDebounceTimer) clearTimeout(sunDebounceTimer);
+    sunDebounceTimer = setTimeout(() => {
+      sunDebounceTimer = null;
+      recalcSunlight(key, requestToken).catch((e) => {
+        // recalcSunlight内でも捕捉するが、タイマー起点のPromiseを未処理にしない最後の防御。
+        console.warn('日照の再計算で未処理のエラーが発生しました', e);
+      });
+    }, SUN_RECALC_DEBOUNCE_MS);
+  }
+
+  /**
+   * タイル先読みが既定（太陽経路ウォームアップ）以外になったときだけ注記を足す。
+   * 非公開APIが使えない環境でも日本語で状況が分かるようにする（R3 §6-6）。
+   */
+  function preloadNote(preload) {
+    if (!preload) return '';
+    if (preload.method === 'prepareTiles') {
+      return '周辺タイルの先読みは従来方式（カメラ移動）にフォールバックしました。';
+    }
+    if (preload.method === 'none') {
+      return '周辺タイルの先読みができなかったため、未読み込みの建物が考慮されていない可能性があります。';
+    }
+    return '';
   }
 
   // ---- 診断の実行 ----------------------------------------------------------
@@ -460,9 +761,16 @@ export function initDiagnosis(ctx) {
    * @returns {Promise<object>} lastResult（コア項目まで埋まった状態）
    */
   async function diagnose(req) {
+    notifyDiagnosisStart();
     const { lon, lat, title = null, picked = null, fly = true, skipSunlight = false } = req;
     const token = ++runToken;
     const alive = () => token === runToken;
+
+    // 新しい診断が始まったら、前の地点のセレクタ再計算文脈は無効にする
+    sunRunToken++;
+    if (sunDebounceTimer) { clearTimeout(sunDebounceTimer); sunDebounceTimer = null; }
+    sunCtx = null;
+    sunlightRecalcProgress = null;
 
     panel.classList.remove('hidden');
     showSearchMsg(''); // 前の診断で出したメッセージを残さない
@@ -562,27 +870,70 @@ export function initDiagnosis(ctx) {
 
   async function runSunlight(lon, lat, picked, alive, fly) {
     const tileset = getCurrentBuildingTileset();
+    const requestToken = sunRunToken;
+    const isCancelled = () => !alive() || requestToken !== sunRunToken;
+    const excludeFeatures = picked ? [picked] : [];
     fill('secSun', '<span class="diag-loading"><span class="spinner"></span>周辺の建物を読み込み中…</span>');
-    if (fly) {
-      await prepareTiles(viewer, tileset, lon, lat);
+
+    // 先読みのレイ原点に地面高さが要るので、先に地面高さを求める
+    const estimatedBaseInfo = await estimateBaseHeight(viewer, lon, lat, picked);
+    const resolvedBaseHeight = resolveBaseHeight(estimatedBaseInfo.height, DEFAULT_BASE_HEIGHT);
+    const baseInfo = resolvedBaseHeight === estimatedBaseInfo.height
+      ? estimatedBaseInfo
+      : { height: resolvedBaseHeight, source: '既定値' };
+    if (isCancelled()) return;
+
+    // 先読みで読み込んだタイルが計算中に追い出されないよう、
+    // 「先読み開始〜日照計算完了」を1つの区間としてキャッシュ上限を引き上げる（R3 P1.1）
+    const restoreCache = boostTilesetCache(tileset);
+    let preload;
+    let result;
+    try {
+      // R3: カメラを動かさない太陽経路ウォームアップ。
+      // 非対応環境では従来方式（カメラ移動）へフォールバックする
+      preload = await preloadForSunlight(viewer, tileset, lon, lat, baseInfo.height, {
+        fly,
+        isCancelled,
+        excludeFeatures,
+      });
+      if (isCancelled()) return;
+
+      fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
+      sunlightRunCount++;
+      result = await estimateSunlight(viewer, tileset, lon, lat, baseInfo.height, {
+        excludeEntities: pinEntity ? [pinEntity] : [],
+        excludeFeatures,
+        isCancelled,
+        onProgress: (f) => {
+          if (isCancelled()) return;
+          const el = $('sunPct');
+          if (el) el.textContent = Math.round(f * 100) + '%';
+        },
+      });
+    } finally {
+      restoreCache();
     }
-    if (!alive()) return;
-
-    const baseInfo = await estimateBaseHeight(viewer, lon, lat, picked);
-    if (!alive()) return;
-
-    fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
-    const result = await estimateSunlight(viewer, tileset, lon, lat, baseInfo.height, {
-      excludeEntities: pinEntity ? [pinEntity] : [],
-      onProgress: (f) => {
-        const el = $('sunPct');
-        if (el) el.textContent = Math.round(f * 100) + '%';
-      },
-    });
-    if (!alive()) return;
+    recordSunlightCancellation(result);
+    if (isCancelled() || result.cancelled) return;
+    result.preload = preload;
     lastResult.sunlight = result;
     lastResult.baseHeight = baseInfo;
-    fill('secSun', renderSunlight(result, baseInfo));
+
+    // R3 F3-1: 視点高さセレクタの再計算文脈を用意する。
+    // 既定選択（'f1' = 1階）は floorHeights の仕様上 base+EYE_HEIGHT と一致するため、
+    // 上のestimateSunlight呼び出し（originHeight省略）の結果とズレない＝再計算にはならない。
+    const floorCtx = buildFloorContext(picked, baseInfo.height);
+    sunCtx = {
+      lon, lat, tileset, picked,
+      baseInfo, floorCtx, selectedKey: 'f1',
+      excludeFeatures,
+      initialPreload: preload,
+      initialPreloadFailed: !!(preload && preload.ok === false),
+      lastResult: result,
+      lastResultKey: 'f1',
+      alive,
+    };
+    fill('secSun', renderSunlight(result, baseInfo, floorCtx, 'f1'));
     // 日照が揃った時点でも通知する（比較スナップショットを取り直せるように）
     for (const fn of resultHandlers) {
       try { fn(lastResult); } catch (e) { console.warn('onResult handler failed', e); }
@@ -591,6 +942,10 @@ export function initDiagnosis(ctx) {
 
   function close() {
     runToken++;
+    sunRunToken++;
+    if (sunDebounceTimer) { clearTimeout(sunDebounceTimer); sunDebounceTimer = null; }
+    sunCtx = null;
+    sunlightRecalcProgress = null;
     panel.classList.add('hidden');
     clearPin();
     clearFloodDepth();
@@ -601,6 +956,11 @@ export function initDiagnosis(ctx) {
 
   // ---- カード内のボタン ------------------------------------------------------
   // セクションは innerHTML で作り直されるので、個々のボタンではなく本文に委譲して拾う。
+  // R3 F3-1: 視点高さセレクタも同じ理由（再計算のたびに innerHTML が作り直される）で委譲する。
+  body.addEventListener('change', (e) => {
+    const sel = e.target.closest?.('#sunFloorSelect');
+    if (sel) onSunFloorChange(sel.value);
+  });
   body.addEventListener('click', (e) => {
     const btn = e.target.closest?.('button[data-act]');
     if (!btn) return;
@@ -829,6 +1189,10 @@ export function initDiagnosis(ctx) {
       return diagnose({ lon, lat, picked: null, ...opts });
     },
     close,
+    /** 実行中または開始待ちの日照計算だけを中断し、診断カード自体は閉じない。 */
+    cancelSunlight,
+    /** 建物レイヤー切替時に旧タイルセットを参照する日照再計算文脈を無効化する。 */
+    onBuildingLayerChange,
     isActive: () => toggle.checked,
     setActive,
     onClose: (fn) => closeHandlers.push(fn),
@@ -837,6 +1201,18 @@ export function initDiagnosis(ctx) {
     /** 診断のコア項目が揃うたび（＋日照完了時）に呼ばれる */
     onResult: (fn) => resultHandlers.push(fn),
     getLastResult: () => lastResult,
+    /** e2e用: 日照計算の実行・キャンセル・進捗と現在選択の期待高さを読み取る */
+    getSunlightTestState: () => {
+      const entry = sunCtx?.floorCtx.floors.find((f) => f.key === sunCtx.selectedKey);
+      return {
+        runCount: sunlightRunCount,
+        cancelledRunCount: sunlightCancelledRunCount,
+        lastCancelledRaysCast,
+        recalculationProgress: sunlightRecalcProgress,
+        selectedKey: sunCtx?.selectedKey || null,
+        expectedOriginHeight: entry?.height ?? null,
+      };
+    },
     flyToPoint,
     diagnoseCurrentLocation,
     getHistory: readHistory,

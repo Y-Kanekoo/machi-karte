@@ -48,6 +48,38 @@
       </div>
     </section>
 
+    <section id="shadeMapSection">
+      <h2>日影マップ</h2>
+      <div class="shade-options">
+        <label for="shadeDate">日付
+          <select id="shadeDate">
+            <option value="winter" selected>冬至</option>
+            <option value="spring">春分</option>
+            <option value="summer">夏至</option>
+          </select>
+        </label>
+        <label for="shadePitch">ピッチ
+          <select id="shadePitch">
+            <option value="10" selected>10m</option>
+            <option value="20">20m</option>
+          </select>
+        </label>
+      </div>
+      <div class="shade-actions">
+        <button id="shadeRun" type="button">計算する</button>
+        <button id="shadeAbort" type="button" class="hidden">中断</button>
+        <button id="shadeClear" type="button">クリア</button>
+      </div>
+      <div class="shade-progress-row">
+        <progress id="shadeProgress" max="100" value="0" aria-label="日影マップの計算進捗"></progress>
+        <span id="shadeProgressLabel">0%</span>
+      </div>
+      <p id="shadeStatus" class="shade-status" role="status" aria-live="polite">未計算</p>
+      <p id="shadeCacheNotice" class="shade-cache hidden">キャッシュから表示</p>
+      <div id="shadeLegend" class="shade-legend" aria-label="日照時間の凡例"></div>
+      <p class="shade-note">建物屋上のセルは屋上面での値。地形は計算中心の地盤高で近似し、地球楕円体として扱います。太陽経路のwarm-up後も未読込タイルを見落とす可能性があります。区外の建物・樹木等は考慮しておらず、参考情報のため法的な検討には使用できません。</p>
+    </section>
+
     <section>
       <h2>都市計画レイヤー</h2>
       <label><input type="checkbox" id="ov-use"> 用途地域</label>

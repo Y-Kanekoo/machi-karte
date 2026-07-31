@@ -7,9 +7,9 @@
   "license": "MIT",
   "scripts": {
     "serve": "python3 -m http.server 8123",
-    "test:unit": "node test/solar.test.mjs && node test/tilemath.test.mjs && node test/hazard.test.mjs && node test/shelter.test.mjs && node test/floodviz.test.mjs && node test/share.test.mjs && node test/overlay.test.mjs && node test/compare.test.mjs",
+    "test:unit": "node test/solar.test.mjs && node test/tilemath.test.mjs && node test/hazard.test.mjs && node test/shelter.test.mjs && node test/floodviz.test.mjs && node test/share.test.mjs && node test/overlay.test.mjs && node test/compare.test.mjs && node test/sunfloor.test.mjs && node test/shademap.test.mjs",
     "test:smoke": "node test/smoke.test.mjs",
-    "test:e2e": "node test/e2e.test.mjs && node test/e2e-r1.test.mjs",
+    "test:e2e": "node test/e2e.test.mjs && node test/e2e-r1.test.mjs && node test/e2e-r3.test.mjs && node test/e2e-r3-shade.test.mjs",
     "test": "npm run test:unit && npm run test:smoke && npm run test:e2e",
     "expectations": "node test/data-expectations.mjs",
     "shelters": "node tools/fetch-shelters.mjs"

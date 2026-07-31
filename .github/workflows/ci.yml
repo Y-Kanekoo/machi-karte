@@ -23,6 +23,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: JS構文チェック
+        run: for f in js/*.js; do node --check "$f"; done
       # push/PR では外部データ取得を伴う照合をスキップする（外部サーバ都合で赤くならないように）。
       # schedule / workflow_dispatch のときはフラグ無しで実タイル照合も行う。
       - name: npm run test:unit

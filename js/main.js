@@ -9,6 +9,7 @@ import { initShare } from './share.js';
 import { initZoningOverlay } from './zoning-overlay.js';
 import { initCompare } from './compare.js';
 import { createShelterLayer } from './shelter.js';
+import { initShadeMap } from './shademap-ui.js';
 
 // ---- Viewer ----------------------------------------------------------------
 
@@ -113,19 +114,39 @@ function heightStyle(prop) {
 
 const BLDG_KEYS = { lod1: 'bldgLod1', lod2: 'bldgLod2', lod2notex: 'bldgLod2NoTex' };
 let currentBldg = null;
+let currentBldgKind = null;
+let shadeMapController = null;
+let buildingLayerRequestGeneration = 0;
 
 async function showBuildings(mode) {
+  const requestGeneration = ++buildingLayerRequestGeneration;
+  shadeMapController?.onBuildingLayerChange();
   for (const k of Object.values(BLDG_KEYS)) {
     if (loaded[k]) loaded[k].show = false;
   }
   currentBldg = null;
-  if (mode === 'none') return;
+  currentBldgKind = null;
+  if (mode === 'none') {
+    diagnosis.onBuildingLayerChange();
+    return;
+  }
   const key = BLDG_KEYS[mode];
   const ts = await getTileset(key);
-  if (!ts) return;
+  if (!ts) {
+    if (requestGeneration === buildingLayerRequestGeneration) {
+      diagnosis.onBuildingLayerChange();
+    }
+    return;
+  }
+  if (requestGeneration !== buildingLayerRequestGeneration) {
+    if (ts !== currentBldg) ts.show = false;
+    return;
+  }
   ts.show = true;
   currentBldg = ts;
+  currentBldgKind = mode;
   applyHeightColor();
+  diagnosis.onBuildingLayerChange();
 }
 
 function applyHeightColor() {
@@ -191,6 +212,7 @@ document.querySelectorAll('input[name="imagery"]').forEach((el) => {
     // ImageryLayer.destroy() は provider を壊さないので、毎回新しい層を作って古い層は破棄してよい
     if (baseImageryLayer) viewer.imageryLayers.remove(baseImageryLayer, true);
     baseImageryLayer = next;
+    shadeMapController?.ensureTop();
   });
 });
 
@@ -258,8 +280,22 @@ const diagnosis = initDiagnosis({
   buildingTableHtml,
   setStatus,
   toast,
+  onDiagnosisStart: () => shadeMapController?.abortForDiagnosis(),
 });
 diagnosis.onClose(clearHighlight);
+
+// ---- R3: 日影マップ -----------------------------------------------------------
+
+shadeMapController = initShadeMap({
+  viewer,
+  getBuildingState: () => ({
+    tileset: currentBldg,
+    layerKind: currentBldgKind,
+  }),
+  cancelDiagnosisSunlight: () => diagnosis.cancelSunlight(
+    '日影マップを開始したため、日照計算を中断しました。'
+  ),
+});
 
 // ---- R2: 避難所レイヤー ----------------------------------------------------------
 // Entityは専用の CustomDataSource に入るので、診断ピン（viewer.entities）とは独立。
@@ -366,5 +402,12 @@ let restored = null;
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
   diagnosis, overlays, compare, share, toast, shelterLayer,
+  shadeMap: {
+    run: (opts) => shadeMapController.run(opts),
+    clear: () => shadeMapController.clear(),
+    abort: () => shadeMapController.abort(),
+    getState: () => shadeMapController.getState(),
+    getCanvasState: () => shadeMapController.getCanvasState(),
+  },
   getRestored: () => restored,
 };

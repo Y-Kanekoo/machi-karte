@@ -1,0 +1,43 @@
+name: バグ報告
+description: 不具合の再現手順や環境を報告します
+title: "[バグ] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 不具合を再現する手順を順番に記載してください。
+      placeholder: |
+        1. ○○を開く
+        2. ○○を操作する
+        3. 不具合が発生する
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+      description: 本来どのように動作するべきか記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: 実際に発生した動作やエラーを記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境
+      description: OS、ブラウザ、端末、対象コミットなどを記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: スクリーンショット
+      description: 必要に応じて画像や動画を添付してください。
