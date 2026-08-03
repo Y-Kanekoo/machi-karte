@@ -83,6 +83,8 @@ export function initShadeMap(deps) {
   function updateUi() {
     const percent = Math.round(state.progress * 100);
     runButton.disabled = state.running;
+    if (state.running) runButton.setAttribute('aria-busy', 'true');
+    else runButton.removeAttribute('aria-busy');
     dateSelect.disabled = state.running;
     pitchSelect.disabled = state.running;
     abortButton.classList.toggle('hidden', !state.running);

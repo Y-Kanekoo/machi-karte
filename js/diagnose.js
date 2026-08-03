@@ -483,6 +483,7 @@ export function initDiagnosis(ctx) {
     const r = lastResult;
     if (!r || !canShowFloodDepth(r.flood)) return;
     btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
     try {
       const base = Number.isFinite(r.baseHeight?.height)
         ? r.baseHeight
@@ -500,6 +501,7 @@ export function initDiagnosis(ctx) {
       console.warn('flood depth 3D failed', e);
     } finally {
       btn.disabled = false;
+      btn.removeAttribute('aria-busy');
     }
     updateFloodDepthButton();
   }
@@ -1100,7 +1102,8 @@ export function initDiagnosis(ctx) {
   function setSearchPending(pending) {
     searchPending = pending;
     searchBtn.disabled = pending;
-    searchBtn.toggleAttribute('aria-busy', pending);
+    if (pending) searchBtn.setAttribute('aria-busy', 'true');
+    else searchBtn.removeAttribute('aria-busy');
     searchBtn.innerHTML = pending
       ? '<span class="spinner" aria-hidden="true"></span>検索中…'
       : searchButtonLabel;
@@ -1294,10 +1297,16 @@ export function initDiagnosis(ctx) {
     }
     hideResults();
     showSearchMsg('現在地を取得中…');
-    if (geoBtn) geoBtn.disabled = true;
+    if (geoBtn) {
+      geoBtn.disabled = true;
+      geoBtn.setAttribute('aria-busy', 'true');
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (geoBtn) geoBtn.disabled = false;
+        if (geoBtn) {
+          geoBtn.disabled = false;
+          geoBtn.removeAttribute('aria-busy');
+        }
         const lon = pos.coords.longitude;
         const lat = pos.coords.latitude;
         flyToPoint(lon, lat);
@@ -1313,7 +1322,10 @@ export function initDiagnosis(ctx) {
         }
       },
       (err) => {
-        if (geoBtn) geoBtn.disabled = false;
+        if (geoBtn) {
+          geoBtn.disabled = false;
+          geoBtn.removeAttribute('aria-busy');
+        }
         const msg =
           err.code === err.PERMISSION_DENIED ? '現在地の利用が許可されませんでした'
             : err.code === err.TIMEOUT ? '現在地の取得がタイムアウトしました'
