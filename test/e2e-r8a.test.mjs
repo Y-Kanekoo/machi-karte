@@ -4,6 +4,7 @@
 import {
   BASE_URL,
   launchViewer,
+  openSection,
   check,
   equal,
   report,
@@ -44,6 +45,7 @@ try {
   equal('軽量プロファイルのmaximumScreenSpaceErrorは24', state.maximumScreenSpaceError, 24);
   equal('軽量プロファイルのcacheBytesは128MB', state.cacheBytes, 128 * MEBIBYTE);
 
+  await openSection(page, 'buildingModelSection');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 180000 }),
     page.evaluate(() => {
@@ -241,6 +243,7 @@ try {
   await page.waitForTimeout(350);
   await page.screenshot({ path: shotPath('r8a-p2-bottomsheet-half.png') });
 
+  await openSection(page, 'buildingModelSection');
   const qualityUi = await page.evaluate(() => ({
     text: document.getElementById('qualityControl')?.textContent.replace(/\s+/g, ' ').trim(),
     lightChecked: document.getElementById('qualityLight')?.checked,

@@ -1288,7 +1288,17 @@ export function initDiagnosis(ctx) {
 
   // ---- 現在地診断 --------------------------------------------------------------
 
-  const geoBtn = document.getElementById('geoBtn');
+  const geoButtons = ['geoBtn', 'geoFab']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+
+  function setGeolocationPending(pending) {
+    for (const button of geoButtons) {
+      button.disabled = pending;
+      if (pending) button.setAttribute('aria-busy', 'true');
+      else button.removeAttribute('aria-busy');
+    }
+  }
 
   function diagnoseCurrentLocation() {
     if (!navigator.geolocation) {
@@ -1297,16 +1307,10 @@ export function initDiagnosis(ctx) {
     }
     hideResults();
     showSearchMsg('現在地を取得中…');
-    if (geoBtn) {
-      geoBtn.disabled = true;
-      geoBtn.setAttribute('aria-busy', 'true');
-    }
+    setGeolocationPending(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (geoBtn) {
-          geoBtn.disabled = false;
-          geoBtn.removeAttribute('aria-busy');
-        }
+        setGeolocationPending(false);
         const lon = pos.coords.longitude;
         const lat = pos.coords.latitude;
         flyToPoint(lon, lat);
@@ -1322,10 +1326,7 @@ export function initDiagnosis(ctx) {
         }
       },
       (err) => {
-        if (geoBtn) {
-          geoBtn.disabled = false;
-          geoBtn.removeAttribute('aria-busy');
-        }
+        setGeolocationPending(false);
         const msg =
           err.code === err.PERMISSION_DENIED ? '現在地の利用が許可されませんでした'
             : err.code === err.TIMEOUT ? '現在地の取得がタイムアウトしました'
@@ -1337,7 +1338,9 @@ export function initDiagnosis(ctx) {
     );
   }
 
-  if (geoBtn) geoBtn.addEventListener('click', diagnoseCurrentLocation);
+  for (const button of geoButtons) {
+    button.addEventListener('click', diagnoseCurrentLocation);
+  }
 
   // ---- 診断モードトグル -----------------------------------------------------
 

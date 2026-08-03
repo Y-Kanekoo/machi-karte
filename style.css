@@ -78,9 +78,8 @@ input[type="checkbox"]:active:not(:disabled) {
 }
 
 .area-selector {
-  margin: 0 -2px 10px;
-  padding: 0 2px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  margin: 0;
+  padding: 0;
 }
 
 .area-selector-heading {
@@ -130,15 +129,54 @@ input[type="checkbox"]:active:not(:disabled) {
   opacity: 0.55;
 }
 
-#controlPanel section {
+#controlPanel .panel-section {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 8px 0;
+  padding: 0;
 }
 
-#controlPanel h2 {
-  font-size: 12px;
+#controlPanel .panel-section-heading {
+  margin: 0;
+}
+
+.panel-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
   color: #7fc4ff;
-  margin: 2px 0 6px;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.panel-section-toggle:hover {
+  color: #dcecff;
+  background: rgba(127, 196, 255, 0.08);
+}
+
+.panel-section-toggle:focus-visible {
+  outline: 2px solid #7fc4ff;
+  outline-offset: -2px;
+}
+
+.panel-section-chevron {
+  font-size: 9px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.panel-section-toggle[aria-expanded="false"] .panel-section-chevron {
+  transform: rotate(-90deg);
+}
+
+.panel-section-content {
+  padding: 0 0 10px;
 }
 
 #controlPanel label {
@@ -404,20 +442,15 @@ input[type="checkbox"]:active:not(:disabled) {
 /* ---- 検索バー ------------------------------------------------------------- */
 
 #searchBar {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
   box-sizing: border-box;
-  width: min(420px, calc(100% - 700px));
-  min-width: 260px;
-  z-index: 12;
+  width: 100%;
+  min-width: 0;
 }
 
 .search-row {
   display: flex;
   gap: 6px;
-  background: rgba(20, 26, 34, 0.9);
+  background: rgba(127, 196, 255, 0.07);
   border-radius: 10px;
   padding: 6px;
   backdrop-filter: blur(4px);
@@ -826,6 +859,14 @@ body.diag-mode #cesiumContainer canvas {
   align-items: center;
 }
 
+#diagnosisPanel > .info-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 44px;
+  background: rgba(20, 26, 34, 0.98);
+}
+
 .info-header h2 {
   font-size: 14px;
   margin: 0;
@@ -891,28 +932,12 @@ body.diag-mode #cesiumContainer canvas {
   display: none !important;
 }
 
-/* 中間幅: 検索バーを左パネルの右隣に寄せる */
-@media (max-width: 1100px) {
-  #searchBar {
-    left: auto;
-    right: 10px;
-    transform: none;
-    width: min(360px, calc(100% - 340px));
-  }
-}
-
 @media (max-width: 760px) {
-  #searchBar {
-    left: 10px;
-    right: 10px;
-    transform: none;
-    width: auto;
-    min-width: 0;
-  }
   #controlPanel {
-    top: 60px;
-    width: calc(100% - 40px);
-    max-height: 38%;
+    top: 10px;
+    right: 10px;
+    width: auto;
+    max-height: 42%;
   }
   #diagnosisPanel {
     top: auto;
@@ -954,6 +979,12 @@ body.diag-mode #cesiumContainer canvas {
 }
 
 .card-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
   background: none;
   border: none;
   color: #aaa;
@@ -1023,6 +1054,11 @@ body.diag-mode #cesiumContainer canvas {
 #geoBtn:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/* モバイルでは検索欄から独立し、地図上の主要アクションとして配置する。 */
+#geoFab {
+  display: none;
 }
 
 /* 検索候補のキーボード選択 */
@@ -1381,6 +1417,48 @@ body.diag-mode #cesiumContainer canvas {
 /* ---- R8a-P2: モバイル診断ボトムシート -------------------------------------- */
 
 @media (max-width: 767px) {
+  #geoBtn {
+    display: none;
+  }
+
+  #geoFab {
+    position: fixed;
+    right: calc(16px + env(safe-area-inset-right));
+    bottom: calc(44px + env(safe-area-inset-bottom));
+    z-index: 13;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 56px;
+    height: 56px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 50%;
+    background: #2b64a8;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    color: #fff;
+    font-size: 23px;
+    cursor: pointer;
+  }
+
+  #geoFab:hover:not(:disabled) {
+    background: #3a7fd0;
+  }
+
+  #geoFab:focus-visible {
+    outline: 3px solid #7fc4ff;
+    outline-offset: 3px;
+  }
+
+  #geoFab:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  body.sheet-open #geoFab {
+    display: none;
+  }
+
   #diagnosisPanel {
     --sheet-translate-y: calc(100% - 50vh);
     position: fixed;

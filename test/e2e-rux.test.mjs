@@ -9,6 +9,7 @@ import {
   OUTPUT_DIR,
   launchViewer,
   waitForViewerReady,
+  openSection,
   check,
   report,
 } from './harness.mjs';
@@ -267,6 +268,7 @@ try {
   await record(page, 'floor-selector', 'desktop');
 
   // 4. 日影マップ開始→中断（縮小グリッド）
+  await openSection(page, 'shadeMapSection');
   await page.evaluate(({ center }) => {
     window.__ruxShadeRun = window.__nakano.shadeMap.run({
       center,
@@ -290,6 +292,7 @@ try {
   await record(page, 'shade-map-start-abort', 'desktop');
 
   // 5. 建物レイヤー切替
+  await openSection(page, 'buildingModelSection');
   await mark(page, 'building-layer-switch');
   await page.locator('input[name="bldg"][value="lod1"]').click();
   await page.waitForFunction(
@@ -428,6 +431,157 @@ try {
   await record(page, 'mobile-sheet-peek-half-full', 'mobile');
 } finally {
   await mobileViewer.close();
+}
+
+console.log('\n=== R-UX-P2 動線 ===');
+const p2DesktopViewer = await launchViewer({ viewport: { width: 1440, height: 900 } });
+try {
+  const { page } = p2DesktopViewer;
+  await page.waitForFunction(() => !!window.__nakano?.panelSections, null, { timeout: 180000 });
+
+  check('PC幅では現在地FABを表示しない', await page.isHidden('#geoFab'));
+
+  const initialPanel = await page.evaluate(() => ({
+    order: [...document.querySelectorAll('#controlPanel > [data-panel-section]')]
+      .map((section) => section.id),
+    open: [...document.querySelectorAll('#controlPanel > [data-panel-section]')]
+      .filter((section) => section.querySelector('.panel-section-toggle')
+        ?.getAttribute('aria-expanded') === 'true')
+      .map((section) => section.id),
+    headerHeights: [...document.querySelectorAll('.panel-section-toggle')]
+      .map((button) => button.getBoundingClientRect().height),
+  }));
+  check(
+    '左パネルを検索→エリア→建物→ハザード→日影→その他の順に配置する',
+    initialPanel.order.join(',') === [
+      'searchSection',
+      'areaSection',
+      'buildingModelSection',
+      'hazardSection',
+      'shadeMapSection',
+      'zoningLayerSection',
+      'basemapSection',
+      'presetSection',
+      'otherLayerSection',
+    ].join(','),
+    JSON.stringify(initialPanel.order),
+  );
+  check(
+    '初期展開は検索とエリアだけ',
+    initialPanel.open.join(',') === 'searchSection,areaSection',
+    JSON.stringify(initialPanel.open),
+  );
+  check(
+    '左パネル見出しのタッチ領域はすべて44px以上',
+    initialPanel.headerHeights.every((height) => height >= 44),
+    JSON.stringify(initialPanel.headerHeights),
+  );
+} finally {
+  await p2DesktopViewer.close();
+}
+
+const p2MobileViewer = await launchViewer({
+  viewport: { width: 390, height: 844 },
+  contextOptions: {
+    hasTouch: true,
+    isMobile: true,
+    geolocation: { longitude: 139.6686, latitude: 35.7056 },
+  },
+  permissions: ['geolocation'],
+});
+try {
+  const { page } = p2MobileViewer;
+  await page.waitForFunction(() => !!window.__nakano?.panelSections, null, { timeout: 180000 });
+
+  const fab = await page.evaluate(() => {
+    const button = document.getElementById('geoFab');
+    const rect = button.getBoundingClientRect();
+    return {
+      visible: getComputedStyle(button).display !== 'none',
+      width: rect.width,
+      height: rect.height,
+      bottom: getComputedStyle(button).bottom,
+    };
+  });
+  check(
+    'モバイル幅では56pxの現在地FABを地図右下に表示する',
+    fab.visible && fab.width === 56 && fab.height === 56 && Number.parseFloat(fab.bottom) >= 44,
+    JSON.stringify(fab),
+  );
+
+  await page.click('#geoFab');
+  await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
+  await page.waitForFunction(
+    () => {
+      const result = window.__nakano.diagnosis.getLastResult();
+      return Math.abs(result?.lon - 139.6686) < 1e-6
+        && Math.abs(result?.lat - 35.7056) < 1e-6;
+    },
+    null,
+    { timeout: 60000 },
+  );
+  check('現在地FABのタップで既存の現在地診断フローから診断カードを表示する', true);
+
+  await page.evaluate(() => {
+    window.__nakano.bottomSheet.setState('full');
+    const body = document.getElementById('diagBody');
+    body.scrollTop = body.scrollHeight;
+  });
+  await page.waitForTimeout(350);
+  const stickyActions = await page.evaluate(() => {
+    const panel = document.getElementById('diagnosisPanel');
+    const header = panel.querySelector(':scope > .info-header');
+    const panelRect = panel.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const actions = [...header.querySelectorAll('.card-actions button')].map((button) => {
+      const rect = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        (rect.left + rect.right) / 2,
+        (rect.top + rect.bottom) / 2,
+      );
+      return {
+        width: rect.width,
+        height: rect.height,
+        visible: hit === button || button.contains(hit),
+      };
+    });
+    return {
+      position: getComputedStyle(header).position,
+      withinPanel: headerRect.top >= panelRect.top && headerRect.bottom <= panelRect.bottom,
+      actions,
+    };
+  });
+  check(
+    '診断カード上部アクションはスクロール後もstickyで見える',
+    stickyActions.position === 'sticky'
+      && stickyActions.withinPanel
+      && stickyActions.actions.every(({ visible }) => visible),
+    JSON.stringify(stickyActions),
+  );
+  check(
+    '診断カード上部アクションのタッチ領域はすべて44px以上',
+    stickyActions.actions.every(({ width, height }) => width >= 44 && height >= 44),
+    JSON.stringify(stickyActions.actions),
+  );
+
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+  await openSection(page, 'buildingModelSection');
+  await page.evaluate(() => {
+    document.querySelector('#searchSection .panel-section-toggle').click();
+  });
+  await page.reload({ waitUntil: 'load', timeout: 180000 });
+  await page.waitForFunction(() => !!window.__nakano?.panelSections, null, { timeout: 180000 });
+  const restoredPanel = await page.evaluate(() => ({
+    search: window.__nakano.panelSections.isOpen('searchSection'),
+    building: window.__nakano.panelSections.isOpen('buildingModelSection'),
+  }));
+  check(
+    '左パネルの折りたたみ状態をreload後も維持する',
+    restoredPanel.search === false && restoredPanel.building === true,
+    JSON.stringify(restoredPanel),
+  );
+} finally {
+  await p2MobileViewer.close();
 }
 
 const allSummaries = operations.map(({ summary }) => summary);

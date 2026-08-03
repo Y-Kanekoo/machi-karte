@@ -3,7 +3,7 @@
 //
 // canvas上のマウス操作は行わず、DOM直叩きとwindow.__nakano.shadeMapを使う。
 
-import { launchViewer, waitForViewerReady, check, report, shotPath } from './harness.mjs';
+import { launchViewer, waitForViewerReady, openSection, check, report, shotPath } from './harness.mjs';
 
 const COMPLETE_OPTIONS = {
   sizeM: 80,
@@ -155,6 +155,7 @@ async function releaseHeldPostRender() {
 
 try {
   await waitForViewerReady(page);
+  await openSection(page, 'shadeMapSection');
   await page.waitForTimeout(8000);
   await page.evaluate((destination) => window.__nakano.flyTo(destination, 0), STATION);
   await page.waitForTimeout(5000);

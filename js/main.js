@@ -32,8 +32,10 @@ import { createShelterLayer } from './shelter.js';
 import { initShadeMap } from './shademap-ui.js';
 import { initBottomSheet } from './bottomsheet.js';
 import { initPerformanceMonitoring } from './perf.js';
+import { initPanelSections } from './panel.js';
 
 const perf = initPerformanceMonitoring();
+const panelSections = initPanelSections();
 
 const qualityProfileName = resolveQualityProfile();
 const qualityProfile = QUALITY_PROFILES[qualityProfileName];
@@ -819,7 +821,7 @@ let restored = null;
 window.__nakano = {
   viewer, getTileset, loaded, flyTo, showBuildings,
   diagnosis, overlays, compare, share, toast, shelterLayer, areaConfig,
-  bottomSheet, perf,
+  bottomSheet, panelSections, perf,
   qualityProfileName, qualityProfile,
   getBuildingState: () => ({ tileset: currentBldg, layerKind: currentBldgKind }),
   shadeMap: {

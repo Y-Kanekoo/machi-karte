@@ -4,7 +4,7 @@
 // 期待値は 2026-07-27 に test/data-expectations.mjs / test/output/probe.mjs で
 // 実タイルから確定した実測値（test/hazard.test.mjs と同じ）。
 
-import { launchViewer, waitForViewerReady, check, equal, report, shotPath } from './harness.mjs';
+import { launchViewer, waitForViewerReady, openSection, check, equal, report, shotPath } from './harness.mjs';
 
 const t = await launchViewer({ viewport: { width: 1440, height: 900 } });
 const { page } = t;
@@ -332,6 +332,7 @@ try {
 
   // ==== 4d. 避難所レイヤー（R2） ====
   console.log('\n--- 避難所レイヤー ---');
+  await openSection(page, 'hazardSection');
   check('初期状態では避難所レイヤーOFF', !(await page.isChecked('#shelterLayer')));
   check('初期状態では凡例が隠れている', await page.isHidden('#shelterLegend'));
 
@@ -417,6 +418,7 @@ try {
   // ==== 6. 建物クリック → 建物セクション付き診断 ====
   console.log('\n--- 建物クリック診断 ---');
   await page.evaluate(() => window.__nakano.diagnosis.close());
+  await openSection(page, 'presetSection');
   await page.click('button[data-preset="nakanoSta"]');
   await page.waitForTimeout(7000);
   let bldgRows = 0;

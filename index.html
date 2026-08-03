@@ -14,158 +14,229 @@
 <body>
   <div id="cesiumContainer"></div>
 
-  <div id="searchBar">
-    <div class="search-row">
-      <input type="search" id="searchInput" placeholder="住所で診断（例: 中野区弥生町2丁目）"
-             autocomplete="off" aria-label="住所検索"
-             role="combobox" aria-expanded="false" aria-autocomplete="list"
-             aria-controls="searchResults" />
-      <button id="geoBtn" type="button" aria-label="現在地を診断" title="現在地を診断">📍</button>
-      <button id="searchBtn" type="button" aria-label="入力した住所を診断">🔍 診断</button>
-    </div>
-    <ul id="searchResults" class="hidden" role="listbox" aria-label="住所の候補"></ul>
-    <div id="searchMsg" class="hidden"></div>
-  </div>
-
   <div id="controlPanel">
-    <div id="areaSelector" class="area-selector">
-      <div class="area-selector-heading">
-        エリア: <strong id="areaCurrentName">中野区</strong>
-        <span aria-hidden="true">▼</span>
-      </div>
-      <div class="area-selector-fields">
-        <label for="areaPrefSelect">都道府県
-          <select id="areaPrefSelect" aria-label="都道府県を選択">
-            <option value="東京都">東京都</option>
-          </select>
-        </label>
-        <label for="areaCitySelect">自治体
-          <select id="areaCitySelect" aria-label="自治体を選択">
-            <option value="13114">中野区</option>
-          </select>
-        </label>
-      </div>
-    </div>
     <h1 id="areaTitle" data-display-title="3D街カルテ — 中野区"
         aria-label="3D街カルテ — 中野区">中野区 3Dビューア</h1>
     <p class="subtitle" id="areaSubtitle">PLATEAU 3D都市モデル (2025年度版)</p>
 
-    <section>
-      <h2>街カルテ（地点診断）</h2>
-      <label><input type="checkbox" id="diagMode"> 地点を診断（地図をクリック）</label>
-      <p class="hint">洪水・土砂災害・用途地域・日照をまとめて表示します。上の検索ボックスからでも診断できます。</p>
-    </section>
-
-    <section>
-      <h2>建物モデル</h2>
-      <div id="buildingLayers">
-        <label><input type="radio" name="bldg" value="lod2" checked> LOD2（テクスチャ付き・高精細）</label>
-        <label><input type="radio" name="bldg" value="lod2notex"> LOD2（テクスチャなし）</label>
-        <label><input type="radio" name="bldg" value="lod1"> LOD1（箱型・軽量）</label>
-        <label><input type="radio" name="bldg" value="none"> 非表示</label>
-      </div>
-      <label class="sub"><input type="checkbox" id="heightColor"> 高さで色分け</label>
-      <label class="sub"><input type="checkbox" id="shadows"> 影を表示（日照シミュレーション）</label>
-      <div id="timeControl" class="hidden">
-        <input type="range" id="timeSlider" min="6" max="18" step="0.25" value="12">
-        <span id="timeLabel">12:00</span>
-      </div>
-      <fieldset id="qualityControl" class="quality-control">
-        <legend>表示品質:</legend>
-        <div class="quality-options">
-          <label><input type="radio" id="qualityLight" name="quality" value="light"> 軽量（推奨）</label>
-          <label><input type="radio" id="qualityHigh" name="quality" value="high"> 高画質</label>
+    <section id="searchSection" class="panel-section" data-panel-section data-default-open="true">
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="true"
+                aria-controls="searchSectionContent">
+          <span>検索・地点診断</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="searchSectionContent" class="panel-section-content">
+        <div id="searchBar">
+          <div class="search-row">
+            <input type="search" id="searchInput" placeholder="住所で診断（例: 中野区弥生町2丁目）"
+                   autocomplete="off" aria-label="住所検索"
+                   role="combobox" aria-expanded="false" aria-autocomplete="list"
+                   aria-controls="searchResults" />
+            <button id="geoBtn" type="button" aria-label="現在地を診断" title="現在地を診断">📍</button>
+            <button id="searchBtn" type="button" aria-label="入力した住所を診断">🔍 診断</button>
+          </div>
+          <ul id="searchResults" class="hidden" role="listbox" aria-label="住所の候補"></ul>
+          <div id="searchMsg" class="hidden"></div>
         </div>
-        <p id="qualityIosWarning" class="quality-warning hidden">メモリ制限により強制再読み込みされる場合があります</p>
-      </fieldset>
-    </section>
-
-    <section id="shadeMapSection">
-      <h2>日影マップ</h2>
-      <div class="shade-options">
-        <label for="shadeDate">日付
-          <select id="shadeDate">
-            <option value="winter" selected>冬至</option>
-            <option value="spring">春分</option>
-            <option value="summer">夏至</option>
-          </select>
-        </label>
-        <label for="shadePitch">ピッチ
-          <select id="shadePitch">
-            <option value="10" selected>10m</option>
-            <option value="20">20m</option>
-          </select>
-        </label>
-      </div>
-      <div class="shade-actions">
-        <button id="shadeRun" type="button">計算する</button>
-        <button id="shadeAbort" type="button" class="hidden">中断</button>
-        <button id="shadeClear" type="button">クリア</button>
-      </div>
-      <div class="shade-progress-row">
-        <progress id="shadeProgress" max="100" value="0" aria-label="日影マップの計算進捗"></progress>
-        <span id="shadeProgressLabel">0%</span>
-      </div>
-      <p id="shadeStatus" class="shade-status" role="status" aria-live="polite">未計算</p>
-      <p id="shadeCacheNotice" class="shade-cache hidden">キャッシュから表示</p>
-      <div id="shadeLegend" class="shade-legend" aria-label="日照時間の凡例"></div>
-      <p class="shade-note">建物屋上のセルは屋上面での値。地形は計算中心の地盤高で近似し、地球楕円体として扱います。太陽経路のwarm-up後も未読込タイルを見落とす可能性があります。区外の建物・樹木等は考慮しておらず、参考情報のため法的な検討には使用できません。</p>
-    </section>
-
-    <section>
-      <h2>都市計画レイヤー</h2>
-      <div id="zoningLayers">
-        <label><input type="checkbox" id="ov-use"> 用途地域</label>
-        <label><input type="checkbox" id="ov-fire"> 防火・準防火地域</label>
-        <label><input type="checkbox" id="ov-height"> 高度地区</label>
-      </div>
-      <div id="overlayAlphaRow" class="hidden">
-        <label for="overlayAlpha">透明度</label>
-        <input type="range" id="overlayAlpha" min="30" max="80" step="5" value="55"
-               aria-label="オーバーレイの透明度">
-        <span id="overlayAlphaLabel">55%</span>
-      </div>
-      <p class="hint hidden" id="overlayHint">重なりで見づらいときは背景地図を「淡色地図」に切り替えると見やすくなります。</p>
-    </section>
-
-    <section>
-      <h2>防災・その他レイヤー</h2>
-      <div id="floodLayers">
-        <label><input type="checkbox" id="fldKanda"> 洪水浸水想定（神田川流域・L2）</label>
-        <label><input type="checkbox" id="fldArakawa"> 洪水浸水想定（荒川水系 神田川等・L2）</label>
-      </div>
-      <label><input type="checkbox" id="shelterLayer"> 避難所・避難場所</label>
-      <div id="shelterLegend" class="hidden">
-        <span class="shelter-key"><i style="background:#5ecb7a"></i>震災時</span>
-        <span class="shelter-key"><i style="background:#5aa9f0"></i>水害時</span>
-        <span class="shelter-key"><i style="background:#f0a44a"></i>広域</span>
-      </div>
-      <div id="transportLayers">
-        <label><input type="checkbox" id="tran"> 道路（LOD3）</label>
-        <label><input type="checkbox" id="wtr"> 水部（LOD1）</label>
+        <label><input type="checkbox" id="diagMode"> 地点を診断（地図をクリック）</label>
+        <p class="hint">洪水・土砂災害・用途地域・日照をまとめて表示します。住所検索からでも診断できます。</p>
       </div>
     </section>
 
-    <section>
-      <h2>背景地図</h2>
-      <label><input type="radio" name="imagery" value="photo" checked> 航空写真（地理院）</label>
-      <label><input type="radio" name="imagery" value="pale"> 淡色地図（地理院）</label>
+    <section id="areaSection" class="panel-section" data-panel-section data-default-open="true">
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="true"
+                aria-controls="areaSectionContent">
+          <span>エリア</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="areaSectionContent" class="panel-section-content">
+        <div id="areaSelector" class="area-selector">
+          <div class="area-selector-heading">
+            現在: <strong id="areaCurrentName">中野区</strong>
+          </div>
+          <div class="area-selector-fields">
+            <label for="areaPrefSelect">都道府県
+              <select id="areaPrefSelect" aria-label="都道府県を選択">
+                <option value="東京都">東京都</option>
+              </select>
+            </label>
+            <label for="areaCitySelect">自治体
+              <select id="areaCitySelect" aria-label="自治体を選択">
+                <option value="13114">中野区</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section>
-      <h2>スポットへ移動</h2>
-      <div class="presets" id="presetButtons">
-        <button data-preset="nakanoSta">中野駅</button>
-        <button data-preset="sunplaza">サンプラザ跡・四季の森</button>
-        <button data-preset="broadway">中野ブロードウェイ</button>
-        <button data-preset="araiyakushi">新井薬師</button>
-        <button data-preset="tetsugakudo">哲学堂公園</button>
-        <button data-preset="overview">全体俯瞰</button>
+    <section id="buildingModelSection" class="panel-section" data-panel-section>
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="false"
+                aria-controls="buildingModelSectionContent">
+          <span>建物モデル</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="buildingModelSectionContent" class="panel-section-content" hidden>
+        <div id="buildingLayers">
+          <label><input type="radio" name="bldg" value="lod2" checked> LOD2（テクスチャ付き・高精細）</label>
+          <label><input type="radio" name="bldg" value="lod2notex"> LOD2（テクスチャなし）</label>
+          <label><input type="radio" name="bldg" value="lod1"> LOD1（箱型・軽量）</label>
+          <label><input type="radio" name="bldg" value="none"> 非表示</label>
+        </div>
+        <label class="sub"><input type="checkbox" id="heightColor"> 高さで色分け</label>
+        <label class="sub"><input type="checkbox" id="shadows"> 影を表示（日照シミュレーション）</label>
+        <div id="timeControl" class="hidden">
+          <input type="range" id="timeSlider" min="6" max="18" step="0.25" value="12">
+          <span id="timeLabel">12:00</span>
+        </div>
+        <fieldset id="qualityControl" class="quality-control">
+          <legend>表示品質:</legend>
+          <div class="quality-options">
+            <label><input type="radio" id="qualityLight" name="quality" value="light"> 軽量（推奨）</label>
+            <label><input type="radio" id="qualityHigh" name="quality" value="high"> 高画質</label>
+          </div>
+          <p id="qualityIosWarning" class="quality-warning hidden">メモリ制限により強制再読み込みされる場合があります</p>
+        </fieldset>
+      </div>
+    </section>
+
+    <section id="hazardSection" class="panel-section" data-panel-section>
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="false"
+                aria-controls="hazardSectionContent">
+          <span>ハザード</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="hazardSectionContent" class="panel-section-content" hidden>
+        <div id="floodLayers">
+          <label><input type="checkbox" id="fldKanda"> 洪水浸水想定（神田川流域・L2）</label>
+          <label><input type="checkbox" id="fldArakawa"> 洪水浸水想定（荒川水系 神田川等・L2）</label>
+        </div>
+        <label><input type="checkbox" id="shelterLayer"> 避難所・避難場所</label>
+        <div id="shelterLegend" class="hidden">
+          <span class="shelter-key"><i style="background:#5ecb7a"></i>震災時</span>
+          <span class="shelter-key"><i style="background:#5aa9f0"></i>水害時</span>
+          <span class="shelter-key"><i style="background:#f0a44a"></i>広域</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="shadeMapSection" class="panel-section" data-panel-section>
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="false"
+                aria-controls="shadeMapSectionContent">
+          <span>日影マップ</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="shadeMapSectionContent" class="panel-section-content" hidden>
+        <div class="shade-options">
+          <label for="shadeDate">日付
+            <select id="shadeDate">
+              <option value="winter" selected>冬至</option>
+              <option value="spring">春分</option>
+              <option value="summer">夏至</option>
+            </select>
+          </label>
+          <label for="shadePitch">ピッチ
+            <select id="shadePitch">
+              <option value="10" selected>10m</option>
+              <option value="20">20m</option>
+            </select>
+          </label>
+        </div>
+        <div class="shade-actions">
+          <button id="shadeRun" type="button">計算する</button>
+          <button id="shadeAbort" type="button" class="hidden">中断</button>
+          <button id="shadeClear" type="button">クリア</button>
+        </div>
+        <div class="shade-progress-row">
+          <progress id="shadeProgress" max="100" value="0" aria-label="日影マップの計算進捗"></progress>
+          <span id="shadeProgressLabel">0%</span>
+        </div>
+        <p id="shadeStatus" class="shade-status" role="status" aria-live="polite">未計算</p>
+        <p id="shadeCacheNotice" class="shade-cache hidden">キャッシュから表示</p>
+        <div id="shadeLegend" class="shade-legend" aria-label="日照時間の凡例"></div>
+        <p class="shade-note">建物屋上のセルは屋上面での値。地形は計算中心の地盤高で近似し、地球楕円体として扱います。太陽経路のwarm-up後も未読込タイルを見落とす可能性があります。区外の建物・樹木等は考慮しておらず、参考情報のため法的な検討には使用できません。</p>
+      </div>
+    </section>
+
+    <section id="zoningLayerSection" class="panel-section" data-panel-section>
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="false"
+                aria-controls="zoningLayerSectionContent">
+          <span>都市計画レイヤー</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="zoningLayerSectionContent" class="panel-section-content" hidden>
+        <div id="zoningLayers">
+          <label><input type="checkbox" id="ov-use"> 用途地域</label>
+          <label><input type="checkbox" id="ov-fire"> 防火・準防火地域</label>
+          <label><input type="checkbox" id="ov-height"> 高度地区</label>
+        </div>
+        <div id="overlayAlphaRow" class="hidden">
+          <label for="overlayAlpha">透明度</label>
+          <input type="range" id="overlayAlpha" min="30" max="80" step="5" value="55"
+                 aria-label="オーバーレイの透明度">
+          <span id="overlayAlphaLabel">55%</span>
+        </div>
+        <p class="hint hidden" id="overlayHint">重なりで見づらいときは背景地図を「淡色地図」に切り替えると見やすくなります。</p>
+      </div>
+    </section>
+
+    <section id="basemapSection" class="panel-section" data-panel-section>
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="false"
+                aria-controls="basemapSectionContent">
+          <span>背景地図</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="basemapSectionContent" class="panel-section-content" hidden>
+        <label><input type="radio" name="imagery" value="photo" checked> 航空写真（地理院）</label>
+        <label><input type="radio" name="imagery" value="pale"> 淡色地図（地理院）</label>
+      </div>
+    </section>
+
+    <section id="presetSection" class="panel-section" data-panel-section>
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="false"
+                aria-controls="presetSectionContent">
+          <span>スポットへ移動</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="presetSectionContent" class="panel-section-content" hidden>
+        <div class="presets" id="presetButtons">
+          <button data-preset="nakanoSta">中野駅</button>
+          <button data-preset="sunplaza">サンプラザ跡・四季の森</button>
+          <button data-preset="broadway">中野ブロードウェイ</button>
+          <button data-preset="araiyakushi">新井薬師</button>
+          <button data-preset="tetsugakudo">哲学堂公園</button>
+          <button data-preset="overview">全体俯瞰</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="otherLayerSection" class="panel-section" data-panel-section>
+      <h2 class="panel-section-heading">
+        <button class="panel-section-toggle" type="button" aria-expanded="false"
+                aria-controls="otherLayerSectionContent">
+          <span>その他レイヤー</span><span class="panel-section-chevron" aria-hidden="true">▼</span>
+        </button>
+      </h2>
+      <div id="otherLayerSectionContent" class="panel-section-content" hidden>
+        <div id="transportLayers">
+          <label><input type="checkbox" id="tran"> 道路（LOD3）</label>
+          <label><input type="checkbox" id="wtr"> 水部（LOD1）</label>
+        </div>
       </div>
     </section>
 
     <div id="status">読み込み中…</div>
   </div>
+
+  <button id="geoFab" type="button" aria-label="現在地を診断" title="現在地を診断">📍</button>
 
   <!-- 比較バーは診断カードより前に置く（モバイルでカードを押し上げるCSSの兄弟セレクタのため） -->
   <div id="compareBar" class="hidden">
