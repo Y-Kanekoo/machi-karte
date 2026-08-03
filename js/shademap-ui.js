@@ -20,6 +20,19 @@ const OVERLAY_ALPHA = 0.65;
 const FINE_REPLACE_INTERVAL_MS = 2000;
 // ページ内で実行条件をまたいで共有するLRU。再実行やオーバーレイのクリアでは破棄しない。
 const shadeMapCache = new ShadeMapCache(4);
+let shadeMapRunning = false;
+const shadeMapRunningHandlers = new Set();
+
+/** 地図連動や診断カメラとの排他に使う、日影マップの実行状態。 */
+export function isShadeMapRunning() {
+  return shadeMapRunning;
+}
+
+/** 実行開始時に、進行中のカメラ処理を即時停止するための購読フック。 */
+export function onShadeMapRunningChange(handler) {
+  shadeMapRunningHandlers.add(handler);
+  return () => shadeMapRunningHandlers.delete(handler);
+}
 
 /**
  * 日影マップUIを初期化する。
@@ -81,6 +94,14 @@ export function initShadeMap(deps) {
   }
 
   function updateUi() {
+    if (shadeMapRunning !== state.running) {
+      shadeMapRunning = state.running;
+      for (const handler of shadeMapRunningHandlers) {
+        try { handler(shadeMapRunning); } catch (error) {
+          console.warn('日影マップ実行状態フックの実行に失敗しました', error);
+        }
+      }
+    }
     const percent = Math.round(state.progress * 100);
     runButton.disabled = state.running;
     if (state.running) runButton.setAttribute('aria-busy', 'true');

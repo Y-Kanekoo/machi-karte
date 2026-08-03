@@ -18,6 +18,7 @@ import {
 import { queryZoning } from './zoning.js';
 import { resolveServiceRect } from './area.js';
 import { isValidCityCode, serializeState } from './share.js';
+import { isShadeMapRunning, onShadeMapRunningChange } from './shademap-ui.js';
 import {
   estimateSunlight,
   estimateBaseHeight,
@@ -136,12 +137,24 @@ export function initDiagnosis(ctx) {
 
   const closeHandlers = [];
   const resultHandlers = [];
+  const cameraFlightHandlers = [];
   let pinEntity = null;
   let runToken = 0;
   let lastResult = null;
   let highlightedResultSections = new Set();
   let searchPending = false;
+  let searchController = null;
   let areaReloading = false;
+  let geolocationPending = false;
+  let geolocationRequestToken = 0;
+  let geolocationWatchId = null;
+  let geolocationTimer = null;
+  let diagnosisCameraFlightToken = null;
+  let nextDiagnosisCameraFlightToken = 0;
+
+  onShadeMapRunningChange((running) => {
+    if (running && diagnosisCameraFlightToken !== null) viewer.camera.cancelFlight?.();
+  });
 
   // ---- R3 F3-1: 視点高さセレクタの再計算文脈 ---------------------------------
   // セレクタのchange時点で sunRunToken を進め、デバウンス中も古い再計算を止める。
@@ -858,7 +871,7 @@ export function initDiagnosis(ctx) {
     fill('secPlace', renderPlace(lon, lat, title));
     setPin(lon, lat, title || '診断地点');
     const result = {
-      lon, lat, title,
+      lon, lat, title, fly,
       flood: null, floodKeizoku: null, floodL1: null,
       landslide: null, shelters: null, zoning: null, sunlight: null,
       buildingHeight: measuredHeightOf(picked),
@@ -1099,7 +1112,7 @@ export function initDiagnosis(ctx) {
     searchMsg.classList.toggle('error', !!isError);
   }
 
-  function setSearchPending(pending) {
+  function setSearchPending(pending, controller = null) {
     searchPending = pending;
     searchBtn.disabled = pending;
     if (pending) searchBtn.setAttribute('aria-busy', 'true');
@@ -1113,6 +1126,26 @@ export function initDiagnosis(ctx) {
         pending ? '住所を検索中' : searchButtonAriaLabel,
       );
     }
+    // 既存の即時フィードバック（disabled＋spinner）を1マイクロタスク表示した後、
+    // 実行中の検索を中断できるボタンへ切り替える。
+    if (pending && controller) {
+      queueMicrotask(() => {
+        if (!searchPending || searchController !== controller) return;
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = '中断';
+        searchBtn.setAttribute('aria-label', '住所検索を中断');
+      });
+    }
+  }
+
+  function abortSearch() {
+    if (!searchController) return false;
+    const controller = searchController;
+    searchController = null;
+    controller.abort();
+    setSearchPending(false);
+    showSearchMsg('住所検索を中断しました');
+    return true;
   }
 
   /** 別自治体へ遷移する直前に、再読み込み中であることを画面へ残す。 */
@@ -1196,12 +1229,33 @@ export function initDiagnosis(ctx) {
   }
 
   function flyToPoint(lon, lat) {
+    // 日影マップのレイ計算中は、診断を起点とする視点変更を行わない。
+    if (isShadeMapRunning()) return false;
+
+    const cameraFlightToken = ++nextDiagnosisCameraFlightToken;
+    let settled = false;
+    const notifyCameraFlightEnd = (completed) => {
+      if (settled) return;
+      settled = true;
+      if (diagnosisCameraFlightToken === cameraFlightToken) {
+        diagnosisCameraFlightToken = null;
+      }
+      for (const fn of cameraFlightHandlers) {
+        try { fn({ completed, lon, lat }); } catch (e) {
+          console.warn('診断カメラ完了フックの実行に失敗しました', e);
+        }
+      }
+    };
+    diagnosisCameraFlightToken = cameraFlightToken;
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, 600),
       orientation: { heading: 0, pitch: Cesium.Math.toRadians(-50), roll: 0 },
       duration: 2.0,
+      complete: () => notifyCameraFlightEnd(true),
+      cancel: () => notifyCameraFlightEnd(false),
     });
     requestRender();
+    return true;
   }
 
   async function pickResult(r) {
@@ -1217,20 +1271,24 @@ export function initDiagnosis(ctx) {
       setTimeout(() => location.reload(), 120);
       return;
     }
-    flyToPoint(r.lon, r.lat);
+    const fly = flyToPoint(r.lon, r.lat);
     // flyTo の途中でも診断は開始してよい（日照計算側で改めてカメラを合わせる）
-    await diagnose({ lon: r.lon, lat: r.lat, title: r.title, picked: null });
+    await diagnose({ lon: r.lon, lat: r.lat, title: r.title, picked: null, fly });
   }
 
   async function doSearch() {
-    if (searchPending) return;
     const q = searchInput.value.trim();
     hideResults();
     if (!q) return;
+    // Enterによる再検索では、結果の競合を防ぐため前回要求を先に中断する。
+    if (searchController) searchController.abort();
+    const controller = new AbortController();
+    searchController = controller;
     showSearchMsg('検索中…');
-    setSearchPending(true);
+    setSearchPending(true, controller);
     try {
-      const results = await geocodeSearch(q, 5);
+      const results = await geocodeSearch(q, 5, { signal: controller.signal });
+      if (searchController !== controller) return;
       if (!results.length) {
         showSearchMsg('見つかりませんでした', true);
         return;
@@ -1242,14 +1300,21 @@ export function initDiagnosis(ctx) {
       }
       renderOptions(results);
     } catch (e) {
+      if (e?.name === 'AbortError') return;
       console.warn('geocode failed', e);
       showSearchMsg('住所検索に失敗しました', true);
     } finally {
-      if (!areaReloading) setSearchPending(false);
+      if (searchController === controller) {
+        searchController = null;
+        if (!areaReloading) setSearchPending(false);
+      }
     }
   }
 
-  searchBtn.addEventListener('click', doSearch);
+  searchBtn.addEventListener('click', () => {
+    if (searchPending) abortSearch();
+    else doSearch();
+  });
 
   // ---- 検索のキーボード操作（↑↓で選択・Enterで確定・Escで閉じる） -----------------
 
@@ -1291,16 +1356,59 @@ export function initDiagnosis(ctx) {
   const geoButtons = ['geoBtn', 'geoFab']
     .map((id) => document.getElementById(id))
     .filter(Boolean);
+  const geolocationButtonLabels = new Map(geoButtons.map((button) => [button, {
+    html: button.innerHTML,
+    ariaLabel: button.getAttribute('aria-label'),
+    title: button.getAttribute('title'),
+  }]));
 
   function setGeolocationPending(pending) {
+    geolocationPending = pending;
     for (const button of geoButtons) {
-      button.disabled = pending;
-      if (pending) button.setAttribute('aria-busy', 'true');
-      else button.removeAttribute('aria-busy');
+      const label = geolocationButtonLabels.get(button);
+      button.disabled = false;
+      button.toggleAttribute('data-pending', pending);
+      if (pending) {
+        button.setAttribute('aria-busy', 'true');
+        button.setAttribute('aria-label', '現在地の取得を中断');
+        button.setAttribute('title', '現在地の取得を中断');
+        button.textContent = '中断';
+      } else {
+        button.removeAttribute('aria-busy');
+        button.innerHTML = label?.html || '📍';
+        if (label?.ariaLabel) button.setAttribute('aria-label', label.ariaLabel);
+        else button.removeAttribute('aria-label');
+        if (label?.title) button.setAttribute('title', label.title);
+        else button.removeAttribute('title');
+      }
     }
   }
 
+  function clearGeolocationRequest() {
+    if (geolocationTimer !== null) {
+      clearTimeout(geolocationTimer);
+      geolocationTimer = null;
+    }
+    if (geolocationWatchId !== null) {
+      navigator.geolocation.clearWatch?.(geolocationWatchId);
+      geolocationWatchId = null;
+    }
+    setGeolocationPending(false);
+  }
+
+  function abortGeolocation(message = '現在地の取得を中断しました', isError = false) {
+    if (!geolocationPending) return false;
+    geolocationRequestToken++;
+    clearGeolocationRequest();
+    showSearchMsg(message, isError);
+    return true;
+  }
+
   function diagnoseCurrentLocation() {
+    if (geolocationPending) {
+      abortGeolocation();
+      return;
+    }
     if (!navigator.geolocation) {
       showSearchMsg('この端末では現在地を取得できません', true);
       return;
@@ -1308,34 +1416,51 @@ export function initDiagnosis(ctx) {
     hideResults();
     showSearchMsg('現在地を取得中…');
     setGeolocationPending(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeolocationPending(false);
-        const lon = pos.coords.longitude;
-        const lat = pos.coords.latitude;
-        flyToPoint(lon, lat);
-        // diagnose() が検索メッセージを消すので、エリア外の案内はその後に出す
-        diagnose({ lon, lat, title: null, picked: null });
-        if (!inServiceArea(lon, lat)) {
-          // エリア外でもハザード・都市計画のタイルは全国分あるので診断自体は実行する
-          showSearchMsg(
-            `対応エリア外です（建物3Dは${serviceAreaName}のみ）。` +
-            'ハザードと都市計画のみ診断します',
-            true,
-          );
-        }
-      },
-      (err) => {
-        setGeolocationPending(false);
-        const msg =
-          err.code === err.PERMISSION_DENIED ? '現在地の利用が許可されませんでした'
-            : err.code === err.TIMEOUT ? '現在地の取得がタイムアウトしました'
-              : '現在地を取得できませんでした';
-        showSearchMsg(msg, true);
-      },
-      // maximumAge=0: 直前の測位結果を使い回さない（移動直後でも今の位置を取る）
-      { enableHighAccuracy: false, timeout: GEOLOCATION_TIMEOUT, maximumAge: 0 }
-    );
+    const requestToken = ++geolocationRequestToken;
+    const isCurrentRequest = () => requestToken === geolocationRequestToken;
+    const onSuccess = (pos) => {
+      if (!isCurrentRequest()) return;
+      geolocationRequestToken++;
+      clearGeolocationRequest();
+      const lon = pos.coords.longitude;
+      const lat = pos.coords.latitude;
+      const fly = flyToPoint(lon, lat);
+      // diagnose() が検索メッセージを消すので、エリア外の案内はその後に出す
+      diagnose({ lon, lat, title: null, picked: null, fly });
+      if (!inServiceArea(lon, lat)) {
+        // エリア外でもハザード・都市計画のタイルは全国分あるので診断自体は実行する
+        showSearchMsg(
+          `対応エリア外です（建物3Dは${serviceAreaName}のみ）。` +
+          'ハザードと都市計画のみ診断します',
+          true,
+        );
+      }
+    };
+    const onError = (err) => {
+      if (!isCurrentRequest()) return;
+      geolocationRequestToken++;
+      clearGeolocationRequest();
+      const msg =
+        err.code === err.PERMISSION_DENIED ? '現在地の利用が許可されませんでした'
+          : err.code === err.TIMEOUT ? '現在地の取得がタイムアウトしました'
+            : '現在地を取得できませんでした';
+      showSearchMsg(msg, true);
+    };
+    const options = {
+      enableHighAccuracy: false,
+      timeout: GEOLOCATION_TIMEOUT,
+      maximumAge: 0,
+    };
+    // Geolocation APIにはAbortSignalがないため、watchPosition＋clearWatchを中断手段にする。
+    if (typeof navigator.geolocation.watchPosition === 'function') {
+      geolocationWatchId = navigator.geolocation.watchPosition(onSuccess, onError, options);
+    } else {
+      navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
+    }
+    geolocationTimer = setTimeout(() => {
+      if (!isCurrentRequest()) return;
+      abortGeolocation('現在地の取得がタイムアウトしました', true);
+    }, GEOLOCATION_TIMEOUT);
   }
 
   for (const button of geoButtons) {
@@ -1359,8 +1484,8 @@ export function initDiagnosis(ctx) {
      * @param {{title?:string|null, fly?:boolean, skipSunlight?:boolean}} [opts]
      */
     runDiagnosisAt: (lon, lat, opts = {}) => {
-      if (opts.fly) flyToPoint(lon, lat);
-      return diagnose({ lon, lat, picked: null, ...opts });
+      const fly = opts.fly ? flyToPoint(lon, lat) : opts.fly;
+      return diagnose({ lon, lat, picked: null, ...opts, fly });
     },
     close,
     /** 実行中または開始待ちの日照計算だけを中断し、診断カード自体は閉じない。 */
@@ -1374,6 +1499,8 @@ export function initDiagnosis(ctx) {
     updateShelterButton,
     /** 診断のコア項目が揃うたび（＋日照完了時）に呼ばれる */
     onResult: (fn) => resultHandlers.push(fn),
+    /** 診断flyToが完了または中断したときに呼ばれる。 */
+    onCameraFlightEnd: (fn) => cameraFlightHandlers.push(fn),
     getLastResult: () => lastResult,
     /** e2e用: 日照計算の実行・キャンセル・進捗と現在選択の期待高さを読み取る */
     getSunlightTestState: () => {

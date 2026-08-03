@@ -15,19 +15,21 @@ export function initPerformanceMonitoring() {
   let loafSupported = supportedEntryTypes.includes(LOAF_ENTRY_TYPE);
   let eventTimingSupported = supportedEntryTypes.includes(EVENT_ENTRY_TYPE);
   const interactions = [];
+  const loafDurations = [];
+  const marks = new Map();
   let loafCount = 0;
   let loafTotalMs = 0;
-  let worstLoafMs = 0;
+  let interactionCount = 0;
   let pendingMarker;
   let renderRequestCount = 0;
-  let lastMarkRenderRequestCount = 0;
+  let lastMarkSnapshot = null;
   if (loafSupported) {
     try {
       const observer = new Observer((list) => {
         for (const entry of list.getEntries()) {
           loafCount += 1;
           loafTotalMs += entry.duration;
-          worstLoafMs = Math.max(worstLoafMs, entry.duration);
+          loafDurations.push(entry.duration);
         }
       });
       observer.observe({ type: LOAF_ENTRY_TYPE, buffered: true });
@@ -54,6 +56,7 @@ export function initPerformanceMonitoring() {
           const name = existing?.name || markedName;
           const interaction = {
             interactionId,
+            sequence: existing?.sequence || ++interactionCount,
             startTime: entry.startTime,
             duration: entry.duration,
             inputDelay: entry.processingStart - entry.startTime,
@@ -83,16 +86,53 @@ export function initPerformanceMonitoring() {
       console.warn('Event Timing計測を開始できませんでした', error);
     }
   }
-  function getSummary() {
-    const publicInteractions = interactions.map(({ interactionId, ...interaction }) => interaction);
+  function createSnapshot() {
+    return {
+      startTime: globalThis.performance?.now?.() || 0,
+      loafCount,
+      loafTotalMs,
+      interactionCount,
+      maxInteractionMs: interactions.reduce(
+        (maximum, interaction) => Math.max(maximum, interaction.duration),
+        0,
+      ),
+      renderRequestCount,
+    };
+  }
+
+  function buildSummary(snapshot = null) {
+    const measuredInteractions = snapshot
+      ? interactions.filter((interaction) => interaction.sequence > snapshot.interactionCount)
+      : interactions;
+    const publicInteractions = measuredInteractions.map(
+      ({ interactionId, sequence, ...interaction }) => interaction,
+    );
+    const measuredLoafCount = snapshot
+      ? Math.max(0, loafCount - snapshot.loafCount)
+      : loafCount;
+    const measuredLoafTotalMs = snapshot
+      ? Math.max(0, loafTotalMs - snapshot.loafTotalMs)
+      : loafTotalMs;
+    const measuredLoafDurations = snapshot
+      ? loafDurations.slice(snapshot.loafCount)
+      : loafDurations;
+    const renderRequestsSinceMark = snapshot
+      ? Math.max(0, renderRequestCount - snapshot.renderRequestCount)
+      : Math.max(0, renderRequestCount - (lastMarkSnapshot?.renderRequestCount || 0));
     return {
       supported: loafSupported,
       eventTimingSupported,
-      loafCount,
-      loafTotalMs,
-      worstLoafMs,
-      renderRequestCount,
-      renderRequestsSinceMark: renderRequestCount - lastMarkRenderRequestCount,
+      loafCount: measuredLoafCount,
+      loafTotalMs: measuredLoafTotalMs,
+      worstLoafMs: measuredLoafDurations.reduce(
+        (maximum, duration) => Math.max(maximum, duration),
+        0,
+      ),
+      interactionCount: snapshot
+        ? Math.max(0, interactionCount - snapshot.interactionCount)
+        : interactionCount,
+      renderRequestCount: snapshot ? renderRequestsSinceMark : renderRequestCount,
+      renderRequestsSinceMark,
       interactions: publicInteractions,
       maxInteractionMs: publicInteractions.reduce(
         (maximum, interaction) => Math.max(maximum, interaction.duration),
@@ -100,15 +140,39 @@ export function initPerformanceMonitoring() {
       ),
     };
   }
+
+  function getSummary() {
+    return buildSummary();
+  }
+
   function mark(name) {
     const normalized = String(name || '').trim();
-    lastMarkRenderRequestCount = renderRequestCount;
+    const snapshot = createSnapshot();
+    lastMarkSnapshot = snapshot;
+    if (normalized) marks.set(normalized, snapshot);
     pendingMarker = normalized
-      ? { name: normalized, startTime: globalThis.performance?.now?.() || 0 }
+      ? { name: normalized, startTime: snapshot.startTime }
       : undefined;
+    return {
+      name: normalized,
+      loafCount: snapshot.loafCount,
+      loafTotalMs: snapshot.loafTotalMs,
+      interactionCount: snapshot.interactionCount,
+      maxInteractionMs: snapshot.maxInteractionMs,
+    };
+  }
+
+  /** mark時点からのLoAF・Event Timing差分を操作単位で返す。 */
+  function measure(name) {
+    const normalized = String(name || '').trim();
+    const snapshot = marks.get(normalized);
+    if (!snapshot) return null;
+    marks.delete(normalized);
+    if (pendingMarker?.name === normalized) pendingMarker = undefined;
+    return buildSummary(snapshot);
   }
   function recordRenderRequest() {
     renderRequestCount += 1;
   }
-  return { getSummary, mark, recordRenderRequest };
+  return { getSummary, mark, measure, recordRenderRequest };
 }

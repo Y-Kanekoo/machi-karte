@@ -515,8 +515,13 @@ input[type="checkbox"]:active:not(:disabled) {
   overflow-y: auto;
 }
 
-#searchResults li {
-  padding: 7px 9px;
+#searchResults li[role="option"] {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 6px 9px;
+  line-height: 1.35;
   border-radius: 5px;
   cursor: pointer;
 }
@@ -1466,8 +1471,8 @@ body.diag-mode #cesiumContainer canvas {
   #geoFab {
     position: fixed;
     right: calc(var(--mobile-viewport-right, 0px) + 16px + env(safe-area-inset-right));
-    bottom: calc(44px + env(safe-area-inset-bottom));
-    z-index: 13;
+    bottom: calc(44px + var(--compare-bar-offset, 0px) + env(safe-area-inset-bottom));
+    z-index: 14;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1495,6 +1500,10 @@ body.diag-mode #cesiumContainer canvas {
   #geoFab:disabled {
     opacity: 0.55;
     cursor: default;
+  }
+
+  #geoFab[data-pending] {
+    font-size: 12px;
   }
 
   body.sheet-open #geoFab {
@@ -1620,6 +1629,7 @@ body.diag-mode #cesiumContainer canvas {
     min-width: 0;
     max-width: var(--mobile-viewport-width, 100vw);
     transform: none;
+    z-index: 13;
   }
 
   #compareBarText {

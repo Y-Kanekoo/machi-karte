@@ -1,5 +1,7 @@
 // モバイル幅の診断カードを3段階で開閉するボトムシート制御。
 
+import { isShadeMapRunning, onShadeMapRunningChange } from './shademap-ui.js';
+
 const MOBILE_QUERY = '(max-width: 767px)';
 const STATE_ORDER = ['full', 'half', 'peek'];
 const PEEK_HEIGHT = 140;
@@ -45,6 +47,8 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
   let mapSyncPending = false;
   let cameraMoving = false;
   let internalCameraMove = false;
+  let userCameraInput = false;
+  let userCameraInputTimer = null;
   let mapAdjustmentCount = 0;
   let lastMapAdjustment = null;
 
@@ -82,7 +86,6 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
       offset = Math.ceil(bottomClearance + measuredHeight + marginTop);
     }
     document.documentElement.style.setProperty(COMPARE_BAR_OFFSET_PROPERTY, `${offset}px`);
-    queueMapSync(true);
   }
 
   function scheduleCompareBarMeasurement() {
@@ -113,6 +116,19 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     return raw.endsWith('ms') ? value : value * 1000;
   }
 
+  /** 待機中の連動を破棄し、後続のmoveEndから再発火しないようにする。 */
+  function discardMapSync() {
+    mapSyncPending = false;
+    if (mapSyncTimer !== null) {
+      clearTimeout(mapSyncTimer);
+      mapSyncTimer = null;
+    }
+    if (mapSyncFrame !== null) {
+      cancelAnimationFrame(mapSyncFrame);
+      mapSyncFrame = null;
+    }
+  }
+
   /** 診断地点とシート上端を、同じ画面座標系で計測する。 */
   function measureMapSync() {
     const result = diagnosis.getLastResult?.();
@@ -141,7 +157,12 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
    */
   function applyMapSync() {
     mapSyncFrame = null;
-    if (!mapSyncPending || cameraMoving || internalCameraMove) return;
+    if (!mapSyncPending) return;
+    if (isShadeMapRunning()) {
+      discardMapSync();
+      return;
+    }
+    if (cameraMoving || internalCameraMove) return;
     if (!mobileQuery.matches
       || !document.body.classList.contains('sheet-open')
       || !['half', 'full'].includes(state)) {
@@ -206,11 +227,9 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
       complete: () => {
         internalCameraMove = false;
         requestRender();
-        if (mapSyncPending) queueMapSync();
       },
       cancel: () => {
         internalCameraMove = false;
-        if (mapSyncPending) queueMapSync();
       },
     });
     requestRender();
@@ -218,6 +237,10 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
 
   function queueMapSync(afterSheetTransition = false) {
     if (!viewer || !mobileQuery.matches || !['half', 'full'].includes(state)) return;
+    if (isShadeMapRunning()) {
+      discardMapSync();
+      return;
+    }
     mapSyncPending = true;
     if (mapSyncTimer !== null) clearTimeout(mapSyncTimer);
     if (mapSyncFrame !== null) cancelAnimationFrame(mapSyncFrame);
@@ -228,14 +251,14 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     }, delay);
   }
 
-  function setState(nextState) {
+  function setState(nextState, options = {}) {
     if (!STATE_ORDER.includes(nextState)) return false;
     state = nextState;
     panel.dataset.sheetState = nextState;
     if (mobileQuery.matches) applyOffset(offsets()[nextState]);
     if (nextState === 'peek') {
-      mapSyncPending = false;
-    } else {
+      discardMapSync();
+    } else if (options.syncMap !== false) {
       queueMapSync(true);
     }
     requestRender();
@@ -341,7 +364,13 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
 
   function syncOpenState() {
     const open = document.body.classList.contains('sheet-open');
-    if (open && !wasOpen) requestAnimationFrame(() => setState('half'));
+    if (open && !wasOpen) {
+      requestAnimationFrame(() => setState('half', {
+        syncMap: diagnosis.getLastResult?.()?.fly !== false,
+      }));
+    } else if (!open && wasOpen) {
+      discardMapSync();
+    }
     wasOpen = open;
   }
 
@@ -364,7 +393,10 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
   const syncSize = () => {
     syncViewportMetrics();
     scheduleCompareBarMeasurement();
-    if (mobileQuery.matches && document.body.classList.contains('sheet-open')) setState(state);
+    if (mobileQuery.matches && document.body.classList.contains('sheet-open')) {
+      applyOffset(offsets()[state]);
+      requestRender();
+    }
   };
   mobileQuery.addEventListener?.('change', syncSize);
   globalThis.visualViewport?.addEventListener('resize', syncSize);
@@ -372,15 +404,53 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
   globalThis.addEventListener('resize', syncSize);
 
   if (viewer?.camera) {
+    onShadeMapRunningChange((running) => {
+      if (!running) return;
+      discardMapSync();
+      if (internalCameraMove) viewer.camera.cancelFlight?.();
+    });
+    const canvas = viewer.scene?.canvas;
+    const releaseUserCameraInput = () => {
+      if (userCameraInputTimer !== null) clearTimeout(userCameraInputTimer);
+      userCameraInputTimer = setTimeout(() => {
+        userCameraInput = false;
+        userCameraInputTimer = null;
+      }, 250);
+    };
+    const markUserCameraInput = () => {
+      userCameraInput = true;
+      discardMapSync();
+      if (internalCameraMove) viewer.camera.cancelFlight?.();
+    };
+    canvas?.addEventListener('pointerdown', markUserCameraInput, { capture: true });
+    canvas?.addEventListener('mousedown', markUserCameraInput, { capture: true });
+    canvas?.addEventListener('touchstart', markUserCameraInput, { capture: true, passive: true });
+    canvas?.addEventListener('wheel', () => {
+      markUserCameraInput();
+      releaseUserCameraInput();
+    }, { capture: true, passive: true });
+    globalThis.addEventListener('pointerup', releaseUserCameraInput, { capture: true });
+    globalThis.addEventListener('mouseup', releaseUserCameraInput, { capture: true });
+    globalThis.addEventListener('touchend', releaseUserCameraInput, { capture: true, passive: true });
     viewer.camera.moveStart.addEventListener(() => {
       cameraMoving = true;
+      if (userCameraInput) discardMapSync();
+    });
+    viewer.camera.changed.addEventListener(() => {
+      if (userCameraInput) discardMapSync();
     });
     viewer.camera.moveEnd.addEventListener(() => {
       cameraMoving = false;
       requestRender();
-      if (mapSyncPending && !internalCameraMove) queueMapSync();
+      releaseUserCameraInput();
     });
-    diagnosis.onResult?.(() => queueMapSync());
+    diagnosis.onCameraFlightEnd?.(({ completed, lon, lat }) => {
+      if (!completed || isShadeMapRunning()) return;
+      const result = diagnosis.getLastResult?.();
+      if (result?.fly !== true || result.lon !== lon || result.lat !== lat) return;
+      // CesiumのmoveEndを同一ターンで処理し終えた後に、診断flyTo完了起点で連動する。
+      setTimeout(() => queueMapSync(), 0);
+    });
   }
 
   panel.dataset.sheetState = state;

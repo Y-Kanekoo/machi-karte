@@ -95,6 +95,7 @@ function isSummary(value) {
     && isFiniteNumber(value?.loafCount)
     && isFiniteNumber(value?.loafTotalMs)
     && isFiniteNumber(value?.worstLoafMs)
+    && isFiniteNumber(value?.interactionCount)
     && isFiniteNumber(value?.maxInteractionMs)
     && isFiniteNumber(value?.renderRequestCount)
     && isFiniteNumber(value?.renderRequestsSinceMark)
@@ -115,10 +116,13 @@ async function mark(page, name) {
   }, name);
 }
 
-async function record(page, name, context) {
+async function record(page, name, context, measurementKind) {
   await page.waitForTimeout(300);
-  const summary = await page.evaluate(() => window.__nakano.perf.getSummary());
-  operations.push({ name, context, summary });
+  const summary = await page.evaluate(
+    (operationName) => window.__nakano.perf.measure(operationName),
+    name,
+  );
+  operations.push({ name, context, measurementKind, summary });
   check(`${name}: 計測サマリーを取得できる`, isSummary(summary), JSON.stringify(summary));
   if (RENDER_REQUIRED_OPERATION_NAMES.has(name)) {
     check(
@@ -172,7 +176,7 @@ async function auditTouchTargets(page, { revealControls = false } = {}) {
     };
     const rectValue = (rect) => ({ width: rect.width, height: rect.height });
     const audit = [...document.querySelectorAll(
-      'button, [role="button"], input, select, a, .sheet-handle',
+      'button, [role="button"], [role="option"], input, select, a, .sheet-handle',
     )].flatMap((element) => {
       const ownRect = element.getBoundingClientRect();
       if (ownRect.width === 0 || ownRect.height === 0) return [];
@@ -264,6 +268,7 @@ try {
       exists: !!perf,
       getSummary: typeof perf?.getSummary,
       mark: typeof perf?.mark,
+      measure: typeof perf?.measure,
       summary: perf?.getSummary(),
     };
   });
@@ -276,6 +281,11 @@ try {
     '計測サマリーにsupportedフラグがある',
     typeof hook.summary?.supported === 'boolean',
     JSON.stringify(hook.summary),
+  );
+  check(
+    'window.__nakano.perfに操作差分を返すmeasureがある',
+    hook.measure === 'function',
+    JSON.stringify(hook),
   );
 
   // 1. 住所検索診断
@@ -304,7 +314,7 @@ try {
     null,
     { timeout: 60000, polling: 100 },
   );
-  await record(page, 'address-search', 'desktop');
+  await record(page, 'address-search', 'desktop', 'user-input');
 
   // 2. scene.pickで取得した実在建物をフック経由で診断
   await page.evaluate(() => {
@@ -329,7 +339,7 @@ try {
   }, { lon: tap.lon, lat: tap.lat });
   await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 30000 });
   await waitForSunlight(page);
-  await record(page, 'map-tap', 'desktop');
+  await record(page, 'map-tap', 'desktop', 'programmatic');
 
   // 3. 階数セレクタ変更
   const floorTarget = await page.evaluate(() => {
@@ -354,7 +364,7 @@ try {
     floorTarget,
     { timeout: 60000, polling: 500 },
   );
-  await record(page, 'floor-selector', 'desktop');
+  await record(page, 'floor-selector', 'desktop', 'programmatic');
 
   // 4. 日影マップ開始→中断（縮小グリッド）
   await openSection(page, 'shadeMapSection');
@@ -378,7 +388,7 @@ try {
   await mark(page, 'shade-map-start-abort');
   await page.click('#shadeAbort');
   await page.evaluate(() => window.__ruxShadeRun);
-  await record(page, 'shade-map-start-abort', 'desktop');
+  await record(page, 'shade-map-start-abort', 'desktop', 'user-input');
 
   // 5. 建物レイヤー切替
   await openSection(page, 'buildingModelSection');
@@ -389,7 +399,7 @@ try {
     null,
     { timeout: 180000, polling: 500 },
   );
-  await record(page, 'building-layer-switch', 'desktop');
+  await record(page, 'building-layer-switch', 'desktop', 'user-input');
 
   // 7. エリアセレクタは開閉だけ行い、自治体変更によるreloadは発生させない
   const urlBeforeAreaSelector = page.url();
@@ -397,7 +407,7 @@ try {
   await page.locator('#areaPrefSelect').click();
   await page.keyboard.press('Escape');
   check('エリアセレクタ開閉でreloadしない', page.url() === urlBeforeAreaSelector);
-  await record(page, 'area-selector-open-close', 'desktop');
+  await record(page, 'area-selector-open-close', 'desktop', 'user-input');
 
   // P1: 同期区間で全スケルトンが揃い、各データの確定後に順次消える。
   const skeletonStart = await page.evaluate(() => {
@@ -538,7 +548,7 @@ try {
   await page.waitForFunction(
     () => document.getElementById('diagnosisPanel')?.dataset.sheetState === 'full',
   );
-  await record(page, 'mobile-sheet-peek-half-full', 'mobile');
+  await record(page, 'mobile-sheet-peek-half-full', 'mobile', 'user-input');
 
   // P3: canvasを操作せず、診断flyTo完了後の画面座標フックで地図連動を検証する。
   await page.evaluate(async () => {
@@ -570,6 +580,52 @@ try {
     mapSync.pointY < mapSync.sheetTop,
     JSON.stringify(mapSync),
   );
+
+  // RC1: シート連動待機中にユーザーがカメラを動かした場合は、moveEnd後も再発火しない。
+  const adjustmentCountBeforeUserMove = mapSync.adjustmentCount;
+  await page.evaluate(() => window.__nakano.bottomSheet.setState('full'));
+  await page.mouse.move(200, 50);
+  await page.mouse.wheel(0, 180);
+  await page.waitForTimeout(700);
+  const afterUserMove = await page.evaluate(
+    () => window.__nakano.bottomSheet.getMapSyncTestState(),
+  );
+  check(
+    'ユーザーのカメラ操作で待機中のシート地図連動を破棄する',
+    !afterUserMove.pending && afterUserMove.adjustmentCount === adjustmentCountBeforeUserMove,
+    JSON.stringify(afterUserMove),
+  );
+
+  // RC1: 比較URLのfly:false診断で、先に復元したカメラをシート連動が上書きしない。
+  const restoredCamera = { lon: 139.680321, lat: 35.690654 };
+  const compareRestorePage = await mobileViewer.newPage(
+    BASE_URL
+      + '#v=1&city=13114&cam=139.680321,35.690654,900,33,-45'
+      + '&compare=139.6686,35.7056;139.6659,35.701',
+  );
+  await compareRestorePage.waitForFunction(
+    () => window.__nakano?.getRestored?.() instanceof Promise,
+    null,
+    { timeout: 180000, polling: 500 },
+  );
+  await compareRestorePage.evaluate(() => window.__nakano.getRestored());
+  await compareRestorePage.waitForTimeout(500);
+  const compareRestoreCamera = await compareRestorePage.evaluate(() => {
+    const cartographic = window.__nakano.viewer.camera.positionCartographic;
+    return {
+      lon: Cesium.Math.toDegrees(cartographic.longitude),
+      lat: Cesium.Math.toDegrees(cartographic.latitude),
+      mapSync: window.__nakano.bottomSheet.getMapSyncTestState(),
+    };
+  });
+  check(
+    '比較URL復元後のカメラ位置をfly:false診断が上書きしない',
+    Math.abs(compareRestoreCamera.lon - restoredCamera.lon) < 1e-5
+      && Math.abs(compareRestoreCamera.lat - restoredCamera.lat) < 1e-5
+      && compareRestoreCamera.mapSync.adjustmentCount === 0,
+    JSON.stringify(compareRestoreCamera),
+  );
+  await compareRestorePage.close();
 } finally {
   await mobileViewer.close();
 }
@@ -713,6 +769,36 @@ try {
   );
 
   await page.click('#compareAddBtn');
+  await page.evaluate(() => window.__nakano.diagnosis.close());
+  await page.waitForFunction(
+    () => Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--compare-bar-offset'),
+    ) > 0 && getComputedStyle(document.getElementById('geoFab')).display !== 'none',
+  );
+  const fabCompareHit = await page.evaluate(() => {
+    const fab = document.getElementById('geoFab');
+    const bar = document.getElementById('compareBar');
+    const fabRect = fab.getBoundingClientRect();
+    const barRect = bar.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      (fabRect.left + fabRect.right) / 2,
+      (fabRect.top + fabRect.bottom) / 2,
+    );
+    return {
+      fabBottom: fabRect.bottom,
+      compareTop: barRect.top,
+      fabZIndex: Number(getComputedStyle(fab).zIndex),
+      compareZIndex: Number(getComputedStyle(bar).zIndex),
+      hitFab: hit === fab || fab.contains(hit),
+    };
+  });
+  check(
+    '比較バー表示中もFABの実効タッチ領域が重ならず最前面にある',
+    fabCompareHit.fabBottom <= fabCompareHit.compareTop
+      && fabCompareHit.fabZIndex > fabCompareHit.compareZIndex
+      && fabCompareHit.hitFab,
+    JSON.stringify(fabCompareHit),
+  );
   await page.evaluate(async () => {
     await window.__nakano.diagnosis.runDiagnosisAt(139.6659, 35.7010, {
       title: '中野駅南口の比較地点',
@@ -816,6 +902,12 @@ check(
   OPERATION_NAMES.every((name) => operations.some((operation) => operation.name === name)),
   JSON.stringify(operations.map(({ name }) => name)),
 );
+check(
+  '各操作の計測種別をuser-inputまたはprogrammaticで記録する',
+  operations.every(({ measurementKind }) =>
+    measurementKind === 'user-input' || measurementKind === 'programmatic'),
+  JSON.stringify(operations.map(({ name, measurementKind }) => ({ name, measurementKind }))),
+);
 
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 fs.writeFileSync(BASELINE_PATH, `${JSON.stringify({
@@ -826,6 +918,11 @@ fs.writeFileSync(BASELINE_PATH, `${JSON.stringify({
     renderer: 'SwiftShader',
   },
   eventDurationThresholdMs: 40,
+  measurementMode: 'mark-measure-delta',
+  measurementKinds: {
+    'user-input': { primaryMetrics: ['loaf', 'event-timing'] },
+    programmatic: { primaryMetrics: ['loaf'] },
+  },
   operations,
 }, null, 2)}\n`);
 console.log(`ベースライン保存先: ${BASELINE_PATH}`);
