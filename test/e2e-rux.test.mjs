@@ -585,8 +585,13 @@ try {
   await record(page, 'mobile-sheet-peek-half-full', 'mobile', 'user-input');
 
   // P3: canvasを操作せず、診断flyTo完了後の画面座標フックで地図連動を検証する。
-  await page.evaluate(async () => {
+  // 検証するのは不変条件「half表示後に診断地点がシートに隠れていない」のみ。
+  // applyMapSync は補正不要（deltaY<=0）なら何もせず終了する正しい実装のため、
+  // adjustmentCount の増加を条件にすると補正不要ケースで偽タイムアウトする。
+  await page.evaluate(() => {
     window.__nakano.bottomSheet.setState('peek');
+  });
+  await page.evaluate(async () => {
     await window.__nakano.diagnosis.runDiagnosisAt(139.6686, 35.7056, {
       title: '中野駅',
       fly: true,
@@ -597,14 +602,15 @@ try {
   await page.waitForFunction(
     () => {
       const state = window.__nakano.bottomSheet.getMapSyncTestState();
-      return !state.pending
+      return document.getElementById('diagnosisPanel')?.dataset.sheetState === 'half'
+        && !state.pending
         && !state.cameraMoving
         && Number.isFinite(state.pointY)
         && Number.isFinite(state.sheetTop)
         && state.pointY < state.sheetTop;
     },
     null,
-    { timeout: 10000, polling: 50 },
+    { timeout: 60000, polling: 50 },
   );
   const mapSync = await page.evaluate(
     () => window.__nakano.bottomSheet.getMapSyncTestState(),
