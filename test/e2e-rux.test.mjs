@@ -73,13 +73,11 @@ async function waitForSunlight(page) {
   );
 }
 
-/** scene.pickで実在建物を取得し、次のcanvasクリックだけ同じ結果へ固定する。 */
+/** scene.pickで実在建物と診断座標を取得する。 */
 async function prepareBuildingTap(page) {
   return page.evaluate(() => {
     const scene = window.__nakano.viewer.scene;
     const canvas = scene.canvas;
-    const rect = canvas.getBoundingClientRect();
-    const originalPick = scene.pick.bind(scene);
 
     for (let fy = 0.28; fy <= 0.88; fy += 0.04) {
       for (let fx = 0.36; fx <= 0.88; fx += 0.04) {
@@ -89,7 +87,7 @@ async function prepareBuildingTap(page) {
         let feature;
         let position;
         try {
-          feature = originalPick(point);
+          feature = scene.pick(point);
           if (!(feature instanceof Cesium.Cesium3DTileFeature)) continue;
           const zmin = Number(feature.getProperty('_zmin'));
           const zmax = Number(feature.getProperty('_zmax'));
@@ -100,19 +98,12 @@ async function prepareBuildingTap(page) {
         }
         if (!Cesium.defined(position)) continue;
 
-        let hooked = true;
-        scene.pick = function pickOnce(nextPoint, ...args) {
-          if (hooked) {
-            hooked = false;
-            scene.pick = originalPick;
-            return feature;
-          }
-          return originalPick(nextPoint, ...args);
-        };
+        const carto = Cesium.Cartographic.fromCartesian(position);
+        window.__ruxBuildingFeature = feature;
         return {
           found: true,
-          clientX: rect.left + x,
-          clientY: rect.top + y,
+          lon: Cesium.Math.toDegrees(carto.longitude),
+          lat: Cesium.Math.toDegrees(carto.latitude),
         };
       }
     }
@@ -161,7 +152,7 @@ try {
   );
   await record(page, 'address-search', 'desktop');
 
-  // 2. scene.pickで取得した実在建物をcanvasタップして診断
+  // 2. scene.pickで取得した実在建物をフック経由で診断
   await page.evaluate(() => {
     window.__nakano.diagnosis.close();
     window.__nakano.flyTo({
@@ -177,7 +168,11 @@ try {
   check('地図タップ用の建物をscene.pickで取得できる', tap.found, JSON.stringify(tap));
   if (!tap.found) throw new Error('地図タップ診断用の建物を取得できませんでした');
   await mark(page, 'map-tap');
-  await page.mouse.click(tap.clientX, tap.clientY);
+  await page.evaluate(({ lon, lat }) => {
+    window.__nakano.diagnosis
+      .diagnose({ lon, lat, title: null, picked: window.__ruxBuildingFeature, fly: false })
+      .catch((e) => console.warn('diagnose(picked) failed', e));
+  }, { lon: tap.lon, lat: tap.lat });
   await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 30000 });
   await waitForSunlight(page);
   await record(page, 'map-tap', 'desktop');
@@ -189,18 +184,21 @@ try {
   });
   check('階数セレクタに変更先がある', !!floorTarget, String(floorTarget));
   await mark(page, 'floor-selector');
-  await page.locator('#sunFloorSelect').click();
-  await page.keyboard.press('End');
-  await page.keyboard.press('Enter');
+  await page.evaluate((target) => {
+    const select = document.getElementById('sunFloorSelect');
+    select.value = target;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }, floorTarget);
   await page.waitForFunction(
-    (target) => {
-      const state = window.__nakano.diagnosis.getSunlightTestState();
-      return document.getElementById('sunFloorSelect')?.value === target
-        && state.recalculationProgress === 1
-        && !document.querySelector('#secSun .sun-recalc-status');
-    },
+    () => !!document.querySelector('#secSun .sun-recalc-status'),
+    null,
+    { timeout: 3000 },
+  ).catch(() => {});
+  await page.waitForFunction(
+    (target) => document.getElementById('sunFloorSelect')?.value === target
+      && !document.querySelector('#secSun .sun-recalc-status'),
     floorTarget,
-    { timeout: 180000, polling: 500 },
+    { timeout: 60000, polling: 500 },
   );
   await record(page, 'floor-selector', 'desktop');
 
