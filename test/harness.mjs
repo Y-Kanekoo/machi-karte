@@ -183,6 +183,28 @@ export async function waitForViewerReady(page, timeoutMs = 120000) {
   ).catch(() => { /* タイル待ちのタイムアウトは致命ではない */ });
 }
 
+/** 折りたたまれた左パネルの対象セクションを、操作前のセットアップとして開く。 */
+export async function openSection(page, sectionId) {
+  await page.evaluate((id) => {
+    const section = document.getElementById(id);
+    const button = section?.querySelector('.panel-section-toggle');
+    if (!section || !button) {
+      throw new Error(`左パネルのセクションが見つかりません: ${id}`);
+    }
+    if (button.getAttribute('aria-expanded') !== 'true') button.click();
+  }, sectionId);
+  await page.waitForFunction(
+    (id) => {
+      const section = document.getElementById(id);
+      const button = section?.querySelector('.panel-section-toggle');
+      const contentId = button?.getAttribute('aria-controls');
+      const content = contentId ? document.getElementById(contentId) : null;
+      return button?.getAttribute('aria-expanded') === 'true' && content?.hidden === false;
+    },
+    sectionId,
+  );
+}
+
 // ---- 簡易アサーション -------------------------------------------------------
 
 let passed = 0;

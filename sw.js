@@ -1,4 +1,4 @@
-const VERSION = 'v3';
+const VERSION = 'v11';
 
 const CACHE_NAMES = {
   shell: `shell-${VERSION}`,
@@ -21,6 +21,8 @@ const PRECACHE_URLS = [
   './js/geocode.js',
   './js/hazard.js',
   './js/main.js',
+  './js/panel.js',
+  './js/perf.js',
   './js/pwa.js',
   './js/shademap-ui.js',
   './js/shademap.js',

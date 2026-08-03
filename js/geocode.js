@@ -12,13 +12,17 @@ import { GEOCODE_URL } from './config.js';
  * 住所を検索する。
  * @param {string} q 検索文字列
  * @param {number} limit 返す最大件数
+ * @param {{signal?:AbortSignal}} options fetchへ渡す中断シグナル
  * @returns {Promise<Array<{title:string, lon:number, lat:number}>>}
  * @throws {Error} 通信失敗時
  */
-export async function search(q, limit = 5) {
+export async function search(q, limit = 5, options = {}) {
   const query = String(q || '').trim();
   if (!query) return [];
-  const res = await fetch(`${GEOCODE_URL}?q=${encodeURIComponent(query)}`);
+  const res = await fetch(
+    `${GEOCODE_URL}?q=${encodeURIComponent(query)}`,
+    { signal: options.signal },
+  );
   if (!res.ok) throw new Error(`住所検索に失敗しました (HTTP ${res.status})`);
   const json = await res.json();
   if (!Array.isArray(json)) return [];

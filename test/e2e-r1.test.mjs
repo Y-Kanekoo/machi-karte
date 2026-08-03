@@ -5,7 +5,7 @@
 // 機能だけをまとめて検証する。期待値は 2026-07-27 実測の実データに基づく。
 
 import { PNG } from 'pngjs';
-import { launchViewer, waitForViewerReady, check, equal, near, report, shotPath, BASE_URL } from './harness.mjs';
+import { launchViewer, waitForViewerReady, openSection, check, equal, near, report, shotPath, BASE_URL } from './harness.mjs';
 import { USE_DISTRICT_COLORS } from '../js/config.js';
 
 const t = await launchViewer({
@@ -174,6 +174,7 @@ try {
   console.log('\n=== 2. 都市計画オーバーレイ ===');
 
   await page.evaluate(() => window.__nakano.diagnosis.close());
+  await openSection(page, 'zoningLayerSection');
 
   // --- 2a. 最小プロバイダ（全タイル単色）でCesiumの要件を満たしているか確認 ---
   const solid = await page.evaluate(async () => {
@@ -214,6 +215,7 @@ try {
     n.viewer.scene.skyAtmosphere.show = false;
     n.overlays.setAlpha(1.0);
   });
+  await openSection(page, 'basemapSection');
   await page.check('input[name="imagery"][value="pale"]');
 
   async function centerPixel(lon, lat, height = 900) {

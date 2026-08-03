@@ -320,6 +320,7 @@ export function prepareTiles(viewer, tileset, lon, lat, timeoutMs = 10000, isCan
         roll: 0,
       },
     });
+    viewer.scene.requestRender?.();
     if (!tileset) return resolve(false);
 
     let done = false;

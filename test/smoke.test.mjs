@@ -1,7 +1,7 @@
 // 既存機能のスモークテスト（P0: ESモジュール分割で挙動が変わっていないことを確認）
 // 実行: node test/smoke.test.mjs （事前に python3 -m http.server 8123 が必要）
 
-import { launchViewer, waitForViewerReady, check, equal, report, shotPath } from './harness.mjs';
+import { launchViewer, waitForViewerReady, openSection, check, equal, report, shotPath } from './harness.mjs';
 
 const t = await launchViewer();
 const { page } = t;
@@ -29,6 +29,7 @@ try {
   check('建物タイルが読み込み完了', bldg.tilesLoaded === true, JSON.stringify(bldg));
 
   // --- 3. 高さ色分け ---
+  await openSection(page, 'buildingModelSection');
   await page.check('#heightColor');
   await page.waitForTimeout(800);
   const hc = await page.evaluate(() => ({
@@ -49,6 +50,7 @@ try {
   check('高さ色分けOFFでスタイルが外れる', !hcOff.styled);
 
   // --- 4. 洪水レイヤー ---
+  await openSection(page, 'hazardSection');
   await page.check('#fldKanda');
   await page.waitForTimeout(6000);
   const fld = await page.evaluate(() => {
@@ -63,6 +65,7 @@ try {
   check('洪水レイヤーOFFで非表示になる', fldOff === false);
 
   // --- 5. 背景地図切り替え ---
+  await openSection(page, 'basemapSection');
   await page.check('input[name="imagery"][value="pale"]');
   await page.waitForTimeout(1500);
   const imagery = await page.evaluate(() => window.__nakano.viewer.imageryLayers.length);
@@ -71,6 +74,7 @@ try {
   await page.waitForTimeout(1000);
 
   // --- 6. スポット移動 ---
+  await openSection(page, 'presetSection');
   const before = await page.evaluate(() => window.__nakano.viewer.camera.positionCartographic.longitude);
   await page.click('button[data-preset="tetsugakudo"]');
   await page.waitForTimeout(4000);

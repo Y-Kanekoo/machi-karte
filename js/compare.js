@@ -346,7 +346,7 @@ export function initCompare(ctx) {
       })));
       try {
         await navigator.clipboard.writeText(url);
-        toast('比較のリンクをコピーしました');
+        toast('リンクをコピーしました');
       } catch (_) {
         try { window.prompt('このURLをコピーしてください', url); } catch (__) { /* noop */ }
         toast('URLを表示しました');

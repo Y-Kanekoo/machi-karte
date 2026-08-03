@@ -20,16 +20,34 @@ const OVERLAY_ALPHA = 0.65;
 const FINE_REPLACE_INTERVAL_MS = 2000;
 // ページ内で実行条件をまたいで共有するLRU。再実行やオーバーレイのクリアでは破棄しない。
 const shadeMapCache = new ShadeMapCache(4);
+let shadeMapRunning = false;
+const shadeMapRunningHandlers = new Set();
+
+/** 地図連動や診断カメラとの排他に使う、日影マップの実行状態。 */
+export function isShadeMapRunning() {
+  return shadeMapRunning;
+}
+
+/** 実行開始時に、進行中のカメラ処理を即時停止するための購読フック。 */
+export function onShadeMapRunningChange(handler) {
+  shadeMapRunningHandlers.add(handler);
+  return () => shadeMapRunningHandlers.delete(handler);
+}
 
 /**
  * 日影マップUIを初期化する。
  *
  * @param {{viewer:object,
  *          getBuildingState:()=>({tileset:object|null,layerKind:string|null}),
- *          cancelDiagnosisSunlight?:(()=>void)}} deps
+ *          cancelDiagnosisSunlight?:(()=>void), requestRender?:(()=>void)}} deps
  */
 export function initShadeMap(deps) {
-  const { viewer, getBuildingState, cancelDiagnosisSunlight = null } = deps;
+  const {
+    viewer,
+    getBuildingState,
+    cancelDiagnosisSunlight = null,
+    requestRender = () => viewer.scene.requestRender(),
+  } = deps;
   const runButton = document.getElementById('shadeRun');
   const abortButton = document.getElementById('shadeAbort');
   const clearButton = document.getElementById('shadeClear');
@@ -76,8 +94,18 @@ export function initShadeMap(deps) {
   }
 
   function updateUi() {
+    if (shadeMapRunning !== state.running) {
+      shadeMapRunning = state.running;
+      for (const handler of shadeMapRunningHandlers) {
+        try { handler(shadeMapRunning); } catch (error) {
+          console.warn('日影マップ実行状態フックの実行に失敗しました', error);
+        }
+      }
+    }
     const percent = Math.round(state.progress * 100);
     runButton.disabled = state.running;
+    if (state.running) runButton.setAttribute('aria-busy', 'true');
+    else runButton.removeAttribute('aria-busy');
     dateSelect.disabled = state.running;
     pitchSelect.disabled = state.running;
     abortButton.classList.toggle('hidden', !state.running);
@@ -160,6 +188,7 @@ export function initShadeMap(deps) {
     pendingLayers.delete(layer);
     if (viewer.imageryLayers.contains(layer)) {
       viewer.imageryLayers.remove(layer, true);
+      requestRender();
     }
   }
 
@@ -176,7 +205,7 @@ export function initShadeMap(deps) {
       };
       removeListener = viewer.scene.postRender.addEventListener(finish);
       const timeout = setTimeout(finish, 2000);
-      viewer.scene.requestRender();
+      requestRender();
     });
   }
 
@@ -224,6 +253,7 @@ export function initShadeMap(deps) {
     viewer.imageryLayers.raiseToTop(nextLayer);
     state.layerPresent = true;
     lastOverlayAt = performance.now();
+    requestRender();
     return true;
   }
 
@@ -248,18 +278,24 @@ export function initShadeMap(deps) {
   }
 
   function removeOverlay() {
+    let changed = false;
     if (overlayLayer && viewer.imageryLayers.contains(overlayLayer)) {
       viewer.imageryLayers.remove(overlayLayer, true);
+      changed = true;
     }
     overlayLayer = null;
     for (const layer of pendingLayers) {
-      if (viewer.imageryLayers.contains(layer)) viewer.imageryLayers.remove(layer, true);
+      if (viewer.imageryLayers.contains(layer)) {
+        viewer.imageryLayers.remove(layer, true);
+        changed = true;
+      }
     }
     pendingLayers.clear();
     state.layerPresent = false;
     lastOverlayAt = 0;
     lastOverlayQueuedAt = 0;
     lastQueuedOverlay = null;
+    if (changed) requestRender();
   }
 
   function pickMapCenter() {
@@ -658,6 +694,7 @@ export function initShadeMap(deps) {
   function ensureTop() {
     if (overlayLayer && viewer.imageryLayers.contains(overlayLayer)) {
       viewer.imageryLayers.raiseToTop(overlayLayer);
+      requestRender();
     }
   }
 

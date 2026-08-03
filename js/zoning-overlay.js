@@ -230,10 +230,14 @@ function legendItems(key) {
 /**
  * 都市計画レイヤーのトグル・透明度・凡例を配線する。
  *
- * @param {{viewer: object}} ctx
+ * @param {{viewer: object, requestRender?:()=>void}} ctx
  */
 export function initZoningOverlay(ctx) {
-  const { viewer, areaConfig = null } = ctx;
+  const {
+    viewer,
+    areaConfig = null,
+    requestRender = () => viewer.scene.requestRender(),
+  } = ctx;
   const zoningTiles = areaConfig?.zoning || ZONING_TILES;
   const areaRectangle = resolveServiceRect(areaConfig);
   const layers = {};    // key -> Cesium.ImageryLayer
@@ -312,12 +316,14 @@ export function initZoningOverlay(ctx) {
     }
     if (checkbox) checkbox.checked = !!layers[key];
     updateChrome();
+    requestRender();
   }
 
   function setAlpha(v) {
     alpha = Math.min(1, Math.max(0, v));
     for (const key of Object.keys(layers)) layers[key].alpha = alpha;
     if (alphaLabel) alphaLabel.textContent = Math.round(alpha * 100) + '%';
+    requestRender();
   }
 
   for (const key of OVERLAY_KEYS) {
@@ -346,7 +352,16 @@ export function initZoningOverlay(ctx) {
     });
     const layer = new Cesium.ImageryLayer(provider, { alpha });
     viewer.imageryLayers.add(layer);
-    return { layer, provider, remove: () => viewer.imageryLayers.remove(layer, true) };
+    requestRender();
+    return {
+      layer,
+      provider,
+      remove: () => {
+        const removed = viewer.imageryLayers.remove(layer, true);
+        if (removed) requestRender();
+        return removed;
+      },
+    };
   }
 
   return {
