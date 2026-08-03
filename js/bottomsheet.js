@@ -14,6 +14,7 @@ const STRONG_VELOCITY_THRESHOLD = 0.9;
 const CLOSE_DRAG_DISTANCE = 24;
 const MAX_CLOSE_OVERSHOOT = 96;
 const MAP_POINT_CLEARANCE = 8;
+const INTERNAL_CAMERA_MOVE_TIMEOUT_MS = 2000;
 const COMPARE_BAR_OFFSET_PROPERTY = '--compare-bar-offset';
 const VIEWPORT_WIDTH_PROPERTY = '--mobile-viewport-width';
 const VIEWPORT_LEFT_PROPERTY = '--mobile-viewport-left';
@@ -47,6 +48,9 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
   let mapSyncPending = false;
   let cameraMoving = false;
   let internalCameraMove = false;
+  let internalCameraMoveTimer = null;
+  let internalCameraRenderFrame = null;
+  let internalCameraMoveGeneration = 0;
   let userCameraInput = false;
   let userCameraInputTimer = null;
   let mapAdjustmentCount = 0;
@@ -116,9 +120,7 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     return raw.endsWith('ms') ? value : value * 1000;
   }
 
-  /** 待機中の連動を破棄し、後続のmoveEndから再発火しないようにする。 */
-  function discardMapSync() {
-    mapSyncPending = false;
+  function clearMapSyncSchedule() {
     if (mapSyncTimer !== null) {
       clearTimeout(mapSyncTimer);
       mapSyncTimer = null;
@@ -127,6 +129,83 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
       cancelAnimationFrame(mapSyncFrame);
       mapSyncFrame = null;
     }
+  }
+
+  /** requestRenderModeでもカメラ補間の次フレームを明示的に駆動する。 */
+  function requestMapRender() {
+    if (mobileQuery.matches) viewer?.scene?.requestRender?.();
+    requestRender();
+  }
+
+  /** 待機中の連動を破棄し、後続のmoveEndから再発火しないようにする。 */
+  function discardMapSync() {
+    mapSyncPending = false;
+    clearMapSyncSchedule();
+  }
+
+  /** pendingを保持する場合は、必ず次のapplyMapSync実行源も同時に確保する。 */
+  function scheduleMapSyncAttempt(delayMs = 0) {
+    if (!mapSyncPending || mapSyncTimer !== null || mapSyncFrame !== null) return;
+    if (delayMs > 0) {
+      mapSyncTimer = setTimeout(() => {
+        mapSyncTimer = null;
+        if (!mapSyncPending) return;
+        mapSyncFrame = requestAnimationFrame(applyMapSync);
+      }, delayMs);
+      return;
+    }
+    mapSyncFrame = requestAnimationFrame(applyMapSync);
+  }
+
+  function stopInternalCameraRenderPump() {
+    if (internalCameraRenderFrame === null) return;
+    cancelAnimationFrame(internalCameraRenderFrame);
+    internalCameraRenderFrame = null;
+  }
+
+  /** mapSyncのカメラ移動を完了し、必要なら最終位置を再計測する。 */
+  function finishInternalCameraMove(generation, retryPending = true) {
+    if (!internalCameraMove || generation !== internalCameraMoveGeneration) return;
+    internalCameraMove = false;
+    cameraMoving = false;
+    if (internalCameraMoveTimer !== null) {
+      clearTimeout(internalCameraMoveTimer);
+      internalCameraMoveTimer = null;
+    }
+    stopInternalCameraRenderPump();
+    requestMapRender();
+    if (retryPending && mapSyncPending) scheduleMapSyncAttempt();
+  }
+
+  function pumpInternalCameraRender(generation) {
+    internalCameraRenderFrame = null;
+    if (!internalCameraMove || generation !== internalCameraMoveGeneration) return;
+    requestMapRender();
+    internalCameraRenderFrame = requestAnimationFrame(
+      () => pumpInternalCameraRender(generation),
+    );
+  }
+
+  /** moveEndやflyToコールバックが欠落しても、2秒後には必ず移動状態を解除する。 */
+  function beginInternalCameraMove() {
+    const generation = ++internalCameraMoveGeneration;
+    internalCameraMove = true;
+    internalCameraMoveTimer = setTimeout(() => {
+      if (!internalCameraMove || generation !== internalCameraMoveGeneration) return;
+      finishInternalCameraMove(generation);
+      viewer?.camera?.cancelFlight?.();
+    }, INTERNAL_CAMERA_MOVE_TIMEOUT_MS);
+    internalCameraRenderFrame = requestAnimationFrame(
+      () => pumpInternalCameraRender(generation),
+    );
+    return generation;
+  }
+
+  function cancelInternalCameraMove() {
+    if (!internalCameraMove) return;
+    const generation = internalCameraMoveGeneration;
+    finishInternalCameraMove(generation, false);
+    viewer?.camera?.cancelFlight?.();
   }
 
   /** 診断地点とシート上端を、同じ画面座標系で計測する。 */
@@ -153,7 +232,7 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
 
   /**
    * カメラの向きと距離を保ったまま平行移動し、診断地点をシート上端より上へ逃がす。
-   * ユーザー操作や診断flyToの途中では実行せず、camera.moveEnd後に再試行する。
+   * ユーザー操作や診断flyToの途中では実行せず、描画フレームとmoveEndで再試行する。
    */
   function applyMapSync() {
     mapSyncFrame = null;
@@ -162,24 +241,30 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
       discardMapSync();
       return;
     }
-    if (cameraMoving || internalCameraMove) return;
     if (!mobileQuery.matches
       || !document.body.classList.contains('sheet-open')
       || !['half', 'full'].includes(state)) {
-      mapSyncPending = false;
+      discardMapSync();
+      return;
+    }
+    if (cameraMoving || internalCameraMove) {
+      requestMapRender();
+      scheduleMapSyncAttempt();
       return;
     }
 
     const measured = measureMapSync();
     if (!measured) {
-      mapSyncPending = false;
+      discardMapSync();
       return;
     }
     const targetY = measured.sheetTop - MAP_POINT_CLEARANCE;
     const deltaY = measured.pointY - targetY;
     if (deltaY <= 0) {
-      mapSyncPending = false;
-      lastMapAdjustment = { deltaY: 0, durationMs: 0 };
+      discardMapSync();
+      if (mapAdjustmentCount === 0) {
+        lastMapAdjustment = { deltaY: 0, durationMs: 0 };
+      }
       return;
     }
 
@@ -192,7 +277,7 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     const plane = Cesium.Plane.fromPointNormal(measured.world, camera.directionWC);
     const desiredWorld = ray && Cesium.IntersectionTests.rayPlane(ray, plane);
     if (!Cesium.defined(desiredWorld)) {
-      mapSyncPending = false;
+      discardMapSync();
       return;
     }
 
@@ -209,46 +294,41 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     const direction = Cesium.Cartesian3.clone(camera.directionWC);
     const up = Cesium.Cartesian3.clone(camera.upWC);
     const durationMs = sheetDurationMs();
-    mapSyncPending = false;
     mapAdjustmentCount++;
     lastMapAdjustment = { deltaY, durationMs };
 
     if (durationMs === 0) {
+      discardMapSync();
       camera.setView({ destination, orientation: { direction, up } });
-      requestRender();
+      requestMapRender();
       return;
     }
 
-    internalCameraMove = true;
+    const generation = beginInternalCameraMove();
     camera.flyTo({
       destination,
       orientation: { direction, up },
       duration: durationMs / 1000,
-      complete: () => {
-        internalCameraMove = false;
-        requestRender();
-      },
-      cancel: () => {
-        internalCameraMove = false;
-      },
+      complete: () => finishInternalCameraMove(generation),
+      cancel: () => finishInternalCameraMove(generation),
     });
-    requestRender();
+    requestMapRender();
   }
 
   function queueMapSync(afterSheetTransition = false) {
-    if (!viewer || !mobileQuery.matches || !['half', 'full'].includes(state)) return;
+    if (!viewer || !mobileQuery.matches || !['half', 'full'].includes(state)) {
+      discardMapSync();
+      return;
+    }
     if (isShadeMapRunning()) {
       discardMapSync();
       return;
     }
     mapSyncPending = true;
-    if (mapSyncTimer !== null) clearTimeout(mapSyncTimer);
-    if (mapSyncFrame !== null) cancelAnimationFrame(mapSyncFrame);
+    clearMapSyncSchedule();
     const delay = afterSheetTransition ? sheetDurationMs() : 0;
-    mapSyncTimer = setTimeout(() => {
-      mapSyncTimer = null;
-      mapSyncFrame = requestAnimationFrame(applyMapSync);
-    }, delay);
+    scheduleMapSyncAttempt(delay);
+    requestMapRender();
   }
 
   function setState(nextState, options = {}) {
@@ -407,7 +487,7 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     onShadeMapRunningChange((running) => {
       if (!running) return;
       discardMapSync();
-      if (internalCameraMove) viewer.camera.cancelFlight?.();
+      cancelInternalCameraMove();
     });
     const canvas = viewer.scene?.canvas;
     const releaseUserCameraInput = () => {
@@ -420,7 +500,7 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     const markUserCameraInput = () => {
       userCameraInput = true;
       discardMapSync();
-      if (internalCameraMove) viewer.camera.cancelFlight?.();
+      cancelInternalCameraMove();
     };
     canvas?.addEventListener('pointerdown', markUserCameraInput, { capture: true });
     canvas?.addEventListener('mousedown', markUserCameraInput, { capture: true });
@@ -441,10 +521,15 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     });
     viewer.camera.moveEnd.addEventListener(() => {
       cameraMoving = false;
-      requestRender();
+      requestMapRender();
       releaseUserCameraInput();
+      if (mapSyncPending && !internalCameraMove && !userCameraInput) {
+        scheduleMapSyncAttempt();
+      }
     });
     diagnosis.onCameraFlightEnd?.(({ completed, lon, lat }) => {
+      cameraMoving = false;
+      if (mobileQuery.matches) requestMapRender();
       if (!completed || isShadeMapRunning()) return;
       const result = diagnosis.getLastResult?.();
       if (result?.fly !== true || result.lon !== lon || result.lat !== lat) return;
