@@ -26,10 +26,15 @@ const shadeMapCache = new ShadeMapCache(4);
  *
  * @param {{viewer:object,
  *          getBuildingState:()=>({tileset:object|null,layerKind:string|null}),
- *          cancelDiagnosisSunlight?:(()=>void)}} deps
+ *          cancelDiagnosisSunlight?:(()=>void), requestRender?:(()=>void)}} deps
  */
 export function initShadeMap(deps) {
-  const { viewer, getBuildingState, cancelDiagnosisSunlight = null } = deps;
+  const {
+    viewer,
+    getBuildingState,
+    cancelDiagnosisSunlight = null,
+    requestRender = () => viewer.scene.requestRender(),
+  } = deps;
   const runButton = document.getElementById('shadeRun');
   const abortButton = document.getElementById('shadeAbort');
   const clearButton = document.getElementById('shadeClear');
@@ -160,6 +165,7 @@ export function initShadeMap(deps) {
     pendingLayers.delete(layer);
     if (viewer.imageryLayers.contains(layer)) {
       viewer.imageryLayers.remove(layer, true);
+      requestRender();
     }
   }
 
@@ -176,7 +182,7 @@ export function initShadeMap(deps) {
       };
       removeListener = viewer.scene.postRender.addEventListener(finish);
       const timeout = setTimeout(finish, 2000);
-      viewer.scene.requestRender();
+      requestRender();
     });
   }
 
@@ -224,6 +230,7 @@ export function initShadeMap(deps) {
     viewer.imageryLayers.raiseToTop(nextLayer);
     state.layerPresent = true;
     lastOverlayAt = performance.now();
+    requestRender();
     return true;
   }
 
@@ -248,18 +255,24 @@ export function initShadeMap(deps) {
   }
 
   function removeOverlay() {
+    let changed = false;
     if (overlayLayer && viewer.imageryLayers.contains(overlayLayer)) {
       viewer.imageryLayers.remove(overlayLayer, true);
+      changed = true;
     }
     overlayLayer = null;
     for (const layer of pendingLayers) {
-      if (viewer.imageryLayers.contains(layer)) viewer.imageryLayers.remove(layer, true);
+      if (viewer.imageryLayers.contains(layer)) {
+        viewer.imageryLayers.remove(layer, true);
+        changed = true;
+      }
     }
     pendingLayers.clear();
     state.layerPresent = false;
     lastOverlayAt = 0;
     lastOverlayQueuedAt = 0;
     lastQueuedOverlay = null;
+    if (changed) requestRender();
   }
 
   function pickMapCenter() {
@@ -658,6 +671,7 @@ export function initShadeMap(deps) {
   function ensureTop() {
     if (overlayLayer && viewer.imageryLayers.contains(overlayLayer)) {
       viewer.imageryLayers.raiseToTop(overlayLayer);
+      requestRender();
     }
   }
 

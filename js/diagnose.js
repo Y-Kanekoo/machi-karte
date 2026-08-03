@@ -63,7 +63,19 @@ function sessionSet(key, value) {
   }
 }
 
-const SPINNER = '<span class="diag-loading"><span class="spinner"></span>取得中…</span>';
+const LOADING = '<span class="diag-loading"><span class="spinner"></span>取得中…</span>';
+
+/** 診断項目のデータ到着前に表示する、進捗文付きのスケルトン。 */
+function skeletonLoading(label = '取得中…', progressId = null) {
+  const progress = progressId
+    ? ` <b id="${progressId}">0%</b>`
+    : '';
+  return `<div class="diag-skeleton" role="status" aria-label="${escapeHtml(label)}">
+    <span class="diag-skeleton-line" aria-hidden="true"></span>
+    <span class="diag-skeleton-line short" aria-hidden="true"></span>
+    <span class="diag-loading"><span class="spinner"></span>${escapeHtml(label)}${progress}</span>
+  </div>`;
+}
 
 /** R3 F3-1: 視点高さセレクタ変更から再計算までのデバウンス（ms） */
 const SUN_RECALC_DEBOUNCE_MS = 400;
@@ -119,12 +131,17 @@ export function initDiagnosis(ctx) {
   const searchBtn = document.getElementById('searchBtn');
   const searchResults = document.getElementById('searchResults');
   const searchMsg = document.getElementById('searchMsg');
+  const searchButtonLabel = searchBtn.innerHTML;
+  const searchButtonAriaLabel = searchBtn.getAttribute('aria-label');
 
   const closeHandlers = [];
   const resultHandlers = [];
   let pinEntity = null;
   let runToken = 0;
   let lastResult = null;
+  let highlightedResultSections = new Set();
+  let searchPending = false;
+  let areaReloading = false;
 
   // ---- R3 F3-1: 視点高さセレクタの再計算文脈 ---------------------------------
   // セレクタのchange時点で sunRunToken を進め、デバウンス中も古い再計算を止める。
@@ -191,30 +208,31 @@ export function initDiagnosis(ctx) {
       ? `／
         <a href="https://catalog.data.metro.tokyo.lg.jp/" target="_blank" rel="noopener">中野区オープンデータ</a>（避難所・CC BY 4.0）`
       : '';
+    highlightedResultSections = new Set();
     body.innerHTML = `
       <section class="diag-sec" data-sec="place">
         <h3>📍 地点</h3>
-        <div class="diag-content" id="secPlace">${SPINNER}</div>
+        <div class="diag-content" id="secPlace">${LOADING}</div>
       </section>
       <section class="diag-sec" data-sec="flood">
         <h3>🌊 洪水浸水想定（想定最大規模）</h3>
-        <div class="diag-content" id="secFlood">${SPINNER}</div>
+        <div class="diag-content" id="secFlood">${skeletonLoading()}</div>
       </section>
       <section class="diag-sec" data-sec="landslide">
         <h3>⛰️ 土砂災害警戒区域</h3>
-        <div class="diag-content" id="secLandslide">${SPINNER}</div>
+        <div class="diag-content" id="secLandslide">${skeletonLoading()}</div>
       </section>
       <section class="diag-sec" data-sec="shelter">
         <h3>🏫 避難所</h3>
-        <div class="diag-content" id="secShelter">${SPINNER}</div>
+        <div class="diag-content" id="secShelter">${skeletonLoading()}</div>
       </section>
       <section class="diag-sec" data-sec="zoning">
         <h3>🏘️ 都市計画</h3>
-        <div class="diag-content" id="secZoning">${SPINNER}</div>
+        <div class="diag-content" id="secZoning">${skeletonLoading()}</div>
       </section>
       <section class="diag-sec" data-sec="sun">
         <h3>☀️ 日照（簡易シミュレーション）</h3>
-        <div class="diag-content" id="secSun">${SPINNER}</div>
+        <div class="diag-content" id="secSun">${skeletonLoading()}</div>
       </section>
       <section class="diag-sec hidden" data-sec="building">
         <h3>🏢 建物</h3>
@@ -287,7 +305,20 @@ export function initDiagnosis(ctx) {
   const $ = (id) => document.getElementById(id);
   function fill(id, html) {
     const el = $(id);
-    if (el) el.innerHTML = html;
+    if (!el) return;
+    el.innerHTML = html;
+    requestRender();
+  }
+
+  /** 新しい診断結果を確定し、同じセクションでは1回だけ出現位置を示す。 */
+  function fillResult(id, html) {
+    fill(id, html);
+    if (highlightedResultSections.has(id)) return;
+    const el = $(id);
+    if (!el) return;
+    highlightedResultSections.add(id);
+    el.classList.add('result-highlight');
+    requestRender();
   }
   function failMsg(text) {
     return `<span class="diag-fail">${escapeHtml(text)}</span>`;
@@ -854,50 +885,65 @@ export function initDiagnosis(ctx) {
         result.flood = f;
         result.floodKeizoku = k;
         result.floodL1 = l1;
-        fill('secFlood', renderFlood(f, k, l1));
+        fillResult('secFlood', renderFlood(f, k, l1));
       })
       .catch((e) => {
         console.warn('flood failed', e);
-        if (alive()) fill('secFlood', failMsg('洪水浸水想定を取得できませんでした'));
+        if (alive()) fillResult('secFlood', failMsg('洪水浸水想定を取得できませんでした'));
       });
 
     // 土砂災害
     const pLand = queryLandslide(lon, lat)
-      .then((r) => { if (alive()) { result.landslide = r; fill('secLandslide', renderLandslide(r)); } })
+      .then((r) => {
+        if (alive()) {
+          result.landslide = r;
+          fillResult('secLandslide', renderLandslide(r));
+        }
+      })
       .catch((e) => {
         console.warn('landslide failed', e);
-        if (alive()) fill('secLandslide', failMsg('土砂災害警戒区域を取得できませんでした'));
+        if (alive()) fillResult('secLandslide', failMsg('土砂災害警戒区域を取得できませんでした'));
       });
 
     // 避難所（同梱GeoJSON。初回だけ読み込み、以降はキャッシュ）
     const pShelter = (sheltersAvailable
       ? queryNearestShelters(lon, lat)
       : Promise.resolve({ unavailable: true, quake: null, flood: null, error: null }))
-      .then((r) => { if (alive()) { result.shelters = r; fill('secShelter', renderShelter(r)); } })
+      .then((r) => {
+        if (alive()) {
+          result.shelters = r;
+          fillResult('secShelter', renderShelter(r));
+        }
+      })
       .catch((e) => {
         console.warn('shelter failed', e);
-        if (alive()) fill('secShelter', failMsg('避難所データを読み込めませんでした'));
+        if (alive()) fillResult('secShelter', failMsg('避難所データを読み込めませんでした'));
       });
 
     // 都市計画
     const pZone = queryZoning(lon, lat, areaConfig?.zoning)
-      .then((r) => { if (alive()) { result.zoning = r; fill('secZoning', renderZoning(r)); } })
+      .then((r) => {
+        if (alive()) {
+          result.zoning = r;
+          fillResult('secZoning', renderZoning(r));
+        }
+      })
       .catch((e) => {
         console.warn('zoning failed', e);
-        if (alive()) fill('secZoning', failMsg('都市計画情報を取得できませんでした'));
+        if (alive()) fillResult('secZoning', failMsg('都市計画情報を取得できませんでした'));
       });
 
     // 日照（重いので最後、カメラ移動＋タイル読み込み待ちを挟む）
     if (skipSunlight) {
-      fill('secSun', '<div class="diag-note">日照は未計算です（比較URLからの復元では省略しています）。</div>');
+      fillResult('secSun', '<div class="diag-note">日照は未計算です（比較URLからの復元では省略しています）。</div>');
     } else if (!result.inArea) {
-      fill('secSun', failMsg(
+      fillResult('secSun', failMsg(
         `対応エリア外です（建物3Dは${serviceAreaName}のみ）。日照は計算できません。`,
       ));
     } else {
       runSunlight(lon, lat, picked, alive, fly).catch((e) => {
         console.warn('sunlight failed', e);
-        if (alive()) fill('secSun', failMsg('日照: 計算できませんでした'));
+        if (alive()) fillResult('secSun', failMsg('日照: 計算できませんでした'));
       });
     }
 
@@ -927,7 +973,7 @@ export function initDiagnosis(ctx) {
     const requestToken = sunRunToken;
     const isCancelled = () => !alive() || requestToken !== sunRunToken;
     const excludeFeatures = picked ? [picked] : [];
-    fill('secSun', '<span class="diag-loading"><span class="spinner"></span>周辺の建物を読み込み中…</span>');
+    fill('secSun', skeletonLoading('周辺の建物を読み込み中…'));
 
     // 先読みのレイ原点に地面高さが要るので、先に地面高さを求める
     const estimatedBaseInfo = await estimateBaseHeight(
@@ -961,7 +1007,7 @@ export function initDiagnosis(ctx) {
       });
       if (isCancelled()) return;
 
-      fill('secSun', '<span class="diag-loading"><span class="spinner"></span>日照を計算中… <b id="sunPct">0%</b></span>');
+      fill('secSun', skeletonLoading('日照を計算中…', 'sunPct'));
       sunlightRunCount++;
       result = await estimateSunlight(viewer, tileset, lon, lat, baseInfo.height, {
         excludeEntities: pinEntity ? [pinEntity] : [],
@@ -996,7 +1042,7 @@ export function initDiagnosis(ctx) {
       lastResultKey: 'f1',
       alive,
     };
-    fill('secSun', renderSunlight(result, baseInfo, floorCtx, 'f1'));
+    fillResult('secSun', renderSunlight(result, baseInfo, floorCtx, 'f1'));
     // 日照が揃った時点でも通知する（比較スナップショットを取り直せるように）
     for (const fn of resultHandlers) {
       try { fn(lastResult); } catch (e) { console.warn('onResult handler failed', e); }
@@ -1049,6 +1095,37 @@ export function initDiagnosis(ctx) {
     searchMsg.textContent = text || '';
     searchMsg.classList.toggle('hidden', !text);
     searchMsg.classList.toggle('error', !!isError);
+  }
+
+  function setSearchPending(pending) {
+    searchPending = pending;
+    searchBtn.disabled = pending;
+    searchBtn.toggleAttribute('aria-busy', pending);
+    searchBtn.innerHTML = pending
+      ? '<span class="spinner" aria-hidden="true"></span>検索中…'
+      : searchButtonLabel;
+    if (searchButtonAriaLabel) {
+      searchBtn.setAttribute(
+        'aria-label',
+        pending ? '住所を検索中' : searchButtonAriaLabel,
+      );
+    }
+  }
+
+  /** 別自治体へ遷移する直前に、再読み込み中であることを画面へ残す。 */
+  function showAreaReloadFeedback() {
+    areaReloading = true;
+    showSearchMsg('エリアを切り替えています…');
+    setSearchPending(true);
+    searchBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>切替中…';
+    searchBtn.setAttribute('aria-label', 'エリアを切り替え中');
+    searchInput.disabled = true;
+    const selector = document.getElementById('areaSelector');
+    selector?.setAttribute('aria-busy', 'true');
+    for (const id of ['areaPrefSelect', 'areaCitySelect']) {
+      const select = document.getElementById(id);
+      if (select) select.disabled = true;
+    }
   }
 
   // 候補リスト（住所検索の結果 or 診断履歴）と、キーボードで選択中の位置
@@ -1121,18 +1198,20 @@ export function initDiagnosis(ctx) {
       orientation: { heading: 0, pitch: Cesium.Math.toRadians(-50), roll: 0 },
       duration: 2.0,
     });
+    requestRender();
   }
 
   async function pickResult(r) {
     hideResults();
     showSearchMsg('');
     if (isValidCityCode(r.city) && r.city !== currentCity) {
+      showAreaReloadFeedback();
       location.hash = serializeState({
         city: r.city,
         spot: { lon: r.lon, lat: r.lat },
         addr: r.title,
       });
-      location.reload();
+      setTimeout(() => location.reload(), 120);
       return;
     }
     flyToPoint(r.lon, r.lat);
@@ -1141,11 +1220,12 @@ export function initDiagnosis(ctx) {
   }
 
   async function doSearch() {
+    if (searchPending) return;
     const q = searchInput.value.trim();
     hideResults();
     if (!q) return;
     showSearchMsg('検索中…');
-    searchBtn.disabled = true;
+    setSearchPending(true);
     try {
       const results = await geocodeSearch(q, 5);
       if (!results.length) {
@@ -1162,7 +1242,7 @@ export function initDiagnosis(ctx) {
       console.warn('geocode failed', e);
       showSearchMsg('住所検索に失敗しました', true);
     } finally {
-      searchBtn.disabled = false;
+      if (!areaReloading) setSearchPending(false);
     }
   }
 

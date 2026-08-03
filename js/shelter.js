@@ -114,9 +114,13 @@ export async function queryNearestShelters(lon, lat) {
  * 表示切替は dataSource.show 一発で済み、診断ピン（viewer.entities）とも干渉しない。
  *
  * @param {object} viewer Cesium.Viewer
+ * @param {()=>void} [requestRender] 軽量モードの描画要求
  * @returns {{setVisible:(on:boolean)=>Promise<number>, isVisible:()=>boolean, count:()=>number}}
  */
-export function createShelterLayer(viewer) {
+export function createShelterLayer(
+  viewer,
+  requestRender = () => viewer.scene.requestRender(),
+) {
   const ds = new Cesium.CustomDataSource('shelters');
   ds.show = false;
   viewer.dataSources.add(ds);
@@ -164,6 +168,7 @@ export function createShelterLayer(viewer) {
     async setVisible(on) {
       if (on) await build();
       ds.show = !!on;
+      requestRender();
       return ds.entities.values.length;
     },
     isVisible: () => ds.show,

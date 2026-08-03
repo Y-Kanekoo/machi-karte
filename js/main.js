@@ -124,6 +124,7 @@ function unavailableText() {
 }
 
 function renderAreaSelector() {
+  const selector = document.getElementById('areaSelector');
   const prefSelect = document.getElementById('areaPrefSelect');
   const citySelect = document.getElementById('areaCitySelect');
   const currentName = document.getElementById('areaCurrentName');
@@ -179,8 +180,11 @@ function renderAreaSelector() {
     if (!city || city === areaConfig.code) return;
     prefSelect.disabled = true;
     citySelect.disabled = true;
+    selector?.setAttribute('aria-busy', 'true');
+    currentName.textContent = '切り替え中…';
+    setStatus('エリアを切り替えています…');
     location.hash = serializeState({ city });
-    location.reload();
+    setTimeout(() => location.reload(), 120);
   });
 }
 
@@ -327,6 +331,7 @@ function initQualityControl() {
     input.addEventListener('change', () => {
       if (!input.checked || !saveQualityPreference(input.value)) return;
       warning.classList.toggle('hidden', !ios || input.value !== 'high');
+      setStatus('表示品質を切り替えています…');
       setTimeout(reloadWithoutQualityOverride, 120);
     });
   }
@@ -373,6 +378,7 @@ viewer.scene.globe.depthTestAgainstTerrain = false;
 viewer.scene.skyAtmosphere.show = true;
 
 function requestRender() {
+  perf.recordRenderRequest();
   if (qualityProfile.requestRenderMode) viewer.scene.requestRender();
 }
 
@@ -384,6 +390,7 @@ function setJstTime(hourDecimal) {
   // JST = UTC+9
   const utc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), h - 9, m, 0);
   viewer.clock.currentTime = Cesium.JulianDate.fromDate(new Date(utc));
+  requestRender();
 }
 setJstTime(12);
 
@@ -418,6 +425,7 @@ async function getTileset(key) {
         color: "color('#2266cc', 0.55)",
       });
     }
+    requestRender();
     setStatus('');
     return tileset;
   } catch (e) {
@@ -579,6 +587,7 @@ function flyTo(p, duration = 2.0) {
     },
     duration,
   });
+  requestRender();
 }
 document.querySelectorAll('#presetButtons button').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -651,7 +660,7 @@ const diagnosis = initDiagnosis({
   requestRender,
   onDiagnosisStart: () => shadeMapController?.abortForDiagnosis(),
 });
-const bottomSheet = initBottomSheet({ diagnosis });
+const bottomSheet = initBottomSheet({ diagnosis, requestRender });
 diagnosis.onClose(() => {
   clearHighlight();
   requestRender();
@@ -663,6 +672,7 @@ diagnosis.onResult(requestRender);
 shadeMapController = initShadeMap({
   viewer,
   areaConfig,
+  requestRender,
   getBuildingState: () => ({
     tileset: currentBldg,
     layerKind: currentBldgKind,
@@ -679,7 +689,7 @@ for (const id of ['shadeRun', 'shadeAbort', 'shadeClear']) {
 // Entityは専用の CustomDataSource に入るので、診断ピン（viewer.entities）とは独立。
 // 表示状態の単一ソースは左パネルのチェックボックスで、カード内のボタンはその表示。
 
-const shelterLayer = createShelterLayer(viewer);
+const shelterLayer = createShelterLayer(viewer, requestRender);
 const shelterCheckbox = document.getElementById('shelterLayer');
 const shelterLegend = document.getElementById('shelterLegend');
 
@@ -701,7 +711,7 @@ shelterCheckbox.addEventListener('change', async () => {
 
 // ---- R1: 都市計画オーバーレイ / 地点比較 / 共有URL -----------------------------------
 
-const overlays = initZoningOverlay({ viewer, areaConfig });
+const overlays = initZoningOverlay({ viewer, areaConfig, requestRender });
 for (const key of ['use', 'fire', 'height']) {
   document.getElementById(`ov-${key}`)?.addEventListener('change', requestRender);
 }
@@ -724,6 +734,7 @@ const share = initShare({
   compare,
   toast,
   areaConfig,
+  requestRender,
 });
 shareRef.api = share;
 
@@ -798,6 +809,7 @@ let restored = null;
     return null;
   });
   const state = await restored;
+  requestRender();
   if (!state && hasHash && initialPreset) {
     flyTo(initialPreset, 3.0);
   }

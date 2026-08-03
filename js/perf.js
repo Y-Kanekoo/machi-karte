@@ -19,6 +19,8 @@ export function initPerformanceMonitoring() {
   let loafTotalMs = 0;
   let worstLoafMs = 0;
   let pendingMarker;
+  let renderRequestCount = 0;
+  let lastMarkRenderRequestCount = 0;
   if (loafSupported) {
     try {
       const observer = new Observer((list) => {
@@ -89,6 +91,8 @@ export function initPerformanceMonitoring() {
       loafCount,
       loafTotalMs,
       worstLoafMs,
+      renderRequestCount,
+      renderRequestsSinceMark: renderRequestCount - lastMarkRenderRequestCount,
       interactions: publicInteractions,
       maxInteractionMs: publicInteractions.reduce(
         (maximum, interaction) => Math.max(maximum, interaction.duration),
@@ -98,9 +102,13 @@ export function initPerformanceMonitoring() {
   }
   function mark(name) {
     const normalized = String(name || '').trim();
+    lastMarkRenderRequestCount = renderRequestCount;
     pendingMarker = normalized
       ? { name: normalized, startTime: globalThis.performance?.now?.() || 0 }
       : undefined;
   }
-  return { getSummary, mark };
+  function recordRenderRequest() {
+    renderRequestCount += 1;
+  }
+  return { getSummary, mark, recordRenderRequest };
 }

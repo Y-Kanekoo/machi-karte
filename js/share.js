@@ -255,6 +255,7 @@ export function normalizeCityHash(
  *   overlays: object,    // initZoningOverlay の戻り（省略可）
  *   compare: object,     // initCompare の戻り（省略可）
  *   toast: (msg:string) => void,
+ *   requestRender?: () => void,
  * }} ctx
  */
 export function initShare(ctx) {
@@ -265,6 +266,7 @@ export function initShare(ctx) {
     compare = null,
     toast,
     areaConfig = null,
+    requestRender = () => viewer.scene.requestRender(),
   } = ctx;
   const btn = document.getElementById('shareBtn');
 
@@ -367,6 +369,7 @@ export function initShare(ctx) {
             roll: 0,
           },
         });
+        requestRender();
       } catch (e) {
         console.warn('share: setView failed', e);
       }

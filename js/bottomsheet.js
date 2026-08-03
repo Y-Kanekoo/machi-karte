@@ -15,7 +15,7 @@ function clamp(value, min, max) {
 }
 
 /** 診断カードをモバイル用ボトムシートとして初期化する。 */
-export function initBottomSheet({ diagnosis }) {
+export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
   const panel = document.getElementById('diagnosisPanel');
   const handle = panel?.querySelector('.sheet-handle');
   const compareBar = document.getElementById('compareBar');
@@ -78,6 +78,7 @@ export function initBottomSheet({ diagnosis }) {
     state = nextState;
     panel.dataset.sheetState = nextState;
     if (mobileQuery.matches) applyOffset(offsets()[nextState]);
+    requestRender();
     return true;
   }
 

@@ -1,4 +1,4 @@
-// R-UX-P0（LoAF・Event Timing）の体感性能ベースライン取得。
+// R-UX-P0（LoAF・Event Timing）ベースラインとP1フィードバックの回帰検証。
 // 実行: node test/e2e-rux.test.mjs（事前に `npm run serve` が必要）
 // 性能値そのものはCIで合否判定せず、計測フックと記録形式だけを検証する。
 
@@ -24,6 +24,45 @@ const OPERATION_NAMES = [
   'mobile-sheet-peek-half-full',
   'area-selector-open-close',
 ];
+const RENDER_REQUIRED_OPERATION_NAMES = new Set([
+  'address-search',
+  'map-tap',
+  'floor-selector',
+  'shade-map-start-abort',
+  'building-layer-switch',
+  'mobile-sheet-peek-half-full',
+]);
+
+const styleSource = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+const styleWithoutTokenDefinitions = styleSource.replace(/:root\s*\{[^}]*\}/g, '');
+const motionDeclarations = [
+  ...styleWithoutTokenDefinitions.matchAll(/\b(?:transition|animation)(?:-[\w-]+)?\s*:[^;]+;/g),
+].map((match) => match[0]);
+const directDurations = motionDeclarations.filter((declaration) =>
+  /(?:^|[\s,(])\d*\.?\d+(?:ms|s)\b/.test(declaration)
+);
+const directEasings = motionDeclarations.filter((declaration) => {
+  const withoutTokens = declaration.replace(/var\([^)]*\)/g, '');
+  return /\b(?:linear|ease|ease-in|ease-out|ease-in-out)\b|cubic-bezier\(/.test(withoutTokens);
+});
+
+check(
+  'transition/animationのdurationをトークン定義外で直書きしない',
+  directDurations.length === 0,
+  directDurations.join(' | '),
+);
+check(
+  'transition/animationのeasingをトークン定義外で直書きしない',
+  directEasings.length === 0,
+  directEasings.join(' | '),
+);
+check(
+  '全ボタン・ラジオ・チェックボックスに押下スタイルがある',
+  /button:active:not\(:disabled\)/.test(styleSource)
+    && /input\[type="radio"\]:active:not\(:disabled\)/.test(styleSource)
+    && /input\[type="checkbox"\]:active:not\(:disabled\)/.test(styleSource)
+    && /var\(--duration-instant\)/.test(styleSource),
+);
 
 const operations = [];
 
@@ -38,6 +77,8 @@ function isSummary(value) {
     && isFiniteNumber(value?.loafTotalMs)
     && isFiniteNumber(value?.worstLoafMs)
     && isFiniteNumber(value?.maxInteractionMs)
+    && isFiniteNumber(value?.renderRequestCount)
+    && isFiniteNumber(value?.renderRequestsSinceMark)
     && Array.isArray(value?.interactions)
     && value.interactions.every((interaction) =>
       (interaction.name === undefined || typeof interaction.name === 'string')
@@ -60,6 +101,13 @@ async function record(page, name, context) {
   const summary = await page.evaluate(() => window.__nakano.perf.getSummary());
   operations.push({ name, context, summary });
   check(`${name}: 計測サマリーを取得できる`, isSummary(summary), JSON.stringify(summary));
+  if (RENDER_REQUIRED_OPERATION_NAMES.has(name)) {
+    check(
+      `${name}: 表示変更後にrequestRenderを要求する`,
+      summary.renderRequestsSinceMark > 0,
+      JSON.stringify(summary),
+    );
+  }
   return summary;
 }
 
@@ -143,8 +191,24 @@ try {
   // 1. 住所検索診断
   await page.fill('#searchInput', '中野区中野五丁目');
   await mark(page, 'address-search');
+  await page.evaluate(() => {
+    const button = document.getElementById('searchBtn');
+    button.addEventListener('click', () => {
+      window.__ruxSearchFeedback = {
+        disabled: button.disabled,
+        busy: button.getAttribute('aria-busy'),
+        spinner: !!button.querySelector('.spinner'),
+      };
+    }, { once: true });
+  });
   await page.click('#searchBtn');
   await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
+  const searchFeedback = await page.evaluate(() => window.__ruxSearchFeedback);
+  check(
+    '検索開始直後はボタンをdisabledにしてスピナーを表示する',
+    searchFeedback.disabled && searchFeedback.busy === 'true' && searchFeedback.spinner,
+    JSON.stringify(searchFeedback),
+  );
   await page.waitForFunction(
     () => window.__nakano.diagnosis.getLastResult()?.title?.includes('中野'),
     null,
@@ -242,6 +306,89 @@ try {
   await page.keyboard.press('Escape');
   check('エリアセレクタ開閉でreloadしない', page.url() === urlBeforeAreaSelector);
   await record(page, 'area-selector-open-close', 'desktop');
+
+  // P1: 同期区間で全スケルトンが揃い、各データの確定後に順次消える。
+  const skeletonStart = await page.evaluate(() => {
+    window.__ruxSkeletonRun = window.__nakano.diagnosis.runDiagnosisAt(139.6659, 35.7010, {
+      title: 'スケルトン確認地点',
+      fly: false,
+    });
+    const ids = ['secFlood', 'secLandslide', 'secShelter', 'secZoning', 'secSun'];
+    return Object.fromEntries(ids.map((id) => [
+      id,
+      !!document.querySelector(`#${id} .diag-skeleton`),
+    ]));
+  });
+  check(
+    '診断開始直後は洪水・土砂・避難所・都市計画・日照にスケルトンがある',
+    Object.values(skeletonStart).every(Boolean),
+    JSON.stringify(skeletonStart),
+  );
+  await page.evaluate(() => window.__ruxSkeletonRun);
+  const coreSkeletons = await page.evaluate(() => [
+    'secFlood',
+    'secLandslide',
+    'secShelter',
+    'secZoning',
+  ].filter((id) => document.querySelector(`#${id} .diag-skeleton`)));
+  check(
+    'コアデータ到着後は対応するスケルトンが消える',
+    coreSkeletons.length === 0,
+    JSON.stringify(coreSkeletons),
+  );
+  await waitForSunlight(page);
+  const finalSkeletonState = await page.evaluate(() => ({
+    remaining: document.querySelectorAll('#diagBody .diag-skeleton').length,
+    highlighted: document.querySelectorAll('#diagBody .diag-content.result-highlight').length,
+  }));
+  check(
+    '全データ到着後はスケルトンが消える',
+    finalSkeletonState.remaining === 0,
+    JSON.stringify(finalSkeletonState),
+  );
+  check(
+    '確定した5つの結果セクションに1回ハイライトを付ける',
+    finalSkeletonState.highlighted === 5,
+    JSON.stringify(finalSkeletonState),
+  );
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const reducedMotion = await page.evaluate(() => {
+    const buttonStyle = getComputedStyle(document.getElementById('searchBtn'));
+    const probe = document.createElement('span');
+    probe.className = 'spinner';
+    document.body.append(probe);
+    const spinnerStyle = getComputedStyle(probe);
+    const skeletonProbe = document.createElement('div');
+    skeletonProbe.className = 'diag-skeleton';
+    document.body.append(skeletonProbe);
+    const shimmerStyle = getComputedStyle(skeletonProbe, '::after');
+    const state = {
+      transitionDuration: buttonStyle.transitionDuration,
+      animationName: spinnerStyle.animationName,
+      animationDuration: spinnerStyle.animationDuration,
+      shimmerAnimationName: shimmerStyle.animationName,
+      shimmerAnimationDuration: shimmerStyle.animationDuration,
+    };
+    probe.remove();
+    skeletonProbe.remove();
+    return state;
+  });
+  check(
+    'reduced-motionではcomputedStyleのtransition-durationが0ms相当',
+    reducedMotion.transitionDuration
+      .split(',')
+      .every((duration) => Number.parseFloat(duration) === 0),
+    JSON.stringify(reducedMotion),
+  );
+  check(
+    'reduced-motionではスピナー・シマー系animationを停止する',
+    reducedMotion.animationName === 'none'
+      && Number.parseFloat(reducedMotion.animationDuration) === 0
+      && reducedMotion.shimmerAnimationName === 'none'
+      && Number.parseFloat(reducedMotion.shimmerAnimationDuration) === 0,
+    JSON.stringify(reducedMotion),
+  );
 } finally {
   await desktopViewer.close();
 }
