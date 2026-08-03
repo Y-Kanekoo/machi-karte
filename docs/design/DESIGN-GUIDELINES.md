@@ -22,6 +22,7 @@
   --duration-sheet: 320ms;    /* ボトムシートのスナップ */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);      /* 出現・移動（減速） */
   --ease-in: cubic-bezier(0.3, 0, 1, 1);       /* 退出（加速） */
+  --ease-linear: linear;                        /* シマー等の等速ループのみ */
   --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1); /* シートスナップのみ */
 }
 @media (prefers-reduced-motion: reduce) {
@@ -30,7 +31,7 @@
 ```
 
 - モーションは**因果・空間関係を伝える目的のみ**（装飾アニメ禁止）。最長500ms
-- reduced-motion はトークン一括ゼロ化で対応（個別対応の分散禁止）
+- reduced-motion は**トークン一括ゼロ化を第一手段**とする。無限ループ系（シマー等）は duration ゼロ化では止まらないため、reduced-motion ブロック内での `animation: none` 併用を許容する（それ以外の個別対応の分散は禁止）
 
 ## 3. タッチ・モバイル
 
