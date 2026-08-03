@@ -662,7 +662,7 @@ const diagnosis = initDiagnosis({
   requestRender,
   onDiagnosisStart: () => shadeMapController?.abortForDiagnosis(),
 });
-const bottomSheet = initBottomSheet({ diagnosis, requestRender });
+const bottomSheet = initBottomSheet({ diagnosis, viewer, requestRender });
 diagnosis.onClose(() => {
   clearHighlight();
   requestRender();

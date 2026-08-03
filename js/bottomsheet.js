@@ -5,9 +5,13 @@ const STATE_ORDER = ['full', 'half', 'peek'];
 const PEEK_HEIGHT = 140;
 const FULL_RATIO = 0.88;
 const HALF_RATIO = 0.5;
-const VELOCITY_THRESHOLD = 0.45;
+// 300px/s程度を「軽いフリック」、900px/s以上を「強いフリック」とする。
+// 一般的な60Hz端末でそれぞれ約5px/frame・15px/frameに相当する。
+const VELOCITY_THRESHOLD = 0.3;
+const STRONG_VELOCITY_THRESHOLD = 0.9;
 const CLOSE_DRAG_DISTANCE = 24;
 const MAX_CLOSE_OVERSHOOT = 96;
+const MAP_POINT_CLEARANCE = 8;
 const COMPARE_BAR_OFFSET_PROPERTY = '--compare-bar-offset';
 const VIEWPORT_WIDTH_PROPERTY = '--mobile-viewport-width';
 const VIEWPORT_LEFT_PROPERTY = '--mobile-viewport-left';
@@ -18,7 +22,7 @@ function clamp(value, min, max) {
 }
 
 /** 診断カードをモバイル用ボトムシートとして初期化する。 */
-export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
+export function initBottomSheet({ diagnosis, viewer = null, requestRender = () => {} }) {
   const panel = document.getElementById('diagnosisPanel');
   const handle = panel?.querySelector('.sheet-handle');
   const compareBar = document.getElementById('compareBar');
@@ -36,6 +40,13 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
   let moved = false;
   let wasOpen = document.body.classList.contains('sheet-open');
   let compareBarMeasureFrame = null;
+  let mapSyncFrame = null;
+  let mapSyncTimer = null;
+  let mapSyncPending = false;
+  let cameraMoving = false;
+  let internalCameraMove = false;
+  let mapAdjustmentCount = 0;
+  let lastMapAdjustment = null;
 
   function viewportHeight() {
     return globalThis.visualViewport?.height || globalThis.innerHeight;
@@ -71,6 +82,7 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
       offset = Math.ceil(bottomClearance + measuredHeight + marginTop);
     }
     document.documentElement.style.setProperty(COMPARE_BAR_OFFSET_PROPERTY, `${offset}px`);
+    queueMapSync(true);
   }
 
   function scheduleCompareBarMeasurement() {
@@ -92,11 +104,140 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
     panel.style.setProperty('--sheet-translate-y', `${offset}px`);
   }
 
+  function sheetDurationMs() {
+    const raw = globalThis.getComputedStyle(document.documentElement)
+      .getPropertyValue('--duration-sheet')
+      .trim();
+    const value = Number.parseFloat(raw);
+    if (!Number.isFinite(value)) return 0;
+    return raw.endsWith('ms') ? value : value * 1000;
+  }
+
+  /** 診断地点とシート上端を、同じ画面座標系で計測する。 */
+  function measureMapSync() {
+    const result = diagnosis.getLastResult?.();
+    if (!viewer || !result || !Number.isFinite(result.lon) || !Number.isFinite(result.lat)) {
+      return null;
+    }
+    const scene = viewer.scene;
+    const canvasRect = scene.canvas.getBoundingClientRect();
+    const world = Cesium.Cartesian3.fromDegrees(result.lon, result.lat, 0);
+    const windowPoint = Cesium.SceneTransforms.worldToWindowCoordinates(scene, world);
+    if (!Cesium.defined(windowPoint)) return null;
+    const sheetRect = panel.getBoundingClientRect();
+    return {
+      world,
+      canvasRect,
+      windowPoint,
+      pointX: canvasRect.left + windowPoint.x,
+      pointY: canvasRect.top + windowPoint.y,
+      sheetTop: sheetRect.top,
+    };
+  }
+
+  /**
+   * カメラの向きと距離を保ったまま平行移動し、診断地点をシート上端より上へ逃がす。
+   * ユーザー操作や診断flyToの途中では実行せず、camera.moveEnd後に再試行する。
+   */
+  function applyMapSync() {
+    mapSyncFrame = null;
+    if (!mapSyncPending || cameraMoving || internalCameraMove) return;
+    if (!mobileQuery.matches
+      || !document.body.classList.contains('sheet-open')
+      || !['half', 'full'].includes(state)) {
+      mapSyncPending = false;
+      return;
+    }
+
+    const measured = measureMapSync();
+    if (!measured) {
+      mapSyncPending = false;
+      return;
+    }
+    const targetY = measured.sheetTop - MAP_POINT_CLEARANCE;
+    const deltaY = measured.pointY - targetY;
+    if (deltaY <= 0) {
+      mapSyncPending = false;
+      lastMapAdjustment = { deltaY: 0, durationMs: 0 };
+      return;
+    }
+
+    const camera = viewer.camera;
+    const desiredCanvasY = targetY - measured.canvasRect.top;
+    const ray = camera.getPickRay(new Cesium.Cartesian2(
+      measured.windowPoint.x,
+      desiredCanvasY,
+    ));
+    const plane = Cesium.Plane.fromPointNormal(measured.world, camera.directionWC);
+    const desiredWorld = ray && Cesium.IntersectionTests.rayPlane(ray, plane);
+    if (!Cesium.defined(desiredWorld)) {
+      mapSyncPending = false;
+      return;
+    }
+
+    const translation = Cesium.Cartesian3.subtract(
+      measured.world,
+      desiredWorld,
+      new Cesium.Cartesian3(),
+    );
+    const destination = Cesium.Cartesian3.add(
+      camera.positionWC,
+      translation,
+      new Cesium.Cartesian3(),
+    );
+    const direction = Cesium.Cartesian3.clone(camera.directionWC);
+    const up = Cesium.Cartesian3.clone(camera.upWC);
+    const durationMs = sheetDurationMs();
+    mapSyncPending = false;
+    mapAdjustmentCount++;
+    lastMapAdjustment = { deltaY, durationMs };
+
+    if (durationMs === 0) {
+      camera.setView({ destination, orientation: { direction, up } });
+      requestRender();
+      return;
+    }
+
+    internalCameraMove = true;
+    camera.flyTo({
+      destination,
+      orientation: { direction, up },
+      duration: durationMs / 1000,
+      complete: () => {
+        internalCameraMove = false;
+        requestRender();
+        if (mapSyncPending) queueMapSync();
+      },
+      cancel: () => {
+        internalCameraMove = false;
+        if (mapSyncPending) queueMapSync();
+      },
+    });
+    requestRender();
+  }
+
+  function queueMapSync(afterSheetTransition = false) {
+    if (!viewer || !mobileQuery.matches || !['half', 'full'].includes(state)) return;
+    mapSyncPending = true;
+    if (mapSyncTimer !== null) clearTimeout(mapSyncTimer);
+    if (mapSyncFrame !== null) cancelAnimationFrame(mapSyncFrame);
+    const delay = afterSheetTransition ? sheetDurationMs() : 0;
+    mapSyncTimer = setTimeout(() => {
+      mapSyncTimer = null;
+      mapSyncFrame = requestAnimationFrame(applyMapSync);
+    }, delay);
+  }
+
   function setState(nextState) {
     if (!STATE_ORDER.includes(nextState)) return false;
     state = nextState;
     panel.dataset.sheetState = nextState;
     if (mobileQuery.matches) applyOffset(offsets()[nextState]);
+    if (nextState === 'peek') {
+      mapSyncPending = false;
+    } else {
+      queueMapSync(true);
+    }
     requestRender();
     return true;
   }
@@ -116,10 +257,11 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
       setState(nearest);
       return;
     }
-    const index = STATE_ORDER.indexOf(nearest);
+    const index = STATE_ORDER.indexOf(state);
+    const steps = Math.abs(velocity) >= STRONG_VELOCITY_THRESHOLD ? 2 : 1;
     const nextIndex = velocity > 0
-      ? Math.min(STATE_ORDER.length - 1, index + 1)
-      : Math.max(0, index - 1);
+      ? Math.min(STATE_ORDER.length - 1, index + steps)
+      : Math.max(0, index - steps);
     setState(STATE_ORDER[nextIndex]);
   }
 
@@ -229,6 +371,18 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
   globalThis.visualViewport?.addEventListener('scroll', syncViewportMetrics);
   globalThis.addEventListener('resize', syncSize);
 
+  if (viewer?.camera) {
+    viewer.camera.moveStart.addEventListener(() => {
+      cameraMoving = true;
+    });
+    viewer.camera.moveEnd.addEventListener(() => {
+      cameraMoving = false;
+      requestRender();
+      if (mapSyncPending && !internalCameraMove) queueMapSync();
+    });
+    diagnosis.onResult?.(() => queueMapSync());
+  }
+
   panel.dataset.sheetState = state;
   syncViewportMetrics();
   measureCompareBarOffset();
@@ -236,5 +390,18 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
     setState,
     getState: () => state,
     isMobile: () => mobileQuery.matches,
+    /** e2e用: canvasを操作せず診断地点とシートの画面座標を検証する。 */
+    getMapSyncTestState: () => {
+      const measured = measureMapSync();
+      return {
+        pointX: measured?.pointX ?? null,
+        pointY: measured?.pointY ?? null,
+        sheetTop: measured?.sheetTop ?? null,
+        pending: mapSyncPending,
+        cameraMoving,
+        adjustmentCount: mapAdjustmentCount,
+        lastAdjustment: lastMapAdjustment,
+      };
+    },
   };
 }

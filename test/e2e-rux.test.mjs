@@ -1,4 +1,4 @@
-// R-UX-P0（LoAF・Event Timing）ベースラインとP1フィードバックの回帰検証。
+// R-UX-P0〜P3（計測・フィードバック・動線・モバイル磨き）の回帰検証。
 // 実行: node test/e2e-rux.test.mjs（事前に `npm run serve` が必要）
 // 性能値そのものはCIで合否判定せず、計測フックと記録形式だけを検証する。
 
@@ -33,6 +33,24 @@ const RENDER_REQUIRED_OPERATION_NAMES = new Set([
   'building-layer-switch',
   'mobile-sheet-peek-half-full',
 ]);
+const TOUCH_TARGET_EXCEPTIONS = [
+  {
+    selector: '.cesium-widget-credits a',
+    reason: 'Cesium標準の地図クレジット内リンクは外部UIのため現状サイズを維持する',
+  },
+  {
+    selector: '#attribution a',
+    reason: '地図出典の固定表示内リンクは、表示領域を占有しない補助情報として現状サイズを維持する',
+  },
+  {
+    selector: '.diag-source a',
+    reason: '診断カード末尾の出典リンクは、本文の可読性を優先する補助情報として現状サイズを維持する',
+  },
+  {
+    selector: '.diag-note a',
+    reason: '診断注記内の公式資料リンクは、文章内リンクとして現状サイズを維持する',
+  },
+];
 
 const styleSource = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
 const styleWithoutTokenDefinitions = styleSource.replace(/:root\s*\{[^}]*\}/g, '');
@@ -120,6 +138,77 @@ async function waitForSunlight(page) {
     null,
     { timeout: 180000, polling: 500 },
   );
+}
+
+/** モバイルUIの全操作要素を機械抽出し、実効ヒット領域とpaddingを返す。 */
+async function auditTouchTargets(page, { revealControls = false } = {}) {
+  return page.evaluate(({ exceptions, reveal }) => {
+    const restored = [];
+    if (reveal) {
+      document.querySelectorAll('[data-panel-section] > .panel-section-content').forEach((content) => {
+        restored.push({ element: content, hidden: content.hidden, hadHiddenClass: false });
+        content.hidden = false;
+      });
+      ['timeControl', 'overlayAlphaRow'].forEach((id) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        restored.push({
+          element,
+          hidden: element.hidden,
+          hadHiddenClass: element.classList.contains('hidden'),
+        });
+        element.hidden = false;
+        element.classList.remove('hidden');
+      });
+    }
+
+    const describe = (element) => {
+      if (element.id) return `#${element.id}`;
+      const classes = [...element.classList].slice(0, 2).map((name) => `.${name}`).join('');
+      const type = element.getAttribute('type');
+      const role = element.getAttribute('role');
+      return `${element.tagName.toLowerCase()}${classes}`
+        + `${type ? `[type=${type}]` : ''}${role ? `[role=${role}]` : ''}`;
+    };
+    const rectValue = (rect) => ({ width: rect.width, height: rect.height });
+    const audit = [...document.querySelectorAll(
+      'button, [role="button"], input, select, a, .sheet-handle',
+    )].flatMap((element) => {
+      const ownRect = element.getBoundingClientRect();
+      if (ownRect.width === 0 || ownRect.height === 0) return [];
+      const style = getComputedStyle(element);
+      if (style.display === 'none' || style.visibility === 'hidden') return [];
+      const label = element.matches('input[type="radio"], input[type="checkbox"]')
+        ? element.closest('label')
+        : null;
+      const hitRect = (label || element).getBoundingClientRect();
+      const exception = exceptions.find(({ selector }) => element.matches(selector));
+      return [{
+        target: describe(element),
+        ownRect: rectValue(ownRect),
+        hitRect: rectValue(hitRect),
+        padding: {
+          top: Number.parseFloat(style.paddingTop) || 0,
+          right: Number.parseFloat(style.paddingRight) || 0,
+          bottom: Number.parseFloat(style.paddingBottom) || 0,
+          left: Number.parseFloat(style.paddingLeft) || 0,
+        },
+        exception: exception?.selector || null,
+        reason: exception?.reason || null,
+      }];
+    });
+
+    for (const { element, hidden, hadHiddenClass } of restored.reverse()) {
+      element.hidden = hidden;
+      element.classList.toggle('hidden', hadHiddenClass);
+    }
+    return {
+      auditedCount: audit.length,
+      exceptions: audit.filter(({ exception }) => exception),
+      violations: audit.filter(({ hitRect, exception }) =>
+        !exception && (hitRect.width < 44 || hitRect.height < 44)),
+    };
+  }, { exceptions: TOUCH_TARGET_EXCEPTIONS, reveal: revealControls });
 }
 
 /** scene.pickで実在建物と診断座標を取得する。 */
@@ -417,6 +506,27 @@ try {
     () => document.getElementById('diagnosisPanel')?.dataset.sheetState === 'peek',
   );
 
+  const dragTransition = await page.evaluate(() => {
+    const panel = document.getElementById('diagnosisPanel');
+    panel.classList.add('sheet-dragging');
+    const style = getComputedStyle(panel);
+    const result = {
+      hasDraggingClass: panel.classList.contains('sheet-dragging'),
+      transitionDuration: style.transitionDuration,
+      transitionProperty: style.transitionProperty,
+    };
+    panel.classList.remove('sheet-dragging');
+    return result;
+  });
+  check(
+    'シートドラッグ中はtransitionを無効化する',
+    dragTransition.hasDraggingClass
+      && dragTransition.transitionDuration.split(',').every(
+        (duration) => Number.parseFloat(duration) === 0,
+      ),
+    JSON.stringify(dragTransition),
+  );
+
   // 6. モバイルシート peek→half→full
   await mark(page, 'mobile-sheet-peek-half-full');
   await page.locator('.sheet-handle').click();
@@ -429,6 +539,37 @@ try {
     () => document.getElementById('diagnosisPanel')?.dataset.sheetState === 'full',
   );
   await record(page, 'mobile-sheet-peek-half-full', 'mobile');
+
+  // P3: canvasを操作せず、診断flyTo完了後の画面座標フックで地図連動を検証する。
+  await page.evaluate(async () => {
+    window.__nakano.bottomSheet.setState('peek');
+    await window.__nakano.diagnosis.runDiagnosisAt(139.6686, 35.7056, {
+      title: '中野駅',
+      fly: true,
+      skipSunlight: true,
+    });
+    window.__nakano.bottomSheet.setState('half');
+  });
+  await page.waitForFunction(
+    () => {
+      const state = window.__nakano.bottomSheet.getMapSyncTestState();
+      return !state.pending
+        && !state.cameraMoving
+        && Number.isFinite(state.pointY)
+        && Number.isFinite(state.sheetTop)
+        && state.pointY < state.sheetTop;
+    },
+    null,
+    { timeout: 10000, polling: 50 },
+  );
+  const mapSync = await page.evaluate(
+    () => window.__nakano.bottomSheet.getMapSyncTestState(),
+  );
+  check(
+    'half表示後は診断地点の画面Y座標がシート上端より上にある',
+    mapSync.pointY < mapSync.sheetTop,
+    JSON.stringify(mapSync),
+  );
 } finally {
   await mobileViewer.close();
 }
@@ -507,6 +648,13 @@ try {
     'モバイル幅では56pxの現在地FABを地図右下に表示する',
     fab.visible && fab.width === 56 && fab.height === 56 && Number.parseFloat(fab.bottom) >= 44,
     JSON.stringify(fab),
+  );
+
+  const controlTouchAudit = await auditTouchTargets(page, { revealControls: true });
+  check(
+    '左パネルを含むモバイルUIのタッチ領域は許容リストを除き44px以上',
+    controlTouchAudit.auditedCount > 0 && controlTouchAudit.violations.length === 0,
+    JSON.stringify(controlTouchAudit),
   );
 
   await page.click('#geoFab');
@@ -590,6 +738,12 @@ try {
   await page.waitForTimeout(350);
   await page.click('#compareShowBtn');
   await page.waitForSelector('#compareModal:not(.hidden) .cmp-table');
+  const resultTouchAudit = await auditTouchTargets(page);
+  check(
+    '診断シート・比較UIのタッチ領域は許容リストを除き44px以上',
+    resultTouchAudit.auditedCount > 0 && resultTouchAudit.violations.length === 0,
+    JSON.stringify(resultTouchAudit),
+  );
   const mobileWidth = await page.evaluate(() => {
     const sheetRect = document.getElementById('diagnosisPanel').getBoundingClientRect();
     const compareScroll = document.querySelector('.cmp-scroll');

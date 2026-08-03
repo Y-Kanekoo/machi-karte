@@ -1533,9 +1533,9 @@ body.diag-mode #cesiumContainer canvas {
   .sheet-handle {
     position: relative;
     display: block;
-    flex: 0 0 28px;
+    flex: 0 0 44px;
     width: 100%;
-    height: 28px;
+    height: 44px;
     margin: 0;
     border: 0;
     background: transparent;
@@ -1546,7 +1546,7 @@ body.diag-mode #cesiumContainer canvas {
 
   .sheet-handle::before {
     position: absolute;
-    top: 10px;
+    top: 18px;
     left: 50%;
     width: 40px;
     height: 4px;
@@ -1710,6 +1710,42 @@ body.diag-mode #cesiumContainer canvas {
   #diagnosisPanel[data-sheet-state="full"] #diagBody {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* 見た目を大きく変えず、モバイルの操作可能領域を44px以上に揃える。 */
+  button,
+  [role="button"],
+  input:not([type="radio"]):not([type="checkbox"]),
+  select,
+  .sheet-handle {
+    min-height: 44px;
+  }
+
+  button,
+  [role="button"],
+  select,
+  .sheet-handle {
+    min-width: 44px;
+  }
+
+  #controlPanel label:not([for]) {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  #controlPanel label.layer-unavailable {
+    flex-wrap: wrap;
+  }
+
+  #controlPanel label.layer-unavailable .unavailable-text {
+    flex: 0 0 calc(100% - 23px);
+  }
+
+  .diag-sec h3.collapsible {
+    margin-bottom: 0;
   }
 }
 
