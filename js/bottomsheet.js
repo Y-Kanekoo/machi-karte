@@ -514,7 +514,7 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     globalThis.addEventListener('touchend', releaseUserCameraInput, { capture: true, passive: true });
     viewer.camera.moveStart.addEventListener(() => {
       cameraMoving = true;
-      if (userCameraInput) discardMapSync();
+      if (!internalCameraMove) discardMapSync();
     });
     viewer.camera.changed.addEventListener(() => {
       if (userCameraInput) discardMapSync();

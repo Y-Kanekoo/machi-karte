@@ -254,4 +254,27 @@ assert.equal(completedState.cameraMoving, false, 'mapSync完了後にカメラ�
 assert.equal(completedState.adjustmentCount, 1, '必要な補正を1回だけ適用する');
 assert.ok(sceneRenderCount >= 6, '待機中と補間中の各段階でscene.requestRenderを発火する');
 
+camera.positionWC = new Cartesian3();
+const adjustmentCountBeforeUserMove = completedState.adjustmentCount;
+bottomSheet.setState('full');
+assert.equal(
+  bottomSheet.getMapSyncTestState().pending,
+  true,
+  'ユーザー操作前はmapSyncを待機する',
+);
+
+moveStart.raise();
+assert.equal(
+  bottomSheet.getMapSyncTestState().pending,
+  false,
+  'ユーザー起因のmoveStartで待機中のmapSyncを即時破棄する',
+);
+moveEnd.raise();
+await new Promise((resolve) => setTimeout(resolve, 30));
+assert.equal(
+  bottomSheet.getMapSyncTestState().adjustmentCount,
+  adjustmentCountBeforeUserMove,
+  'ユーザー操作後のmoveEndからmapSyncを再発火しない',
+);
+
 console.log('bottomsheet.test.mjs: パス');
