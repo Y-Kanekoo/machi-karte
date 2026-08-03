@@ -564,6 +564,59 @@ try {
     JSON.stringify(stickyActions.actions),
   );
 
+  await page.click('#compareAddBtn');
+  await page.evaluate(async () => {
+    await window.__nakano.diagnosis.runDiagnosisAt(139.6659, 35.7010, {
+      title: '中野駅南口の比較地点',
+      fly: false,
+      skipSunlight: true,
+    });
+  });
+  await page.click('#compareAddBtn');
+
+  await openSection(page, 'shadeMapSection');
+  await page.evaluate(async (center) => {
+    const result = await window.__nakano.shadeMap.run({
+      center,
+      sizeM: 20,
+      pitchM: 20,
+      date: 'winter',
+      frameBudgetMs: 40,
+    });
+    if (!result.completed) throw new Error('モバイルの日影マップ計算が完了しませんでした');
+  }, STATION);
+
+  await page.evaluate(() => window.__nakano.bottomSheet.setState('full'));
+  await page.waitForTimeout(350);
+  await page.click('#compareShowBtn');
+  await page.waitForSelector('#compareModal:not(.hidden) .cmp-table');
+  const mobileWidth = await page.evaluate(() => {
+    const sheetRect = document.getElementById('diagnosisPanel').getBoundingClientRect();
+    const compareScroll = document.querySelector('.cmp-scroll');
+    return {
+      viewportWidth: innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      sheetWidth: sheetRect.width,
+      sheetLeft: sheetRect.left,
+      sheetRight: sheetRect.right,
+      compareTableVisible: getComputedStyle(document.getElementById('compareModal')).display !== 'none',
+      compareClientWidth: compareScroll.clientWidth,
+      compareScrollWidth: compareScroll.scrollWidth,
+    };
+  });
+  check(
+    '390px幅で診断→比較追加→日影実行後も横オーバーフローがない',
+    mobileWidth.compareTableVisible
+      && mobileWidth.documentWidth <= mobileWidth.viewportWidth + 1,
+    JSON.stringify(mobileWidth),
+  );
+  check(
+    '比較テーブル表示中も診断シート幅をビューポート幅±1pxに固定する',
+    Math.abs(mobileWidth.sheetWidth - mobileWidth.viewportWidth) <= 1,
+    JSON.stringify(mobileWidth),
+  );
+  await page.evaluate(() => window.__nakano.compare.clearAll());
+
   await page.evaluate(() => window.__nakano.diagnosis.close());
   await openSection(page, 'buildingModelSection');
   await page.evaluate(() => {

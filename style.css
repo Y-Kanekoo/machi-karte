@@ -1417,13 +1417,55 @@ body.diag-mode #cesiumContainer canvas {
 /* ---- R8a-P2: モバイル診断ボトムシート -------------------------------------- */
 
 @media (max-width: 767px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  #cesiumContainer,
+  #controlPanel,
+  #diagnosisPanel,
+  #diagBody,
+  #compareBar,
+  #compareModal,
+  .cmp-panel,
+  .cmp-scroll,
+  #attribution {
+    box-sizing: border-box;
+    max-width: 100%;
+  }
+
+  #controlPanel *,
+  #diagnosisPanel *,
+  #compareBar *,
+  #compareModal * {
+    box-sizing: border-box;
+  }
+
+  #cesiumContainer,
+  #controlPanel,
+  #diagnosisPanel,
+  #diagBody,
+  #compareModal,
+  .cmp-panel {
+    overflow-x: hidden;
+  }
+
+  #controlPanel {
+    right: auto;
+    left: calc(var(--mobile-viewport-left, 0px) + 10px);
+    width: calc(var(--mobile-viewport-width, 100vw) - 20px);
+    max-width: calc(var(--mobile-viewport-width, 100vw) - 20px);
+  }
+
   #geoBtn {
     display: none;
   }
 
   #geoFab {
     position: fixed;
-    right: calc(16px + env(safe-area-inset-right));
+    right: calc(var(--mobile-viewport-right, 0px) + 16px + env(safe-area-inset-right));
     bottom: calc(44px + env(safe-area-inset-bottom));
     z-index: 13;
     display: inline-flex;
@@ -1463,12 +1505,14 @@ body.diag-mode #cesiumContainer canvas {
     --sheet-translate-y: calc(100% - 50vh);
     position: fixed;
     top: auto;
-    right: 0;
+    right: auto;
     bottom: var(--compare-bar-offset, 0px);
-    left: 0;
+    left: var(--mobile-viewport-left, 0px);
     display: flex;
     flex-direction: column;
-    width: auto;
+    width: var(--mobile-viewport-width, 100vw);
+    min-width: 0;
+    max-width: var(--mobile-viewport-width, 100vw);
     height: 88vh;
     height: 88dvh;
     max-height: none;
@@ -1523,13 +1567,144 @@ body.diag-mode #cesiumContainer canvas {
 
   #diagnosisPanel .info-header {
     flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #diagnosisPanel .info-header h2,
+  #diagBody,
+  .diag-sec,
+  .diag-content,
+  .diag-row,
+  .diag-key,
+  .diag-val {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #diagnosisPanel .info-header h2,
+  #diagnosisPanel label,
+  .diag-title,
+  .diag-sub,
+  .diag-note,
+  .diag-key,
+  .diag-val,
+  .sun-floor-row label {
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   #diagBody {
     flex: 1 1 auto;
+    width: 100%;
     min-height: 0;
     overflow-y: hidden;
     overscroll-behavior: contain;
+  }
+
+  .diag-table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #compareBar {
+    position: fixed;
+    right: auto;
+    left: var(--mobile-viewport-left, 0px);
+    justify-content: center;
+    width: var(--mobile-viewport-width, 100vw);
+    min-width: 0;
+    max-width: var(--mobile-viewport-width, 100vw);
+    transform: none;
+  }
+
+  #compareBarText {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  #compareBar button,
+  .cmp-actions button {
+    min-height: 44px;
+  }
+
+  #compareModal {
+    position: fixed;
+    right: auto;
+    left: var(--mobile-viewport-left, 0px);
+    width: var(--mobile-viewport-width, 100vw);
+    min-width: 0;
+    max-width: var(--mobile-viewport-width, 100vw);
+  }
+
+  .cmp-panel,
+  #compareModalBody,
+  .cmp-scroll {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #compareModalBody {
+    overflow-x: hidden;
+  }
+
+  .cmp-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cmp-table {
+    max-width: 100%;
+  }
+
+  #toast,
+  #swUpdateToast {
+    position: fixed;
+    right: auto;
+    left: calc(var(--mobile-viewport-left, 0px) + 10px);
+    width: calc(var(--mobile-viewport-width, 100vw) - 20px);
+    max-width: calc(var(--mobile-viewport-width, 100vw) - 20px);
+    overflow-wrap: anywhere;
+    transform: none;
+  }
+
+  #zoningLegend,
+  #legend {
+    box-sizing: border-box;
+    max-width: calc(var(--mobile-viewport-width, 100vw) - 20px);
+    overflow-wrap: anywhere;
+  }
+
+  #zoningLegend {
+    right: calc(var(--mobile-viewport-right, 0px) + 10px);
+  }
+
+  #legend,
+  #zoningLegend:not(.hidden) ~ #legend {
+    left: calc(var(--mobile-viewport-left, 0px) + 10px);
+  }
+
+  .legend-row,
+  .shade-legend-item,
+  .shelter-key {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  #attribution {
+    right: auto;
+    left: var(--mobile-viewport-left, 0px);
+    width: var(--mobile-viewport-width, 100vw);
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
   }
 
   #diagnosisPanel[data-sheet-state="full"] #diagBody {

@@ -9,6 +9,9 @@ const VELOCITY_THRESHOLD = 0.45;
 const CLOSE_DRAG_DISTANCE = 24;
 const MAX_CLOSE_OVERSHOOT = 96;
 const COMPARE_BAR_OFFSET_PROPERTY = '--compare-bar-offset';
+const VIEWPORT_WIDTH_PROPERTY = '--mobile-viewport-width';
+const VIEWPORT_LEFT_PROPERTY = '--mobile-viewport-left';
+const VIEWPORT_RIGHT_PROPERTY = '--mobile-viewport-right';
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -36,6 +39,22 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
 
   function viewportHeight() {
     return globalThis.visualViewport?.height || globalThis.innerHeight;
+  }
+
+  function viewportWidth() {
+    return globalThis.visualViewport?.width || globalThis.innerWidth;
+  }
+
+  /** ピンチズーム中も固定UIをvisual viewportの左右端へ追従させる。 */
+  function syncViewportMetrics() {
+    const viewport = globalThis.visualViewport;
+    const width = viewportWidth();
+    const left = viewport?.offsetLeft || 0;
+    const right = Math.max(0, globalThis.innerWidth - left - width);
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty(VIEWPORT_WIDTH_PROPERTY, `${width}px`);
+    rootStyle.setProperty(VIEWPORT_LEFT_PROPERTY, `${left}px`);
+    rootStyle.setProperty(VIEWPORT_RIGHT_PROPERTY, `${right}px`);
   }
 
   function measureCompareBarOffset() {
@@ -201,14 +220,17 @@ export function initBottomSheet({ diagnosis, requestRender = () => {} }) {
     }
   }
   const syncSize = () => {
+    syncViewportMetrics();
     scheduleCompareBarMeasurement();
     if (mobileQuery.matches && document.body.classList.contains('sheet-open')) setState(state);
   };
   mobileQuery.addEventListener?.('change', syncSize);
   globalThis.visualViewport?.addEventListener('resize', syncSize);
+  globalThis.visualViewport?.addEventListener('scroll', syncViewportMetrics);
   globalThis.addEventListener('resize', syncSize);
 
   panel.dataset.sheetState = state;
+  syncViewportMetrics();
   measureCompareBarOffset();
   return {
     setState,
