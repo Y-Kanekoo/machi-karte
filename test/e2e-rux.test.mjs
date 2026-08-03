@@ -621,19 +621,30 @@ try {
     JSON.stringify(mapSync),
   );
 
-  // RC1: シート連動待機中にユーザーがカメラを動かした場合は、moveEnd後も再発火しない。
-  const adjustmentCountBeforeUserMove = mapSync.adjustmentCount;
+  // RC1: ユーザーのカメラ操作の後に、連動が遅れて再適用されないこと（視点強奪の禁止）。
+  // setState('full') はシート状態変化＝正当な連動トリガーなので、その連動の完了
+  // （pending解消）を待ってからユーザー操作を行い、以後カウントが増えないことを検証する。
   await page.evaluate(() => window.__nakano.bottomSheet.setState('full'));
+  await page.waitForFunction(
+    () => !window.__nakano.bottomSheet.getMapSyncTestState().pending,
+    null,
+    { timeout: 30000, polling: 50 },
+  );
   await page.mouse.move(200, 50);
   await page.mouse.wheel(0, 180);
   await page.waitForTimeout(700);
   const afterUserMove = await page.evaluate(
     () => window.__nakano.bottomSheet.getMapSyncTestState(),
   );
+  await page.waitForTimeout(1000);
+  const afterQuietPeriod = await page.evaluate(
+    () => window.__nakano.bottomSheet.getMapSyncTestState(),
+  );
   check(
     'ユーザーのカメラ操作で待機中のシート地図連動を破棄する',
-    !afterUserMove.pending && afterUserMove.adjustmentCount === adjustmentCountBeforeUserMove,
-    JSON.stringify(afterUserMove),
+    !afterQuietPeriod.pending
+      && afterQuietPeriod.adjustmentCount === afterUserMove.adjustmentCount,
+    JSON.stringify({ afterUserMove, afterQuietPeriod }),
   );
 
   // RC1: 比較URLのfly:false診断で、先に復元したカメラをシート連動が上書きしない。
