@@ -293,26 +293,60 @@ try {
   await mark(page, 'address-search');
   await page.evaluate(() => {
     const button = document.getElementById('searchBtn');
+    window.__ruxSearchButtonInitial = {
+      html: button.innerHTML,
+      ariaLabel: button.getAttribute('aria-label'),
+    };
     button.addEventListener('click', () => {
       window.__ruxSearchFeedback = {
         disabled: button.disabled,
         busy: button.getAttribute('aria-busy'),
-        spinner: !!button.querySelector('.spinner'),
+        text: button.textContent,
+        ariaLabel: button.getAttribute('aria-label'),
       };
     }, { once: true });
   });
   await page.click('#searchBtn');
   await page.waitForSelector('#diagnosisPanel:not(.hidden)', { timeout: 60000 });
   const searchFeedback = await page.evaluate(() => window.__ruxSearchFeedback);
-  check(
-    '検索開始直後はボタンをdisabledにしてスピナーを表示する',
-    searchFeedback.disabled && searchFeedback.busy === 'true' && searchFeedback.spinner,
-    JSON.stringify(searchFeedback),
-  );
   await page.waitForFunction(
     () => window.__nakano.diagnosis.getLastResult()?.title?.includes('中野'),
     null,
     { timeout: 60000, polling: 100 },
+  );
+  await page.waitForFunction(
+    () => {
+      const button = document.getElementById('searchBtn');
+      const initial = window.__ruxSearchButtonInitial;
+      return !button.disabled
+        && button.getAttribute('aria-busy') === null
+        && button.innerHTML === initial.html
+        && button.getAttribute('aria-label') === initial.ariaLabel;
+    },
+    null,
+    { timeout: 60000, polling: 100 },
+  );
+  const searchRestored = await page.evaluate(() => {
+    const button = document.getElementById('searchBtn');
+    return {
+      disabled: button.disabled,
+      busy: button.getAttribute('aria-busy'),
+      html: button.innerHTML,
+      ariaLabel: button.getAttribute('aria-label'),
+    };
+  });
+  const searchInitial = await page.evaluate(() => window.__ruxSearchButtonInitial);
+  check(
+    '検索中は中断ボタンとaria-busyを表示する',
+    !searchFeedback.disabled
+      && searchFeedback.busy === 'true'
+      && searchFeedback.text === '中断'
+      && searchFeedback.ariaLabel === '住所検索を中断'
+      && !searchRestored.disabled
+      && searchRestored.busy === null
+      && searchRestored.html === searchInitial.html
+      && searchRestored.ariaLabel === searchInitial.ariaLabel,
+    JSON.stringify({ searchFeedback, searchRestored, searchInitial }),
   );
   await record(page, 'address-search', 'desktop', 'user-input');
 
