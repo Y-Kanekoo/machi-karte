@@ -14,6 +14,9 @@ const STRONG_VELOCITY_THRESHOLD = 0.9;
 const CLOSE_DRAG_DISTANCE = 24;
 const MAX_CLOSE_OVERSHOOT = 96;
 const MAP_POINT_CLEARANCE = 8;
+// 補正要否のサブピクセル許容。厳密な <=0 判定だと浮動小数点誤差（deltaY≒2.7e-6等）で
+// マイクロ補正が無限に繰り返され pending が固着する（RC1.5実測）。
+const MAP_SYNC_EPSILON_PX = 1;
 const INTERNAL_CAMERA_MOVE_TIMEOUT_MS = 2000;
 const COMPARE_BAR_OFFSET_PROPERTY = '--compare-bar-offset';
 const VIEWPORT_WIDTH_PROPERTY = '--mobile-viewport-width';
@@ -260,7 +263,7 @@ export function initBottomSheet({ diagnosis, viewer = null, requestRender = () =
     }
     const targetY = measured.sheetTop - MAP_POINT_CLEARANCE;
     const deltaY = measured.pointY - targetY;
-    if (deltaY <= 0) {
+    if (deltaY <= MAP_SYNC_EPSILON_PX) {
       discardMapSync();
       if (mapAdjustmentCount === 0) {
         lastMapAdjustment = { deltaY: 0, durationMs: 0 };
