@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 3
       - name: Verify application and lockfile match PR #12 head
         run: |
           git cat-file -e 379bca1479e026e7b769b297da24a1ceaf025150^{commit}
