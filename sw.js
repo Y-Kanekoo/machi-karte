@@ -24,6 +24,7 @@ const PRECACHE_URLS = [
   './js/panel.js',
   './js/perf.js',
   './js/pwa.js',
+  './js/reinfolib.js',
   './js/shademap-ui.js',
   './js/shademap.js',
   './js/share.js',
