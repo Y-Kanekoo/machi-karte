@@ -449,14 +449,14 @@ try {
       title: 'スケルトン確認地点',
       fly: false,
     });
-    const ids = ['secFlood', 'secLandslide', 'secShelter', 'secZoning', 'secSun'];
+    const ids = ['secFlood', 'secLandslide', 'secShelter', 'secZoning', 'secPrice', 'secSun'];
     return Object.fromEntries(ids.map((id) => [
       id,
       !!document.querySelector(`#${id} .diag-skeleton`),
     ]));
   });
   check(
-    '診断開始直後は洪水・土砂・避難所・都市計画・日照にスケルトンがある',
+    '診断開始直後は洪水・土砂・避難所・都市計画・相場・日照にスケルトンがある',
     Object.values(skeletonStart).every(Boolean),
     JSON.stringify(skeletonStart),
   );
@@ -483,8 +483,8 @@ try {
     JSON.stringify(finalSkeletonState),
   );
   check(
-    '確定した5つの結果セクションに1回ハイライトを付ける',
-    finalSkeletonState.highlighted === 5,
+    '確定した6つの結果セクションに1回ハイライトを付ける',
+    finalSkeletonState.highlighted === 6,
     JSON.stringify(finalSkeletonState),
   );
 

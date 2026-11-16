@@ -16,6 +16,12 @@ import {
   resolveBaseHeight,
 } from './floodviz.js';
 import { queryZoning } from './zoning.js';
+import {
+  loadPriceSnapshot,
+  formatManYenValue,
+  formatPricePerUnit,
+  formatTradePrice,
+} from './reinfolib.js';
 import { resolveServiceRect } from './area.js';
 import { isValidCityCode, serializeState } from './share.js';
 import { isShadeMapRunning, onShadeMapRunningChange } from './shademap-ui.js';
@@ -40,6 +46,7 @@ import {
   GEOLOCATION_TIMEOUT,
   FLOOD_VIZ_RADIUS,
   FLOOD_VIZ_MAX_DEPTH,
+  REINFOLIB_ATTRIBUTION,
 } from './config.js';
 
 /**
@@ -242,6 +249,10 @@ export function initDiagnosis(ctx) {
       <section class="diag-sec" data-sec="zoning">
         <h3>🏘️ 都市計画</h3>
         <div class="diag-content" id="secZoning">${skeletonLoading()}</div>
+      </section>
+      <section class="diag-sec" data-sec="price">
+        <h3>💴 相場（取引価格）</h3>
+        <div class="diag-content" id="secPrice">${skeletonLoading()}</div>
       </section>
       <section class="diag-sec" data-sec="sun">
         <h3>☀️ 日照（簡易シミュレーション）</h3>
@@ -549,6 +560,63 @@ export function initDiagnosis(ctx) {
       rows.push(`<div class="diag-note">告示上の区域名: ${escapeHtml(z.use.location)}</div>`);
     }
     return rows.join('');
+  }
+
+
+  /**
+   * 相場セクション。同梱スナップショット（自治体単位の取引価格集計）を表示する。
+   * 地点そのものの価格ではないため、対象範囲（自治体全域）と参考値である旨を必ず併記する。
+   * スナップショットが無い自治体では、未収録であることだけを静かに出す。
+   * @param {object|null} snapshot loadPriceSnapshot の結果
+   */
+  function renderPrice(snapshot) {
+    if (!snapshot) {
+      return '<div class="diag-note">この自治体の相場データはまだ収録されていません。</div>'
+        + `<div class="diag-note">${escapeHtml(
+          '相場は国土交通省「不動産情報ライブラリ」の取引価格情報を自治体単位で集計し、'
+          + '収録できた自治体から順次表示します。')}</div>`;
+    }
+    const { metadata = {}, summary = {} } = snapshot;
+    const condo = summary.condominium || {};
+    const land = summary.land || {};
+    const all = summary.all || {};
+    // 主役は中古マンション等の㎡単価。無ければ宅地、それも無ければ全取引に落とす。
+    const hero = [
+      { label: '中古マンション等 ㎡単価（中央値）', s: condo },
+      { label: '宅地（土地） ㎡単価（中央値）', s: land },
+      { label: '全取引 ㎡単価（中央値）', s: all },
+    ].find((x) => x.s.medianPricePerUnit != null);
+    const parts = [];
+    if (hero) {
+      parts.push(`<div class="price-hero">
+        <div class="price-hero-label">${escapeHtml(hero.label)}</div>
+        <div class="price-hero-value">${escapeHtml(formatManYenValue(hero.s.medianPricePerUnit))}<span class="price-unit">万円/㎡</span></div>
+      </div>`);
+    }
+    const rowFor = (label, s2) => {
+      if (hero && s2 === hero.s) return;
+      const v = formatPricePerUnit(s2?.medianPricePerUnit);
+      if (v) parts.push(kvRow(label, `${v}（${s2.count}件）`));
+    };
+    rowFor('中古マンション等 ㎡単価', condo);
+    rowFor('宅地（土地） ㎡単価', land);
+    if (condo.medianTradePrice != null) {
+      parts.push(kvRow('中古マンション等 取引総額（中央値）', formatTradePrice(condo.medianTradePrice)));
+    }
+    const period = all.period
+      || (metadata.year && metadata.quarter ? `${metadata.year}年第${metadata.quarter}四半期` : null);
+    if (period) parts.push(kvRow('対象期間', period));
+    if (all.count) parts.push(kvRow('集計件数', `${all.count}件`));
+    if (!parts.length) {
+      return '<div class="diag-note">この自治体の取引事例が少なく、相場を表示できません。</div>';
+    }
+    parts.push(`<div class="diag-note">${escapeHtml(
+      `${serviceAreaName}全域の取引事例を集計した参考値です。診断地点周辺の相場ではなく、`
+      + '個別の物件価格を示すものではありません。')}</div>`);
+    const source = metadata.source || REINFOLIB_ATTRIBUTION;
+    const fetched = metadata.fetchedAt ? `（${metadata.fetchedAt} 取得）` : '';
+    parts.push(`<div class="diag-note">${escapeHtml(source)}${escapeHtml(fetched)}</div>`);
+    return parts.join('');
   }
 
   // ---- R3 F3-1: 視点の高さセレクタ ------------------------------------------
@@ -873,7 +941,7 @@ export function initDiagnosis(ctx) {
     const result = {
       lon, lat, title, fly,
       flood: null, floodKeizoku: null, floodL1: null,
-      landslide: null, shelters: null, zoning: null, sunlight: null,
+      landslide: null, shelters: null, zoning: null, sunlight: null, price: null,
       buildingHeight: measuredHeightOf(picked),
       inArea: inServiceArea(lon, lat),
     };
@@ -948,6 +1016,18 @@ export function initDiagnosis(ctx) {
         if (alive()) fillResult('secZoning', failMsg('都市計画情報を取得できませんでした'));
       });
 
+    // 相場（同梱スナップショットを読むだけなので軽い。無い自治体では未収録表示）
+    const pPrice = loadPriceSnapshot(currentCity)
+      .then((snap) => {
+        if (!alive()) return;
+        result.price = snap;
+        fillResult('secPrice', renderPrice(snap));
+      })
+      .catch((e) => {
+        console.warn('price snapshot failed', e);
+        if (alive()) fillResult('secPrice', renderPrice(null));
+      });
+
     // 日照（重いので最後、カメラ移動＋タイル読み込み待ちを挟む）
     if (skipSunlight) {
       fillResult('secSun', '<div class="diag-note">日照は未計算です（比較URLからの復元では省略しています）。</div>');
@@ -974,7 +1054,7 @@ export function initDiagnosis(ctx) {
       }
     }
 
-    await Promise.all([pFlood, pLand, pZone, pShelter]);
+    await Promise.all([pFlood, pLand, pZone, pShelter, pPrice]);
     if (alive()) {
       for (const fn of resultHandlers) {
         try { fn(result); } catch (e) { console.warn('onResult handler failed', e); }

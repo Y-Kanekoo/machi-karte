@@ -20,6 +20,9 @@ import {
   quarterCandidates,
   median,
   loadPriceSnapshot,
+  formatManYenValue,
+  formatPricePerUnit,
+  formatTradePrice,
 } from '../js/reinfolib.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -178,6 +181,22 @@ console.log('--- スナップショット読み込み ---');
     fetchImpl: mockFetch(() => ({ status: 404, json: {} })),
   });
   equal('無ければ null', missing, null);
+}
+
+console.log('--- 価格の表示フォーマット ---');
+{
+  equal('万円値: 小数1桁', formatManYenValue(623000), '62.3');
+  equal('万円値: 整数は .0 を落とす', formatManYenValue(500000), '50');
+  equal('万円値: 四捨五入', formatManYenValue(625000), '62.5');
+  equal('万円値: null は null', formatManYenValue(null), null);
+  equal('万円値: NaN は null', formatManYenValue(NaN), null);
+  equal('㎡単価表記', formatPricePerUnit(623000), '62.3万円/㎡');
+  equal('㎡単価: null は null', formatPricePerUnit(null), null);
+  equal('総額: 万円表記', formatTradePrice(39800000), '3,980万円');
+  equal('総額: 億円表記', formatTradePrice(123000000), '1億2,300万円');
+  equal('総額: ちょうど億円', formatTradePrice(200000000), '2億円');
+  equal('総額: 万円への繰り上がり', formatTradePrice(199996000), '2億円');
+  equal('総額: null は null', formatTradePrice(null), null);
 }
 
 report('reinfolib.test');

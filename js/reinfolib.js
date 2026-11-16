@@ -211,6 +211,39 @@ export function summarizeTransactions(rows, filter = {}) {
 }
 
 /**
+ * 円額を万円単位の数値文字列にする（例: 623000 → '62.3'、500000 → '50'）。
+ * 小数1桁までで表し、末尾の '.0' は落とす。null や不正値は null。
+ */
+export function formatManYenValue(yen) {
+  if (yen == null || !Number.isFinite(yen)) return null;
+  const man = yen / 10000;
+  const rounded = Math.round(man * 10) / 10;
+  return Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(1);
+}
+
+/** ㎡単価（円/㎡）を「62.3万円/㎡」表記にする。null は null。 */
+export function formatPricePerUnit(yenPerSqm) {
+  const v = formatManYenValue(yenPerSqm);
+  return v == null ? null : `${v}万円/㎡`;
+}
+
+/**
+ * 取引総額（円）を「3,980万円」「1億2,300万円」表記にする。null は null。
+ */
+export function formatTradePrice(yen) {
+  if (yen == null || !Number.isFinite(yen)) return null;
+  if (yen >= 100000000) {
+    let oku = Math.floor(yen / 100000000);
+    let man = Math.round((yen % 100000000) / 10000);
+    if (man === 10000) { oku += 1; man = 0; }
+    return man > 0 ? `${oku}億${man.toLocaleString('ja-JP')}万円` : `${oku}億円`;
+  }
+  return `${Math.round(yen / 10000).toLocaleString('ja-JP')}万円`;
+}
+
+/**
  * 同梱スナップショット（data/price-<city>.json）を読む。
  * 無ければ null（「価格データ未設定」として扱う）。ブラウザ/Node 両対応。
  */
