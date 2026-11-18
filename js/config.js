@@ -101,6 +101,18 @@ export const HAZARD_TILES = {
   },
 };
 
+/** 不動産情報ライブラリAPI（国土交通省）。取引価格・地価公示等の公式データ。
+ *  利用にはAPI利用申請（無料・審査あり）で発行されるAPIキーが必要。
+ *  公式マニュアルは「CORS回避のためブラウザから直接リクエストしない」よう求めているため、
+ *  本アプリでは Node ツール（tools/fetch-price-snapshot.mjs）で事前取得した
+ *  スナップショットJSONを同梱配信する方式を採る（js/reinfolib.js 参照）。 */
+export const REINFOLIB_API_BASE = 'https://www.reinfolib.mlit.go.jp/ex-api/external';
+export const REINFOLIB_MANUAL_URL = 'https://www.reinfolib.mlit.go.jp/help/apiManual/';
+export const REINFOLIB_ATTRIBUTION = '出典：国土交通省 不動産情報ライブラリ';
+
+/** 価格スナップショット（tools/fetch-price-snapshot.mjs が生成）のURLパターン */
+export const PRICE_SNAPSHOT_URL = (city) => new URL(`../data/price-${city}.json`, import.meta.url).href;
+
 /** PLATEAU 都市計画決定情報 MVT（中野区 2025年度） */
 export const ZONING_TILES = {
   use: {

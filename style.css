@@ -639,6 +639,30 @@ body.diag-mode #cesiumContainer canvas {
   background: #7fc4ff;
 }
 
+/* 相場セクションの主役数値（㎡単価の中央値）。単位だけ小さく添える */
+.price-hero {
+  margin: 2px 0 7px;
+}
+
+.price-hero-label {
+  font-size: 11px;
+  color: #a9c0d6;
+}
+
+.price-hero-value {
+  font-size: 21px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.price-hero-value .price-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a9c0d6;
+  margin-left: 3px;
+}
+
 .diag-row {
   display: flex;
   justify-content: space-between;
@@ -1038,6 +1062,11 @@ body.diag-mode #cesiumContainer canvas {
 
 .diag-sec h3.collapsible[aria-expanded="false"] + .diag-content {
   display: none;
+}
+
+.diag-sec h3.collapsible:focus-visible {
+  outline: 2px solid #7fc4ff;
+  outline-offset: 1px;
 }
 
 /* 現在地ボタン */

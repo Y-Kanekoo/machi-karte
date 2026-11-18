@@ -1,4 +1,4 @@
-const VERSION = 'v11';
+const VERSION = 'v12';
 
 const CACHE_NAMES = {
   shell: `shell-${VERSION}`,
@@ -24,6 +24,7 @@ const PRECACHE_URLS = [
   './js/panel.js',
   './js/perf.js',
   './js/pwa.js',
+  './js/reinfolib.js',
   './js/shademap-ui.js',
   './js/shademap.js',
   './js/share.js',
