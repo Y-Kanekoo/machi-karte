@@ -79,8 +79,8 @@ export function normalizeTransaction(raw) {
     municipalityCode: raw.MunicipalityCode ?? null,
     districtName: raw.DistrictName ?? null,
     tradePrice: toNumberOrNull(raw.TradePrice), // 取引総額（円）
-    pricePerUnit: toNumberOrNull(raw.PricePerUnit), // 坪単価ではなく m² 単価（円/m²）
-    unitPrice: toNumberOrNull(raw.UnitPrice), // 坪単価（円/坪）
+    pricePerUnit: toNumberOrNull(raw.UnitPrice), // 平方メートル単価（円/㎡）
+    unitPrice: toNumberOrNull(raw.PricePerUnit), // 坪単価（円/坪）
     areaSqm: toNumberOrNull(raw.Area), // 面積（m²）
     floorPlan: raw.FloorPlan ?? null,
     buildingYear: raw.BuildingYear ?? null,
@@ -207,6 +207,23 @@ export function summarizeTransactions(rows, filter = {}) {
     medianTradePrice: median(totals),
     period: target.find((r) => r.period)?.period ?? null,
     districtNames: [...new Set(target.map((r) => r.districtName).filter(Boolean))],
+  };
+}
+
+/** 土地のみの取引区分かどうか（API表記の半角括弧と資料表記の全角括弧の両方に対応）。 */
+export function isLandOnly(row) {
+  return row?.type === '宅地(土地)' || row?.type === '宅地（土地）';
+}
+
+/**
+ * スナップショット用の価格サマリ（全件／マンション／土地のみ）を構築する純粋関数。
+ * 生成器（tools/fetch-price-snapshot.mjs）とテストの両方から使う。
+ */
+export function buildPriceSummary(rows) {
+  return {
+    all: summarizeTransactions(rows),
+    condominium: summarizeTransactions(rows, { typeIncludes: 'マンション' }),
+    land: summarizeTransactions(rows.filter(isLandOnly)),
   };
 }
 

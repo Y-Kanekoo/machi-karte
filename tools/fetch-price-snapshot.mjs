@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   fetchLatestTransactions,
-  summarizeTransactions,
+  buildPriceSummary,
   resolveReinfolibApiKey,
 } from '../js/reinfolib.js';
 import { REINFOLIB_ATTRIBUTION } from '../js/config.js';
@@ -66,11 +66,7 @@ const snapshot = {
     fetchedAt: new Date().toISOString().slice(0, 10),
     count: result.rows.length,
   },
-  summary: {
-    all: summarizeTransactions(result.rows),
-    condominium: summarizeTransactions(result.rows, { typeIncludes: 'マンション' }),
-    land: summarizeTransactions(result.rows, { typeIncludes: '宅地' }),
-  },
+  summary: buildPriceSummary(result.rows),
   rows: result.rows,
 };
 

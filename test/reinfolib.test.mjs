@@ -17,6 +17,7 @@ import {
   fetchLatestTransactions,
   normalizeTransactions,
   summarizeTransactions,
+  buildPriceSummary,
   quarterCandidates,
   median,
   loadPriceSnapshot,
@@ -117,7 +118,8 @@ console.log('--- 正規化 ---');
   const rows = normalizeTransactions(fixture);
   equal('4件', rows.length, 4);
   equal('TradePrice は数値化', rows[0].tradePrice, 45000000);
-  equal('PricePerUnit は数値化', rows[0].pricePerUnit, 750000);
+  equal('XIT001 の UnitPrice を円/㎡として読む', rows[0].pricePerUnit, 750000);
+  equal('XIT001 の PricePerUnit を坪単価として読む', rows[0].unitPrice, 2480000);
   equal('Area は数値化', rows[0].areaSqm, 60);
   equal('地区名', rows[0].districtName, '中央');
   equal('空文字の BuildingYear はそのまま', rows[3].buildingYear, '');
@@ -141,6 +143,29 @@ console.log('--- 集計 ---');
   equal('空配列の中央値は null', summarizeTransactions([]).medianPricePerUnit, null);
   equal('median の偶数個', median([4, 1, 3, 2]), 2.5);
   near('median の奇数個', median([10, 30, 20]), 20, 0);
+}
+
+console.log('--- 回帰: ㎡単価の欠損 ---');
+{
+  const rawMissing = { ...fixture.data[0], UnitPrice: '' };
+  const rowsMissing = normalizeTransactions({ data: [rawMissing] });
+  equal('㎡単価欠損時は pricePerUnit が null', rowsMissing[0].pricePerUnit, null);
+  equal('坪単価は残る（㎡単価へ流入しない）', rowsMissing[0].unitPrice, 2480000);
+  equal('㎡単価欠損行だけの集計では medianPricePerUnit が null', summarizeTransactions(rowsMissing).medianPricePerUnit, null);
+}
+
+console.log('--- 回帰: 土地のみ集計（buildPriceSummary） ---');
+{
+  const rawLand = [
+    { Type: '宅地(土地)', TradePrice: '58000000', PricePerUnit: '1720000', UnitPrice: '520000', Area: '111', Period: '2025年第3四半期', DistrictName: '野方' },
+    { Type: '宅地（土地）', TradePrice: '70000000', PricePerUnit: '2380000', UnitPrice: '720000', Area: '97', Period: '2025年第3四半期', DistrictName: '中央' },
+    { Type: '宅地(土地と建物)', TradePrice: '90000000', PricePerUnit: '4960000', UnitPrice: '1500000', Area: '60', Period: '2025年第3四半期', DistrictName: '本町' },
+  ];
+  const rowsLand = normalizeTransactions({ data: rawLand });
+  const summary = buildPriceSummary(rowsLand);
+  equal('土地集計テスト: all.count', summary.all.count, 3);
+  equal('土地集計テスト: land.count は土地のみ2件', summary.land.count, 2);
+  equal('土地集計テスト: land.medianPricePerUnit', summary.land.medianPricePerUnit, 620000);
 }
 
 console.log('--- 四半期候補と最新探索 ---');
